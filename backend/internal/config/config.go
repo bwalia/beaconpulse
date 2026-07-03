@@ -1,0 +1,292 @@
+// Package config loads and validates Beacon runtime configuration from the
+// environment. Configuration is read once at startup into an immutable struct
+// that is injected into the rest of the application; nothing reads os.Getenv
+// after Load returns. This keeps configuration explicit, testable, and free of
+// hidden global state.
+package config
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// Environment enumerates deployment environments.
+type Environment string
+
+const (
+	EnvDevelopment Environment = "development"
+	EnvStaging     Environment = "staging"
+	EnvProduction  Environment = "production"
+)
+
+// Config is the fully-resolved application configuration.
+type Config struct {
+	Env       Environment
+	HTTP      HTTP
+	Log       Log
+	DB        DB
+	Redis     Redis
+	Auth      Auth
+	Crypto    Crypto
+	CtrlPlane ControlPlane
+	Worker    Worker
+	Notify    Notify
+}
+
+// Notify holds notification/alerting configuration.
+type Notify struct {
+	// WebhookToken is the shared secret Alertmanager presents (as a Bearer
+	// token) when POSTing alerts to Beacon's webhook. Empty disables the check
+	// (development only).
+	WebhookToken string
+	// DashboardURL is the base URL used to build "open dashboard" links in
+	// notification messages.
+	DashboardURL string
+}
+
+// HTTP holds the API server configuration.
+type HTTP struct {
+	Addr            string
+	ReadTimeout     time.Duration
+	WriteTimeout    time.Duration
+	ShutdownTimeout time.Duration
+	CORSOrigins     []string
+}
+
+// Log holds structured-logging configuration.
+type Log struct {
+	Level  string // debug|info|warn|error
+	Format string // json|text
+}
+
+// DB holds the Postgres connection pool configuration.
+type DB struct {
+	DSN             string
+	MaxConns        int32
+	MinConns        int32
+	MaxConnLifetime time.Duration
+}
+
+// Redis holds the cache/queue connection configuration.
+type Redis struct {
+	Addr     string
+	Password string
+	DB       int
+}
+
+// Auth holds JWT configuration for access and refresh tokens.
+type Auth struct {
+	AccessSecret  []byte
+	RefreshSecret []byte
+	AccessTTL     time.Duration
+	RefreshTTL    time.Duration
+}
+
+// Crypto holds symmetric-encryption configuration used to protect secrets at
+// rest (e.g. notification credentials).
+type Crypto struct {
+	EncryptionKey []byte // exactly 32 bytes (AES-256)
+}
+
+// ControlPlane holds configuration for managing Prometheus and Blackbox. Beacon
+// regenerates these files from the database and hot-reloads the services.
+type ControlPlane struct {
+	// PromScrapeFile is written with generated scrape_configs (referenced by the
+	// main prometheus.yml via scrape_config_files).
+	PromScrapeFile string
+	// PromRulesFile is written with generated alerting rules (referenced via
+	// rule_files).
+	PromRulesFile string
+	// PromReloadURL is Prometheus's POST /-/reload endpoint.
+	PromReloadURL string
+	// PromQueryURL is Prometheus's base URL for the query API (/api/v1/query),
+	// used by the worker to read probe results back into monitor status.
+	PromQueryURL string
+	// BlackboxConfigFile is the full Blackbox config Beacon owns and rewrites.
+	BlackboxConfigFile string
+	// BlackboxReloadURL is Blackbox's POST /-/reload endpoint.
+	BlackboxReloadURL string
+	// BlackboxAddr is the host:port Prometheus uses to reach Blackbox's /probe.
+	BlackboxAddr string
+	// DNSResolver is the default resolver DNS monitors query (host:port).
+	DNSResolver string
+}
+
+// Worker holds background-worker tuning.
+type Worker struct {
+	Concurrency int
+	MaxRetries  int
+}
+
+// Load reads configuration from the environment, applies defaults, and
+// validates the result. It returns an error describing every problem found so
+// operators can fix misconfiguration in one pass rather than one variable at a
+// time.
+func Load() (Config, error) {
+	var errs []string
+	add := func(format string, a ...any) { errs = append(errs, fmt.Sprintf(format, a...)) }
+
+	cfg := Config{
+		Env: Environment(getStr("BEACON_ENV", "development")),
+		HTTP: HTTP{
+			Addr:            getStr("BEACON_HTTP_ADDR", ":8080"),
+			ReadTimeout:     getDur("BEACON_HTTP_READ_TIMEOUT", 15*time.Second, add),
+			WriteTimeout:    getDur("BEACON_HTTP_WRITE_TIMEOUT", 30*time.Second, add),
+			ShutdownTimeout: getDur("BEACON_HTTP_SHUTDOWN_TIMEOUT", 20*time.Second, add),
+			CORSOrigins:     getCSV("BEACON_CORS_ORIGINS", []string{"http://localhost:3000"}),
+		},
+		Log: Log{
+			Level:  getStr("BEACON_LOG_LEVEL", "info"),
+			Format: getStr("BEACON_LOG_FORMAT", "json"),
+		},
+		DB: DB{
+			DSN:             getStr("BEACON_DB_DSN", ""),
+			MaxConns:        int32(getInt("BEACON_DB_MAX_CONNS", 20, add)),
+			MinConns:        int32(getInt("BEACON_DB_MIN_CONNS", 2, add)),
+			MaxConnLifetime: getDur("BEACON_DB_MAX_CONN_LIFETIME", time.Hour, add),
+		},
+		Redis: Redis{
+			Addr:     getStr("BEACON_REDIS_ADDR", "localhost:6379"),
+			Password: getStr("BEACON_REDIS_PASSWORD", ""),
+			DB:       getInt("BEACON_REDIS_DB", 0, add),
+		},
+		Auth: Auth{
+			AccessSecret:  []byte(getStr("BEACON_JWT_ACCESS_SECRET", "")),
+			RefreshSecret: []byte(getStr("BEACON_JWT_REFRESH_SECRET", "")),
+			AccessTTL:     getDur("BEACON_JWT_ACCESS_TTL", 15*time.Minute, add),
+			RefreshTTL:    getDur("BEACON_JWT_REFRESH_TTL", 720*time.Hour, add),
+		},
+		Crypto: Crypto{
+			EncryptionKey: decodeKey(getStr("BEACON_ENCRYPTION_KEY", ""), add),
+		},
+		CtrlPlane: ControlPlane{
+			PromScrapeFile:     getStr("BEACON_PROM_SCRAPE_FILE", "./deploy/prometheus/generated/scrape_monitors.yml"),
+			PromRulesFile:      getStr("BEACON_PROM_RULES_FILE", "./deploy/prometheus/generated/rules_monitors.yml"),
+			PromReloadURL:      getStr("BEACON_PROM_RELOAD_URL", "http://localhost:9090/-/reload"),
+			PromQueryURL:       getStr("BEACON_PROM_QUERY_URL", "http://localhost:9090"),
+			BlackboxConfigFile: getStr("BEACON_BLACKBOX_CONFIG_FILE", "./deploy/blackbox/blackbox.yml"),
+			BlackboxReloadURL:  getStr("BEACON_BLACKBOX_RELOAD_URL", "http://localhost:9115/-/reload"),
+			BlackboxAddr:       getStr("BEACON_BLACKBOX_ADDR", "localhost:9115"),
+			DNSResolver:        getStr("BEACON_DNS_RESOLVER", "8.8.8.8:53"),
+		},
+		Worker: Worker{
+			Concurrency: getInt("BEACON_WORKER_CONCURRENCY", 8, add),
+			MaxRetries:  getInt("BEACON_WORKER_MAX_RETRIES", 5, add),
+		},
+		Notify: Notify{
+			WebhookToken: getStr("BEACON_WEBHOOK_TOKEN", ""),
+			DashboardURL: getStr("BEACON_DASHBOARD_URL", "http://localhost:3000"),
+		},
+	}
+
+	// ---- validation ----
+	switch cfg.Env {
+	case EnvDevelopment, EnvStaging, EnvProduction:
+	default:
+		add("BEACON_ENV %q is invalid (want development|staging|production)", cfg.Env)
+	}
+	if cfg.DB.DSN == "" {
+		add("BEACON_DB_DSN is required")
+	}
+	if len(cfg.Auth.AccessSecret) < 32 {
+		add("BEACON_JWT_ACCESS_SECRET must be at least 32 bytes")
+	}
+	if len(cfg.Auth.RefreshSecret) < 32 {
+		add("BEACON_JWT_REFRESH_SECRET must be at least 32 bytes")
+	}
+	if len(cfg.Crypto.EncryptionKey) != 32 {
+		add("BEACON_ENCRYPTION_KEY must decode to exactly 32 bytes (got %d)", len(cfg.Crypto.EncryptionKey))
+	}
+	if cfg.IsProduction() {
+		if strings.Contains(string(cfg.Auth.AccessSecret), "change-me") ||
+			strings.Contains(string(cfg.Auth.RefreshSecret), "change-me") {
+			add("refusing to start in production with default 'change-me' JWT secrets")
+		}
+		if cfg.Notify.WebhookToken == "" {
+			add("BEACON_WEBHOOK_TOKEN is required in production to authenticate the Alertmanager webhook")
+		}
+	}
+	if cfg.Worker.Concurrency < 1 {
+		add("BEACON_WORKER_CONCURRENCY must be >= 1")
+	}
+
+	if len(errs) > 0 {
+		return Config{}, fmt.Errorf("invalid configuration:\n  - %s", strings.Join(errs, "\n  - "))
+	}
+	return cfg, nil
+}
+
+// IsProduction reports whether the app is running in production.
+func (c Config) IsProduction() bool { return c.Env == EnvProduction }
+
+// ---- typed env helpers ----
+
+func getStr(key, def string) string {
+	if v, ok := os.LookupEnv(key); ok && v != "" {
+		return v
+	}
+	return def
+}
+
+func getInt(key string, def int, add func(string, ...any)) int {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		add("%s must be an integer, got %q", key, v)
+		return def
+	}
+	return n
+}
+
+func getDur(key string, def time.Duration, add func(string, ...any)) time.Duration {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return def
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		add("%s must be a duration (e.g. 15s, 1h), got %q", key, v)
+		return def
+	}
+	return d
+}
+
+func getCSV(key string, def []string) []string {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return def
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// decodeKey accepts a hex- or base64-encoded key and returns the raw bytes. An
+// empty value yields nil so validation can report the requirement.
+func decodeKey(v string, add func(string, ...any)) []byte {
+	if v == "" {
+		return nil
+	}
+	if b, err := hexDecode(v); err == nil {
+		return b
+	}
+	if b, err := base64Decode(v); err == nil {
+		return b
+	}
+	add("BEACON_ENCRYPTION_KEY must be hex or base64 encoded")
+	return nil
+}
+
+var errBadEncoding = errors.New("bad encoding")

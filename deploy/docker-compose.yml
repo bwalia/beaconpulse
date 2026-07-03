@@ -1,0 +1,224 @@
+# Beacon full stack for local development and self-hosting.
+#
+#   docker compose -f deploy/docker-compose.yml up -d --build
+#
+# Brings up Postgres, Redis, Prometheus, Blackbox, Alertmanager, the Beacon API,
+# the Beacon worker, and the dashboard. The API auto-applies migrations on
+# startup; the worker reconciles Prometheus/Blackbox from the database.
+#
+# Beacon writes the generated Prometheus scrape/rule files and the Blackbox
+# config into bind-mounted directories shared read-only with those services.
+
+name: beacon
+
+x-backend-env: &backend-env
+  BEACON_ENV: development
+  BEACON_LOG_LEVEL: info
+  BEACON_LOG_FORMAT: json
+  BEACON_DB_DSN: postgres://beacon:beacon@postgres:5432/beacon?sslmode=disable
+  BEACON_REDIS_ADDR: redis:6379
+  BEACON_JWT_ACCESS_SECRET: dev-access-secret-please-change-000000000000000000000000000000
+  BEACON_JWT_REFRESH_SECRET: dev-refresh-secret-please-change-00000000000000000000000000000
+  BEACON_ENCRYPTION_KEY: "00000000000000000000000000000000000000000000000000000000000000ff"
+  # Dashboard and API share the gateway origin, so CORS is effectively a no-op;
+  # kept in sync with the gateway for any direct cross-origin API use.
+  BEACON_CORS_ORIGINS: http://localhost:${BEACON_GATEWAY_PORT:-8090}
+  BEACON_PROM_SCRAPE_FILE: /etc/prometheus/generated/scrape_monitors.yml
+  BEACON_PROM_RULES_FILE: /etc/prometheus/generated/rules_monitors.yml
+  BEACON_PROM_RELOAD_URL: http://prometheus:9090/-/reload
+  BEACON_PROM_QUERY_URL: http://prometheus:9090
+  BEACON_BLACKBOX_CONFIG_FILE: /etc/blackbox/blackbox.yml
+  BEACON_BLACKBOX_RELOAD_URL: http://blackbox:9115/-/reload
+  BEACON_BLACKBOX_ADDR: blackbox:9115
+  BEACON_DNS_RESOLVER: 8.8.8.8:53
+  # Must match the credentials in deploy/alertmanager/alertmanager.yml.
+  BEACON_WEBHOOK_TOKEN: beacon-dev-webhook-token
+  # Base URL used for "open dashboard" links in notification messages.
+  BEACON_DASHBOARD_URL: http://localhost:${BEACON_GATEWAY_PORT:-8090}
+
+services:
+  postgres:
+    restart: unless-stopped
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: beacon
+      POSTGRES_PASSWORD: beacon
+      POSTGRES_DB: beacon
+    ports:
+      - "${BEACON_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beacon -d beacon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    restart: unless-stopped
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${BEACON_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  prometheus:
+    restart: unless-stopped
+    image: prom/prometheus:v2.54.1
+    # Served behind the gateway at /prometheus/. route-prefix=/ keeps Prometheus
+    # serving at root internally (so Beacon's reload/query calls are unchanged)
+    # while external-url makes the UI generate /prometheus/-prefixed asset links,
+    # which nginx strips.
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+      - --web.external-url=http://localhost:${BEACON_GATEWAY_PORT:-8090}/prometheus/
+      - --web.route-prefix=/
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/generated:/etc/prometheus/generated:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - alertmanager
+
+  blackbox:
+    restart: unless-stopped
+    image: prom/blackbox-exporter:v0.25.0
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    cap_add:
+      - NET_RAW           # required for ICMP probes
+    volumes:
+      - ./blackbox:/etc/blackbox:ro
+
+  alertmanager:
+    restart: unless-stopped
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --web.external-url=http://localhost:${BEACON_GATEWAY_PORT:-8090}/alertmanager/
+      - --web.route-prefix=/
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+
+  api:
+    restart: unless-stopped
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.backend
+    command: ["api"]
+    # Runs as root in dev so it can write the bind-mounted control-plane configs.
+    # In production, use proper volume ownership / an init container instead.
+    user: "0:0"
+    environment: *backend-env
+    # No host port — reached through the nginx gateway at /api/.
+    volumes:
+      - ./prometheus/generated:/etc/prometheus/generated
+      - ./blackbox:/etc/blackbox
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    restart: unless-stopped
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.backend
+    command: ["worker"]
+    user: "0:0"
+    environment: *backend-env
+    volumes:
+      - ./prometheus/generated:/etc/prometheus/generated
+      - ./blackbox:/etc/blackbox
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    restart: unless-stopped
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        # Empty => the browser calls the API same-origin (/api/...) through the
+        # gateway. No host, no port, no CORS.
+        NEXT_PUBLIC_API_BASE_URL: ""
+    # No host port — reached through the nginx gateway at /.
+    depends_on:
+      - api
+
+  # prom-label-proxy enforces {org_id="<tenant>"} on every Prometheus query,
+  # rules and alerts request. The gateway supplies the tenant via the X-Org-Id
+  # header (derived from the authenticated proxy cookie), so the raw Prometheus
+  # UI only ever returns the caller's own data. Safe read-only status endpoints
+  # are passed through so the UI can render.
+  prom-label-proxy-prom:
+    restart: unless-stopped
+    image: quay.io/prometheuscommunity/prom-label-proxy:v0.11.0
+    command:
+      - -label=org_id
+      - -upstream=http://prometheus:9090
+      - -insecure-listen-address=0.0.0.0:8080
+      - -header-name=X-Org-Id
+      - -error-on-replace
+      - -rules-with-active-alerts
+      # Enforce org_id on the label APIs too, so the Graph page's metric-name
+      # autocomplete works and is scoped to the tenant (Prometheus >= 2.24).
+      - -enable-label-apis
+      - -unsafe-passthrough-paths=/api/v1/status/buildinfo,/api/v1/status/runtimeinfo,/api/v1/status/flags,/api/v1/metadata
+    depends_on:
+      - prometheus
+
+  # Same enforcement for Alertmanager: /api/v2/alerts and silences are filtered
+  # by org_id so a tenant only sees its own alerts in the Alertmanager UI.
+  prom-label-proxy-am:
+    restart: unless-stopped
+    image: quay.io/prometheuscommunity/prom-label-proxy:v0.11.0
+    command:
+      - -label=org_id
+      - -upstream=http://alertmanager:9093
+      - -insecure-listen-address=0.0.0.0:8080
+      - -header-name=X-Org-Id
+      - -unsafe-passthrough-paths=/api/v2/status
+    depends_on:
+      - alertmanager
+
+  # Single entry point. Everything the user opens is served from this one port.
+  nginx:
+    restart: unless-stopped
+    image: nginx:1.27-alpine
+    ports:
+      - "${BEACON_GATEWAY_PORT:-8090}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+      - frontend
+      - prometheus
+      - alertmanager
+      - blackbox
+      - prom-label-proxy-prom
+      - prom-label-proxy-am
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  alertmanager_data:

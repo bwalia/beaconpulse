@@ -1,0 +1,39 @@
+# Alertmanager configuration.
+#
+# All alerts are forwarded to Beacon's webhook, which owns delivery (Telegram,
+# and later Slack/Discord/email/…) and routing to the right organization's
+# channels. Alertmanager still handles grouping, de-duplication, inhibition and
+# repeat intervals. `send_resolved: true` means Beacon also receives recovery
+# events so it can send "✅ resolved" notifications.
+#
+# The bearer token below MUST match BEACON_WEBHOOK_TOKEN in the API environment.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: beacon
+  group_by: ['alertname', 'monitor_id']
+  group_wait: 30s
+  group_interval: 5m
+  # How often an ONGOING alert is re-sent. 1h keeps users reminded of active
+  # outages without spamming; it also means a channel added after an alert first
+  # fired starts receiving that alert within the hour.
+  repeat_interval: 1h
+
+receivers:
+  - name: beacon
+    webhook_configs:
+      - url: http://api:8080/api/v1/alerts/webhook
+        send_resolved: true
+        http_config:
+          authorization:
+            type: Bearer
+            credentials: beacon-dev-webhook-token
+
+inhibit_rules:
+  # A critical MonitorDown alert suppresses lower-severity noise for the same
+  # monitor while it is fully down.
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: ['monitor_id']

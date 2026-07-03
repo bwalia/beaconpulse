@@ -1,0 +1,52 @@
+# Blackbox exporter configuration — SEED FILE.
+#
+# Beacon OWNS this file at runtime: on every sync it overwrites it with one
+# module per monitor (derived from each monitor's type and settings) and reloads
+# Blackbox (POST /-/reload). This committed version provides a valid baseline so
+# Blackbox starts cleanly before Beacon's first reconcile, and serves as a set of
+# generic fallback modules.
+
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      valid_status_codes: [200, 201, 202, 203, 204, 206, 300, 301, 302, 303, 304, 307, 308]
+
+  http_2xx_insecure:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      tls_config:
+        insecure_skip_verify: true
+
+  http_post_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: POST
+      preferred_ip_protocol: ip4
+
+  tcp_connect:
+    prober: tcp
+    timeout: 10s
+    tcp:
+      preferred_ip_protocol: ip4
+
+  icmp:
+    prober: icmp
+    timeout: 10s
+    icmp:
+      preferred_ip_protocol: ip4
+
+  dns_a:
+    prober: dns
+    timeout: 10s
+    dns:
+      query_name: example.com
+      query_type: A
+      preferred_ip_protocol: ip4

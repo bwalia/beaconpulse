@@ -1,0 +1,272 @@
+// Command api runs the Beacon REST API server. It also provides a `migrate`
+// subcommand for applying database migrations explicitly in production
+// (`api migrate up` / `api migrate status`).
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
+
+	"beacon/internal/adapter/notifier"
+	"beacon/internal/adapter/postgres"
+	"beacon/internal/adapter/promapi"
+	"beacon/internal/adapter/queue"
+	"beacon/internal/config"
+	"beacon/internal/domain/audit"
+	"beacon/internal/domain/auth"
+	"beacon/internal/domain/billing"
+	"beacon/internal/domain/insight"
+	"beacon/internal/domain/monitor"
+	"beacon/internal/domain/notification"
+	"beacon/internal/domain/project"
+	"beacon/internal/platform/cache"
+	"beacon/internal/platform/crypto"
+	"beacon/internal/platform/database"
+	"beacon/internal/platform/logger"
+	"beacon/internal/platform/metrics"
+	"beacon/internal/platform/validate"
+	"beacon/internal/transport/rest"
+	"beacon/internal/transport/rest/middleware"
+	"beacon/migrations"
+)
+
+// version is overridable at build time with -ldflags "-X main.version=...".
+var version = "dev"
+
+func main() {
+	if err := run(); err != nil {
+		slog.Error("fatal", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	log := logger.New(cfg.Log.Level, cfg.Log.Format)
+	slog.SetDefault(log)
+
+	// Root context cancelled on SIGINT/SIGTERM for graceful shutdown.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := connectDBWithRetry(ctx, cfg.DB, log)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	// Handle the migrate subcommand (uses the same config/pool) and exit.
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		return runMigrate(ctx, pool, os.Args[2:])
+	}
+
+	// Apply migrations on startup so a fresh environment is usable immediately.
+	if err := applyMigrations(ctx, pool, log); err != nil {
+		return err
+	}
+
+	rdb, err := cache.Connect(ctx, cfg.Redis)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rdb.Close() }()
+
+	router, err := buildRouter(cfg, log, pool, rdb)
+	if err != nil {
+		return err
+	}
+
+	return serve(ctx, cfg.HTTP, log, router)
+}
+
+// buildRouter performs dependency injection: it constructs adapters, domain
+// services and handlers, then assembles the HTTP router.
+func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *redis.Client) (http.Handler, error) {
+	cipher, err := crypto.NewCipher(cfg.Crypto.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+
+	hasher := crypto.NewPasswordHasher(crypto.DefaultBcryptCost)
+	tokens := auth.NewTokenManager(cfg.Auth.AccessSecret, cfg.Auth.RefreshSecret, cfg.Auth.AccessTTL, cfg.Auth.RefreshTTL)
+	validator := validate.New()
+
+	// Repositories.
+	userRepo := postgres.NewUserRepository(pool)
+	refreshRepo := postgres.NewRefreshTokenRepository(pool)
+	auditRepo := postgres.NewAuditRepository(pool)
+	projectRepo := postgres.NewProjectRepository(pool)
+	monitorRepo := postgres.NewMonitorRepository(pool)
+	orgPlanRepo := postgres.NewOrgPlanRepository(pool)
+	notificationRepo := postgres.NewNotificationRepository(pool)
+
+	// Cross-cutting.
+	auditRec := audit.NewRecorder(auditRepo)
+	// The API enqueues control-plane syncs; the worker performs them.
+	syncEnqueuer := queue.NewSyncEnqueuer(queue.NewQueue(rdb, queue.DefaultStream))
+
+	// Notification wiring: a registry of per-type notifiers, the CRUD service,
+	// and the dispatcher used by the Alertmanager webhook.
+	notifierRegistry := map[notification.ChannelType]notification.Notifier{
+		notification.TypeTelegram: notifier.NewTelegramNotifier(),
+	}
+	projectLookup := postgres.NewProjectLookupAdapter(projectRepo)
+	notifySvc := notification.NewService(notificationRepo, cipher, notifierRegistry, auditRec, cfg.Notify.DashboardURL)
+	dispatcher := notification.NewDispatcher(notificationRepo, cipher, notifierRegistry, projectLookup, auditRec, cfg.Notify.DashboardURL)
+
+	// Tenant-scoped insight reads over Prometheus.
+	insightQuerier := promapi.NewInsightQuerier(promapi.New(cfg.CtrlPlane.PromQueryURL))
+	insightSvc := insight.NewService(insightQuerier, monitorRepo)
+	billingSvc := billing.NewService(orgPlanRepo, auditRec)
+
+	// Services.
+	authSvc := auth.NewService(userRepo, refreshRepo, tokens, hasher, auditRec)
+	projectSvc := project.NewService(projectRepo, syncEnqueuer, auditRec)
+	monitorSvc := monitor.NewService(monitorRepo, syncEnqueuer, orgPlanRepo, auditRec)
+
+	// Transport.
+	m := metrics.New()
+	authn := middleware.NewAuthenticator(tokens)
+	health := rest.NewHealthHandler(version, time.Now(),
+		rest.Checker{Name: "postgres", Check: func(ctx context.Context) error { return pool.Ping(ctx) }},
+		rest.Checker{Name: "redis", Check: func(ctx context.Context) error { return rdb.Ping(ctx).Err() }},
+	)
+
+	return rest.NewRouter(rest.RouterDeps{
+		Logger:        log,
+		Metrics:       m,
+		CORSOrigins:   cfg.HTTP.CORSOrigins,
+		Authenticator: authn,
+		Health:        health,
+		Auth:          rest.NewAuthHandler(authSvc, validator, cfg.IsProduction()),
+		Project:       rest.NewProjectHandler(projectSvc, validator, authn),
+		Monitor:       rest.NewMonitorHandler(monitorSvc, insightSvc, validator, authn),
+		Notification:  rest.NewNotificationHandler(notifySvc, validator, authn),
+		Alert:         rest.NewAlertHandler(dispatcher, cfg.Notify.WebhookToken),
+		Insight:       rest.NewInsightHandler(insightSvc),
+		Billing:       rest.NewBillingHandler(billingSvc, validator, authn),
+	}), nil
+}
+
+// serve runs the HTTP server and shuts it down gracefully when ctx is cancelled.
+func serve(ctx context.Context, cfg config.HTTP, log *slog.Logger, handler http.Handler) error {
+	srv := &http.Server{
+		Addr:         cfg.Addr,
+		Handler:      handler,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		log.Info("api server listening", slog.String("addr", cfg.Addr), slog.String("version", version))
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		log.Info("shutdown signal received; draining connections")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("graceful shutdown failed: %w", err)
+		}
+		log.Info("server stopped cleanly")
+		return nil
+	}
+}
+
+// ---- database bootstrap ----
+
+func connectDBWithRetry(ctx context.Context, cfg config.DB, log *slog.Logger) (*pgxpool.Pool, error) {
+	const maxAttempts = 15
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		pool, err := database.Connect(ctx, cfg)
+		if err == nil {
+			return pool, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		log.Warn("database not ready; retrying",
+			slog.Int("attempt", attempt), slog.String("error", err.Error()))
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+	return nil, fmt.Errorf("could not connect to database after %d attempts: %w", maxAttempts, lastErr)
+}
+
+func applyMigrations(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger) error {
+	migrator, err := database.NewMigrator(pool, migrations.FS)
+	if err != nil {
+		return err
+	}
+	applied, err := migrator.Up(ctx)
+	if err != nil {
+		return fmt.Errorf("apply migrations: %w", err)
+	}
+	if len(applied) > 0 {
+		log.Info("applied migrations", slog.Any("versions", applied))
+	} else {
+		log.Info("database schema up to date")
+	}
+	return nil
+}
+
+func runMigrate(ctx context.Context, pool *pgxpool.Pool, args []string) error {
+	migrator, err := database.NewMigrator(pool, migrations.FS)
+	if err != nil {
+		return err
+	}
+	sub := "up"
+	if len(args) > 0 {
+		sub = args[0]
+	}
+	switch sub {
+	case "up":
+		applied, err := migrator.Up(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("applied %d migration(s): %v\n", len(applied), applied)
+		return nil
+	case "status":
+		statuses, err := migrator.Status(ctx)
+		if err != nil {
+			return err
+		}
+		for _, s := range statuses {
+			mark := "pending"
+			if s.Applied {
+				mark = "applied"
+			}
+			fmt.Printf("  %04d  %-8s  %s\n", s.Version, mark, s.Name)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown migrate subcommand %q (want up|status)", sub)
+	}
+}
