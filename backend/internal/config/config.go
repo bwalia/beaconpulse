@@ -35,6 +35,29 @@ type Config struct {
 	CtrlPlane ControlPlane
 	Worker    Worker
 	Notify    Notify
+	AI        AI
+}
+
+// AI holds optional LLM-based alert enrichment configuration. When Enabled, a
+// firing alert is sent to an Ollama-compatible endpoint that classifies its real
+// severity and suggests a fix; that analysis is attached to the notification
+// before it is delivered. Enrichment is always best-effort: if the model is slow
+// or unreachable the alert is still delivered, just without the AI section.
+type AI struct {
+	// Enabled turns alert enrichment on. Off by default so existing deployments
+	// behave exactly as before.
+	Enabled bool
+	// BaseURL is the Ollama-compatible endpoint root, e.g.
+	// https://ollama.example.com (no trailing slash, no /api).
+	BaseURL string
+	// Model is the model tag to prompt, e.g. "llama3.1".
+	Model string
+	// APIKey, when set, is sent as the `x-api-key` header (for endpoints behind
+	// an auth proxy). Empty means no auth header.
+	APIKey string
+	// Timeout bounds a single analysis call. On expiry the alert is delivered
+	// without enrichment.
+	Timeout time.Duration
 }
 
 // Notify holds notification/alerting configuration.
@@ -181,6 +204,13 @@ func Load() (Config, error) {
 			WebhookToken: getStr("BEACON_WEBHOOK_TOKEN", ""),
 			DashboardURL: getStr("BEACON_DASHBOARD_URL", "http://localhost:3000"),
 		},
+		AI: AI{
+			Enabled: getBool("BEACON_AI_ENABLED", false, add),
+			BaseURL: strings.TrimRight(getStr("BEACON_AI_BASE_URL", ""), "/"),
+			Model:   getStr("BEACON_AI_MODEL", ""),
+			APIKey:  getStr("BEACON_AI_API_KEY", ""),
+			Timeout: getDur("BEACON_AI_TIMEOUT", 20*time.Second, add),
+		},
 	}
 
 	// ---- validation ----
@@ -213,6 +243,14 @@ func Load() (Config, error) {
 	if cfg.Worker.Concurrency < 1 {
 		add("BEACON_WORKER_CONCURRENCY must be >= 1")
 	}
+	if cfg.AI.Enabled {
+		if cfg.AI.BaseURL == "" {
+			add("BEACON_AI_BASE_URL is required when BEACON_AI_ENABLED=true")
+		}
+		if cfg.AI.Model == "" {
+			add("BEACON_AI_MODEL is required when BEACON_AI_ENABLED=true")
+		}
+	}
 
 	if len(errs) > 0 {
 		return Config{}, fmt.Errorf("invalid configuration:\n  - %s", strings.Join(errs, "\n  - "))
@@ -230,6 +268,19 @@ func getStr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func getBool(key string, def bool, add func(string, ...any)) bool {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return def
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		add("%s must be a boolean (true/false), got %q", key, v)
+		return def
+	}
+	return b
 }
 
 func getInt(key string, def int, add func(string, ...any)) int {

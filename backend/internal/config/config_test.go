@@ -35,6 +35,33 @@ func TestLoadValid(t *testing.T) {
 	}
 }
 
+func TestLoadAIEnabledRequiresURLAndModel(t *testing.T) {
+	setValidBase(t)
+	t.Setenv("BEACON_AI_ENABLED", "true")
+	// BEACON_AI_BASE_URL and BEACON_AI_MODEL intentionally unset.
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "BEACON_AI_BASE_URL") || !strings.Contains(err.Error(), "BEACON_AI_MODEL") {
+		t.Fatalf("expected AI url+model errors, got %v", err)
+	}
+}
+
+func TestLoadAIEnabledValid(t *testing.T) {
+	setValidBase(t)
+	t.Setenv("BEACON_AI_ENABLED", "true")
+	t.Setenv("BEACON_AI_BASE_URL", "https://ollama.example.com/")
+	t.Setenv("BEACON_AI_MODEL", "llama3.1")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.AI.Enabled {
+		t.Error("AI should be enabled")
+	}
+	if cfg.AI.BaseURL != "https://ollama.example.com" { // trailing slash trimmed
+		t.Errorf("base url = %q", cfg.AI.BaseURL)
+	}
+}
+
 func TestLoadMissingDSN(t *testing.T) {
 	t.Setenv("BEACON_JWT_ACCESS_SECRET", "access-secret-at-least-32-bytes-long-xx")
 	t.Setenv("BEACON_JWT_REFRESH_SECRET", "refresh-secret-at-least-32-bytes-long-x")

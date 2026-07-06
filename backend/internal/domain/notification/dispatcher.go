@@ -17,25 +17,33 @@ import (
 // channels of the owning organization. It is best-effort: a failed delivery to
 // one channel is logged and audited but never blocks the others.
 type Dispatcher struct {
-	repo     Repository
-	cipher   *crypto.Cipher
-	registry map[ChannelType]Notifier
-	projects ProjectLookup
-	auditlog audit.Recorder
-	dashURL  string
-	now      func() time.Time
+	repo      Repository
+	cipher    *crypto.Cipher
+	registry  map[ChannelType]Notifier
+	projects  ProjectLookup
+	auditlog  audit.Recorder
+	dashURL   string
+	analyzer  Analyzer      // optional AI enrichment; nil disables it
+	aiTimeout time.Duration // per-alert budget for the analyzer
+	now       func() time.Time
 }
 
-// NewDispatcher wires the dispatcher.
-func NewDispatcher(repo Repository, cipher *crypto.Cipher, registry map[ChannelType]Notifier, projects ProjectLookup, auditlog audit.Recorder, dashboardURL string) *Dispatcher {
+// NewDispatcher wires the dispatcher. analyzer may be nil, in which case alerts
+// are delivered without AI enrichment.
+func NewDispatcher(repo Repository, cipher *crypto.Cipher, registry map[ChannelType]Notifier, projects ProjectLookup, auditlog audit.Recorder, dashboardURL string, analyzer Analyzer, aiTimeout time.Duration) *Dispatcher {
+	if aiTimeout <= 0 {
+		aiTimeout = 20 * time.Second
+	}
 	return &Dispatcher{
-		repo:     repo,
-		cipher:   cipher,
-		registry: registry,
-		projects: projects,
-		auditlog: auditlog,
-		dashURL:  strings.TrimRight(dashboardURL, "/"),
-		now:      time.Now,
+		repo:      repo,
+		cipher:    cipher,
+		registry:  registry,
+		projects:  projects,
+		auditlog:  auditlog,
+		dashURL:   strings.TrimRight(dashboardURL, "/"),
+		analyzer:  analyzer,
+		aiTimeout: aiTimeout,
+		now:       time.Now,
 	}
 }
 
@@ -65,10 +73,36 @@ func (d *Dispatcher) DispatchAlerts(ctx context.Context, events []AlertEvent) {
 		}
 
 		msg := d.render(ctx, ev)
+		// Ask the AI to triage a firing alert before we deliver it. Recoveries
+		// (resolved) need no analysis — they are good news. Enrichment is
+		// best-effort and never blocks or fails delivery.
+		if ev.Status == StatusFiring {
+			msg.Analysis = d.enrich(ctx, ev)
+		}
 		for i := range channels {
 			d.deliver(ctx, &channels[i], msg)
 		}
 	}
+}
+
+// enrich runs the analyzer against a firing event within a bounded context. It
+// returns nil (and logs) on any error, timeout, or when no analyzer is wired, so
+// the caller can always proceed to deliver.
+func (d *Dispatcher) enrich(ctx context.Context, ev AlertEvent) *AlertAnalysis {
+	if d.analyzer == nil {
+		return nil
+	}
+	log := logger.FromContext(ctx)
+	aiCtx, cancel := context.WithTimeout(ctx, d.aiTimeout)
+	defer cancel()
+
+	analysis, err := d.analyzer.Analyze(aiCtx, ev)
+	if err != nil {
+		log.Warn("dispatch: AI enrichment failed; delivering without analysis",
+			slog.String("monitor", ev.MonitorName), slog.String("error", err.Error()))
+		return nil
+	}
+	return analysis
 }
 
 func (d *Dispatcher) deliver(ctx context.Context, ch *Channel, msg Message) {

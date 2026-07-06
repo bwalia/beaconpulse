@@ -62,4 +62,7 @@ type Message struct {
 	DashboardURL string
 	// IsTest marks a "send test" message so notifiers can label it clearly.
 	IsTest bool
+	// Analysis is an optional AI triage of the alert (assessed severity, likely
+	// cause, suggested fix). Nil when enrichment is disabled or unavailable.
+	Analysis *AlertAnalysis
 }

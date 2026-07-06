@@ -1,8 +1,10 @@
 package rest
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"beacon/internal/domain/notification"
 	"beacon/internal/platform/apperror"
 	"beacon/internal/platform/httpx"
+	"beacon/internal/platform/logger"
 )
 
 // AlertHandler receives Alertmanager webhook deliveries and fans them out to the
@@ -81,11 +84,24 @@ func (h *AlertHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Dispatch is best-effort and may involve slow network calls; run it without
-	// blocking the Alertmanager response beyond the request lifetime is not
-	// desirable (context would be cancelled), so we dispatch synchronously but
-	// the dispatcher never fails the request.
-	h.dispatcher.DispatchAlerts(r.Context(), events)
+	// Dispatch is best-effort and may involve slow network calls (AI enrichment,
+	// then per-channel delivery). We run it in the background on a context
+	// detached from the request — so a slow model can't hold the Alertmanager
+	// connection open and trigger a webhook timeout + retry — but retaining the
+	// request's values (request id, logger) for correlated logs.
+	log := logger.FromContext(r.Context())
+	bg := context.WithoutCancel(r.Context())
+	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Error("alert dispatch panicked", slog.Any("panic", rec))
+			}
+		}()
+		ctx, cancel := context.WithTimeout(bg, 2*time.Minute)
+		defer cancel()
+		h.dispatcher.DispatchAlerts(ctx, events)
+	}()
+
 	httpx.OK(w, map[string]any{"received": len(events)})
 }
 

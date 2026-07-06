@@ -122,10 +122,42 @@ func formatMessage(msg notification.Message) string {
 	if msg.Description != "" {
 		fmt.Fprintf(&b, "\n%s\n", esc(msg.Description))
 	}
+	if msg.Analysis != nil {
+		writeAnalysis(&b, msg.Analysis)
+	}
 	if msg.DashboardURL != "" {
 		fmt.Fprintf(&b, "\n<a href=\"%s\">Open dashboard</a>", esc(msg.DashboardURL))
 	}
 	return b.String()
+}
+
+// writeAnalysis appends the AI triage block. It is only present on firing alerts
+// when enrichment is enabled and succeeded.
+func writeAnalysis(b *strings.Builder, a *notification.AlertAnalysis) {
+	b.WriteString("\n")
+	fmt.Fprintf(b, "%s <b>AI analysis</b>", severityEmoji(a.Severity))
+	if a.Model != "" {
+		fmt.Fprintf(b, " <i>(%s)</i>", esc(a.Model))
+	}
+	b.WriteString("\n")
+	writeField(b, "Assessed impact", strings.ToUpper(a.Severity))
+	if a.Summary != "" {
+		fmt.Fprintf(b, "%s\n", esc(a.Summary))
+	}
+	writeField(b, "Likely cause", a.LikelyCause)
+	writeField(b, "Suggested fix", a.SuggestedFix)
+}
+
+// severityEmoji maps an assessed-impact level to a leading glyph.
+func severityEmoji(severity string) string {
+	switch strings.ToLower(severity) {
+	case notification.AISeverityHigh:
+		return "🔴"
+	case notification.AISeverityLow:
+		return "🟢"
+	default:
+		return "🟡"
+	}
 }
 
 func header(msg notification.Message) string {

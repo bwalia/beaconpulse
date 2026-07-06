@@ -35,6 +35,42 @@ func TestFormatMessageFiring(t *testing.T) {
 	}
 }
 
+func TestFormatMessageWithAIAnalysis(t *testing.T) {
+	msg := notification.Message{
+		Status:      notification.StatusFiring,
+		Severity:    "warning",
+		Title:       "API degraded",
+		MonitorName: "API",
+		Analysis: &notification.AlertAnalysis{
+			Severity:     notification.AISeverityHigh,
+			Summary:      "The payments API is returning 500s.",
+			LikelyCause:  "Database connection pool exhausted.",
+			SuggestedFix: "Increase max connections and restart the service.",
+			Model:        "llama3.1",
+		},
+	}
+	out := formatMessage(msg)
+
+	for _, want := range []string{
+		"AI analysis", "llama3.1", "Assessed impact:", "HIGH",
+		"The payments API is returning 500s.",
+		"Likely cause:", "Database connection pool exhausted.",
+		"Suggested fix:", "Increase max connections",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("AI-enriched message missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestFormatMessageWithoutAIAnalysis(t *testing.T) {
+	// A message with no Analysis must not render the AI section.
+	msg := notification.Message{Status: notification.StatusFiring, Severity: "critical", MonitorName: "x"}
+	if strings.Contains(formatMessage(msg), "AI analysis") {
+		t.Error("did not expect AI section when Analysis is nil")
+	}
+}
+
 func TestFormatMessageResolvedAndEscaping(t *testing.T) {
 	msg := notification.Message{
 		Status:      notification.StatusResolved,

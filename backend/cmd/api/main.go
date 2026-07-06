@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"beacon/internal/adapter/ai"
 	"beacon/internal/adapter/notifier"
 	"beacon/internal/adapter/postgres"
 	"beacon/internal/adapter/promapi"
@@ -125,7 +126,16 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	}
 	projectLookup := postgres.NewProjectLookupAdapter(projectRepo)
 	notifySvc := notification.NewService(notificationRepo, cipher, notifierRegistry, auditRec, cfg.Notify.DashboardURL)
-	dispatcher := notification.NewDispatcher(notificationRepo, cipher, notifierRegistry, projectLookup, auditRec, cfg.Notify.DashboardURL)
+
+	// Optional AI alert enrichment: when enabled, firing alerts are triaged by an
+	// LLM (assessed severity + likely cause + suggested fix) before delivery.
+	var analyzer notification.Analyzer
+	if cfg.AI.Enabled {
+		analyzer = ai.NewOllamaAnalyzer(cfg.AI.BaseURL, cfg.AI.Model, cfg.AI.APIKey, cfg.AI.Timeout)
+		log.Info("AI alert enrichment enabled",
+			slog.String("endpoint", cfg.AI.BaseURL), slog.String("model", cfg.AI.Model))
+	}
+	dispatcher := notification.NewDispatcher(notificationRepo, cipher, notifierRegistry, projectLookup, auditRec, cfg.Notify.DashboardURL, analyzer, cfg.AI.Timeout)
 
 	// Tenant-scoped insight reads over Prometheus.
 	insightQuerier := promapi.NewInsightQuerier(promapi.New(cfg.CtrlPlane.PromQueryURL))

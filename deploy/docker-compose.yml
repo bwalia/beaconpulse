@@ -35,6 +35,16 @@ x-backend-env: &backend-env
   BEACON_WEBHOOK_TOKEN: beacon-dev-webhook-token
   # Base URL used for "open dashboard" links in notification messages.
   BEACON_DASHBOARD_URL: http://localhost:${BEACON_GATEWAY_PORT:-8090}
+  # AI alert enrichment (optional). Turn on by setting these in deploy/.env:
+  #   BEACON_AI_ENABLED=true
+  #   BEACON_AI_BASE_URL=https://ollama.diytaxreturn.co.uk
+  #   BEACON_AI_MODEL=<a model available on that endpoint, e.g. llama3.1>
+  #   BEACON_AI_API_KEY=<x-api-key for the endpoint>
+  BEACON_AI_ENABLED: ${BEACON_AI_ENABLED:-false}
+  BEACON_AI_BASE_URL: ${BEACON_AI_BASE_URL:-}
+  BEACON_AI_MODEL: ${BEACON_AI_MODEL:-}
+  BEACON_AI_API_KEY: ${BEACON_AI_API_KEY:-}
+  BEACON_AI_TIMEOUT: ${BEACON_AI_TIMEOUT:-20s}
 
 services:
   postgres:
