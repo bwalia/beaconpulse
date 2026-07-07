@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+    {{- include "beacon.selector" "postgres" | nindent 4 }}
+spec:
+  replicas: 1
+  # RWO volume — never run two Postgres pods at once.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "beacon.selector" "postgres" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "beacon.labels" . | nindent 8 }}
+        {{- include "beacon.selector" "postgres" | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: {{ .Values.images.postgres }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.user | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: beacon-secrets
+                  key: POSTGRES_PASSWORD
+            # Keep data in a subdirectory so the volume root (which may carry a
+            # lost+found) is never PGDATA.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U {{ .Values.postgres.user }} -d {{ .Values.postgres.database }}"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U {{ .Values.postgres.user }} -d {{ .Values.postgres.database }}"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources.postgres | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: beacon-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "beacon.selector" "postgres" | nindent 4 }}
+  ports:
+    - port: 5432
+      targetPort: 5432

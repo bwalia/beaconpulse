@@ -1,0 +1,146 @@
+# Default values for the Beacon chart. Environment-specific overrides live in
+# values-int.yaml / values-acc.yaml / values-test.yaml / values-prod.yaml and are
+# passed with `-f` at deploy time. Everything here is a sane default; each env
+# file only sets what differs (host, image tag, env label, sizes, AI settings).
+
+# env is the deployment tier label (int|acc|test|prod). It selects the Vault path
+# (secret/beaconpulse/<env>/config) and is surfaced for labels. ALWAYS overridden
+# by the env values file.
+env: int
+
+# Public gateway hostname for this environment (the single nginx entry point).
+# ALWAYS overridden by the env values file, e.g. int.beaconpulse.net.
+host: int.beaconpulse.net
+
+# ── Beacon application images (built + pushed by CI to Docker Hub) ──────────
+# api and worker are the same image (both binaries); they differ only by command.
+image:
+  api: bwalia/beacon-api
+  worker: bwalia/beacon-worker
+  frontend: bwalia/beacon-frontend
+  # Overridden per-deploy by CI with the git SHA for immutable, traceable rollouts.
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# ── Third-party images (pinned to match docker-compose) ────────────────────
+images:
+  postgres: postgres:16-alpine
+  redis: redis:7-alpine
+  prometheus: prom/prometheus:v2.54.1
+  blackbox: prom/blackbox-exporter:v0.25.0
+  alertmanager: prom/alertmanager:v0.27.0
+  promLabelProxy: quay.io/prometheuscommunity/prom-label-proxy:v0.11.0
+  nginx: nginx:1.27-alpine
+  # busybox is used by the blackbox init container to seed its config.
+  busybox: busybox:1.36
+
+# ── Beacon runtime configuration (non-secret) ──────────────────────────────
+app:
+  # BEACON_ENV — one of development|staging|production. Drives Secure-cookie and
+  # secret-strength enforcement, NOT the deployment tier. Prod uses "production";
+  # lower envs use "staging". Overridden per env file.
+  beaconEnv: staging
+  logLevel: info
+  logFormat: json
+  # DNS resolver used by DNS monitors.
+  dnsResolver: 8.8.8.8:53
+  # Prometheus TSDB retention.
+  promRetention: 15d
+  replicas:
+    api: 1
+    frontend: 1
+
+# ── AI alert enrichment (non-secret parts; API key comes from Vault) ───────
+ai:
+  enabled: false
+  baseURL: ""      # e.g. https://ollama.workstation.co.uk
+  model: ""        # e.g. qwen3:30b-a3b
+  timeout: 20s
+
+# ── Postgres (in-cluster) ──────────────────────────────────────────────────
+postgres:
+  user: beacon
+  database: beacon
+  # Password is provided by the ExternalSecret (Vault key POSTGRES_PASSWORD) and
+  # injected into both Postgres and the API/worker DSN.
+
+# ── Persistence ────────────────────────────────────────────────────────────
+storage:
+  # k3s default provisioner. RWO volumes are shared across control-plane pods on
+  # a single node (see README: single-node assumption / RWX for multi-node).
+  className: local-path
+  postgres: 5Gi
+  redis: 1Gi
+  prometheus: 10Gi
+  alertmanager: 1Gi
+  # Shared control-plane config surfaces the API/worker generate for Prometheus
+  # and Blackbox to consume.
+  promGenerated: 128Mi
+  blackboxConfig: 64Mi
+
+# ── Secrets via External Secrets Operator (Vault) ──────────────────────────
+externalSecret:
+  enabled: true
+  refreshInterval: "1m"
+  storeName: vault-backend
+  storeKind: ClusterSecretStore
+  # Vault path — STANDALONE beaconpulse project, not under diytaxreturn.
+  # {{ .Values.env }} is appended: secret/beaconpulse/<env>/config.
+  vaultKeyPrefix: secret/beaconpulse
+  vaultKeySuffix: config
+
+# Only used when externalSecret.enabled=false (local testing without Vault).
+# Inject real values with `--set secrets.jwtAccess=...`; never commit them.
+secrets:
+  jwtAccess: ""
+  jwtRefresh: ""
+  encryptionKey: ""
+  webhookToken: ""
+  postgresPassword: ""
+  aiApiKey: ""
+
+# ── Ingress (single gateway host) ──────────────────────────────────────────
+ingress:
+  enabled: true
+  className: wslproxy
+  clusterIssuer: main-issuer
+  tls: true
+  # host comes from top-level .Values.host
+
+# ── Per-component resource requests/limits (modest defaults) ───────────────
+resources:
+  api:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: "1", memory: 512Mi }
+  worker:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+  frontend:
+    requests: { cpu: 25m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  prometheus:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 1Gi }
+  alertmanager:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+  blackbox:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 250m, memory: 128Mi }
+  promLabelProxy:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+  nginx:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 250m, memory: 128Mi }
+  postgres:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: "1", memory: 512Mi }
+  redis:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+
+# nodeSelector applied to the control-plane pods (api, worker, prometheus,
+# blackbox) so they co-locate and can share RWO volumes on multi-node clusters.
+# Leave empty for single-node k3s.
+controlPlaneNodeSelector: {}

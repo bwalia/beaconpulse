@@ -1,0 +1,23 @@
+apiVersion: v2
+name: beacon
+description: |
+  Beacon — self-hosted, multi-tenant infrastructure monitoring platform.
+  Deploys the full stack: API + worker + dashboard, its Prometheus/Blackbox/
+  Alertmanager control plane, per-tenant prom-label-proxy, an nginx gateway,
+  and in-cluster Postgres + Redis.
+type: application
+# Chart version — bump on template changes.
+version: 0.1.0
+# Application version — the Beacon app release this chart targets.
+appVersion: "1.0.0"
+keywords:
+  - monitoring
+  - uptime
+  - prometheus
+  - multi-tenant
+home: https://beaconpulse.net
+sources:
+  - https://github.com/bwalia/beaconpulse
+maintainers:
+  - name: Balinder Walia
+    email: bwalia@workstation.co.uk

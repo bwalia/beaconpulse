@@ -1,0 +1,152 @@
+name: ->Beacon Build/Push Docker Images and Deploy to K3S
+
+# Build the three Beacon images (api, worker, frontend) to Docker Hub and deploy
+# the Helm chart to the chosen environment's namespace on k3s. Manual trigger so
+# environment promotion is deliberate — same pattern as the opsapi platform.
+on:
+  # Continuous deployment: every push to main builds the images and deploys to
+  # the int environment (TARGET_ENV/DEPLOYMENT_TYPE resolve to int/build-and-deploy
+  # via the env: block below, since push events carry no workflow inputs).
+  push:
+    branches:
+      - main
+
+  # Manual promotion to any environment (test/acc/prod) or build/deploy-only.
+  workflow_dispatch:
+    inputs:
+      TARGET_ENV:
+        type: choice
+        description: "Target environment"
+        default: "int"
+        required: true
+        options:
+          - int
+          - test
+          - acc
+          - prod
+      DEPLOYMENT_TYPE:
+        type: choice
+        description: "Build only, deploy only, or both"
+        default: "build-and-deploy"
+        required: true
+        options:
+          - build
+          - deploy
+          - build-and-deploy
+      IMAGE_TAG:
+        type: string
+        description: "Image tag to DEPLOY (deploy-only). Leave blank to use this commit's short SHA."
+        default: ""
+        required: false
+
+env:
+  IMAGE_REGISTRY: bwalia
+  TARGET_ENV: ${{ github.event.inputs.TARGET_ENV || 'int' }}
+  DEPLOYMENT_TYPE: ${{ github.event.inputs.DEPLOYMENT_TYPE || 'build-and-deploy' }}
+
+jobs:
+  build:
+    # Self-hosted runner (must have Docker available to build + push images).
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute image tag (short SHA)
+        id: tag
+        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker login
+        if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        run: docker login -u "${{ secrets.DOCKER_USERNAME }}" -p "${{ secrets.DOCKER_PASSWD }}"
+
+      - name: Build & push backend (api + worker share one image)
+        if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        run: |
+          set -euo pipefail
+          SHA=${{ steps.tag.outputs.sha }}
+          # One backend image contains both binaries; api/worker differ by command.
+          docker build -f deploy/docker/Dockerfile.backend \
+            -t "$IMAGE_REGISTRY/beacon-api:$SHA" \
+            -t "$IMAGE_REGISTRY/beacon-api:latest" \
+            -t "$IMAGE_REGISTRY/beacon-worker:$SHA" \
+            -t "$IMAGE_REGISTRY/beacon-worker:latest" .
+          docker push "$IMAGE_REGISTRY/beacon-api:$SHA"
+          docker push "$IMAGE_REGISTRY/beacon-api:latest"
+          docker push "$IMAGE_REGISTRY/beacon-worker:$SHA"
+          docker push "$IMAGE_REGISTRY/beacon-worker:latest"
+
+      - name: Build & push frontend
+        if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        run: |
+          set -euo pipefail
+          SHA=${{ steps.tag.outputs.sha }}
+          # Empty NEXT_PUBLIC_API_BASE_URL => the browser calls the API same-origin
+          # (/api/...) through the gateway. No CORS.
+          docker build -f frontend/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_BASE_URL="" \
+            -t "$IMAGE_REGISTRY/beacon-frontend:$SHA" \
+            -t "$IMAGE_REGISTRY/beacon-frontend:latest" \
+            ./frontend
+          docker push "$IMAGE_REGISTRY/beacon-frontend:$SHA"
+          docker push "$IMAGE_REGISTRY/beacon-frontend:latest"
+
+  deploy:
+    runs-on: self-hosted
+    needs: [build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Decode kubeconfig
+        if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        env:
+          KUBECONFIG_BASE64: ${{ secrets.KUBE_CONFIG_DATA_K3S }}
+        run: |
+          echo "$KUBECONFIG_BASE64" | base64 -d > kubeconfig
+          echo "KUBECONFIG=$(pwd)/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Ensure kubectl
+        if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        run: |
+          if ! command -v kubectl >/dev/null 2>&1; then
+            curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+          fi
+
+      - name: Ensure Helm
+        if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        run: |
+          if ! command -v helm >/dev/null 2>&1; then
+            curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          fi
+
+      - name: Deploy Beacon Helm chart
+        if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.IMAGE_TAG }}"
+          [ -z "$TAG" ] && TAG="${GITHUB_SHA::7}"
+          echo "Deploying beacon to '$TARGET_ENV' namespace with image tag '$TAG'..."
+          helm upgrade --install beacon ./deploy/helm/beacon \
+            -f ./deploy/helm/beacon/values-${TARGET_ENV}.yaml \
+            --set image.tag="$TAG" \
+            --namespace "$TARGET_ENV" --create-namespace \
+            --wait --timeout 10m
+
+      - name: Rollout status
+        if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        run: |
+          kubectl -n "$TARGET_ENV" rollout status deploy/api --timeout=5m || true
+          kubectl -n "$TARGET_ENV" get pods -o wide
+
+      - name: Slack notification
+        if: ${{ always() && (env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy') }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: general
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: "Beacon deployment status"
+          SLACK_MESSAGE: "Beacon deployed to ${{ env.TARGET_ENV }} :rocket:"
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true

@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+    {{- include "beacon.selector" "nginx" | nindent 4 }}
+  annotations:
+    # Roll when the gateway config changes.
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "beacon.selector" "nginx" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "beacon.labels" . | nindent 8 }}
+        {{- include "beacon.selector" "nginx" | nindent 8 }}
+    spec:
+      containers:
+        - name: nginx
+          image: {{ .Values.images.nginx }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources.nginx | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: config
+          configMap:
+            name: beacon-nginx-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "beacon.selector" "nginx" | nindent 4 }}
+  ports:
+    - port: 80
+      targetPort: 80

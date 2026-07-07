@@ -1,0 +1,97 @@
+{{- /* Two prom-label-proxy instances enforce {org_id="<tenant>"} on Prometheus
+and Alertmanager, using the X-Org-Id header the gateway derives from the
+authenticated proxy cookie. */ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prom-label-proxy-prom
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+    {{- include "beacon.selector" "prom-label-proxy-prom" | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "beacon.selector" "prom-label-proxy-prom" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "beacon.labels" . | nindent 8 }}
+        {{- include "beacon.selector" "prom-label-proxy-prom" | nindent 8 }}
+    spec:
+      containers:
+        - name: prom-label-proxy
+          image: {{ .Values.images.promLabelProxy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - -label=org_id
+            - -upstream=http://prometheus:9090
+            - -insecure-listen-address=0.0.0.0:8080
+            - -header-name=X-Org-Id
+            - -error-on-replace
+            - -rules-with-active-alerts
+            - -enable-label-apis
+            - -unsafe-passthrough-paths=/api/v1/status/buildinfo,/api/v1/status/runtimeinfo,/api/v1/status/flags,/api/v1/metadata
+          ports:
+            - containerPort: 8080
+          resources:
+            {{- toYaml .Values.resources.promLabelProxy | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prom-label-proxy-prom
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "beacon.selector" "prom-label-proxy-prom" | nindent 4 }}
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prom-label-proxy-am
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+    {{- include "beacon.selector" "prom-label-proxy-am" | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "beacon.selector" "prom-label-proxy-am" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "beacon.labels" . | nindent 8 }}
+        {{- include "beacon.selector" "prom-label-proxy-am" | nindent 8 }}
+    spec:
+      containers:
+        - name: prom-label-proxy
+          image: {{ .Values.images.promLabelProxy }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - -label=org_id
+            - -upstream=http://alertmanager:9093
+            - -insecure-listen-address=0.0.0.0:8080
+            - -header-name=X-Org-Id
+            - -unsafe-passthrough-paths=/api/v2/status
+          ports:
+            - containerPort: 8080
+          resources:
+            {{- toYaml .Values.resources.promLabelProxy | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prom-label-proxy-am
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "beacon.selector" "prom-label-proxy-am" | nindent 4 }}
+  ports:
+    - port: 8080
+      targetPort: 8080

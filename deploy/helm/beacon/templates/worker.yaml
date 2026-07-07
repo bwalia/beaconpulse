@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+    {{- include "beacon.selector" "worker" | nindent 4 }}
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  # Single writer of the Blackbox/Prometheus generated config; Recreate avoids
+  # two reconcilers racing on the shared volume.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "beacon.selector" "worker" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "beacon.labels" . | nindent 8 }}
+        {{- include "beacon.selector" "worker" | nindent 8 }}
+    spec:
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      {{- with .Values.controlPlaneNodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: worker
+          image: {{ include "beacon.image" (dict "repo" .Values.image.worker "tag" .Values.image.tag) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["worker"]
+          env:
+            {{- include "beacon.backendEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources.worker | nindent 12 }}
+          volumeMounts:
+            {{- include "beacon.backendVolumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "beacon.backendVolumes" . | nindent 8 }}

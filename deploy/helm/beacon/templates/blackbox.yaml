@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+    {{- include "beacon.selector" "blackbox" | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "beacon.selector" "blackbox" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "beacon.labels" . | nindent 8 }}
+        {{- include "beacon.selector" "blackbox" | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 10001
+      {{- with .Values.controlPlaneNodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Seed a minimal config so Blackbox can start before the worker's first
+        # reconcile. Runs as 10001 (like the worker) so the worker can later
+        # overwrite the file it owns.
+        - name: seed-config
+          image: {{ .Values.images.busybox }}
+          command: ["sh", "-c", "test -f /etc/blackbox/blackbox.yml || cp /seed/blackbox.yml /etc/blackbox/blackbox.yml"]
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+          volumeMounts:
+            - name: blackbox-config
+              mountPath: /etc/blackbox
+            - name: seed
+              mountPath: /seed
+      containers:
+        - name: blackbox
+          image: {{ .Values.images.blackbox }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config.file=/etc/blackbox/blackbox.yml
+          securityContext:
+            capabilities:
+              add: ["NET_RAW"]   # required for ICMP probes
+          ports:
+            - containerPort: 9115
+          readinessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 9115
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.resources.blackbox | nindent 12 }}
+          volumeMounts:
+            - name: blackbox-config
+              mountPath: /etc/blackbox
+              readOnly: true
+      volumes:
+        - name: blackbox-config
+          persistentVolumeClaim:
+            claimName: beacon-blackbox-config
+        - name: seed
+          configMap:
+            name: beacon-blackbox-seed
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blackbox
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "beacon.selector" "blackbox" | nindent 4 }}
+  ports:
+    - port: 9115
+      targetPort: 9115

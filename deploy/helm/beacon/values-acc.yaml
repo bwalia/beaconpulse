@@ -1,0 +1,29 @@
+# ── Acceptance (staging/pre-prod) environment ──────────────────────────────
+# Namespace: acc   Host: https://acc.beaconpulse.net
+# Secrets:   Vault  secret/beaconpulse/acc/config
+env: acc
+host: acc.beaconpulse.net
+
+app:
+  beaconEnv: staging
+  logLevel: info
+  promRetention: 15d
+  replicas:
+    api: 2
+    frontend: 1
+
+ai:
+  enabled: true
+  baseURL: https://ollama.workstation.co.uk
+  model: qwen3:30b-a3b
+  timeout: 60s
+
+storage:
+  postgres: 10Gi
+  redis: 1Gi
+  prometheus: 10Gi
+  alertmanager: 1Gi
+
+ingress:
+  enabled: true
+  tls: true

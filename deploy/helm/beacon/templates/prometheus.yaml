@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+    {{- include "beacon.selector" "prometheus" | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "beacon.selector" "prometheus" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "beacon.labels" . | nindent 8 }}
+        {{- include "beacon.selector" "prometheus" | nindent 8 }}
+    spec:
+      # Same fsGroup as api/worker so the shared generated volume (written by
+      # them, read here) needs no per-pod ownership dance.
+      securityContext:
+        fsGroup: 10001
+      {{- with .Values.controlPlaneNodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: prometheus
+          image: {{ .Values.images.prometheus }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.retention.time={{ .Values.app.promRetention }}
+            - --web.enable-lifecycle
+            - --web.external-url=https://{{ .Values.host }}/prometheus/
+            - --web.route-prefix=/
+          ports:
+            - containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 9090
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.resources.prometheus | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+            - name: generated
+              mountPath: /etc/prometheus/generated
+              readOnly: true
+            - name: data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: beacon-prometheus-config
+        - name: generated
+          persistentVolumeClaim:
+            claimName: beacon-prom-generated
+        - name: data
+          persistentVolumeClaim:
+            claimName: beacon-prometheus-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "beacon.selector" "prometheus" | nindent 4 }}
+  ports:
+    - port: 9090
+      targetPort: 9090

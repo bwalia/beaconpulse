@@ -1,0 +1,30 @@
+# ── Test environment ────────────────────────────────────────────────────────
+# Namespace: test   Host: https://test.beaconpulse.net
+# Secrets:   Vault  secret/beaconpulse/test/config
+env: test
+host: test.beaconpulse.net
+
+app:
+  beaconEnv: staging
+  logLevel: info
+  promRetention: 7d
+  replicas:
+    api: 1
+    frontend: 1
+
+# AI disabled in test by default; flip enabled + populate Vault to turn on.
+ai:
+  enabled: false
+  baseURL: https://ollama.workstation.co.uk
+  model: qwen3:30b-a3b
+  timeout: 60s
+
+storage:
+  postgres: 5Gi
+  redis: 1Gi
+  prometheus: 5Gi
+  alertmanager: 1Gi
+
+ingress:
+  enabled: true
+  tls: true

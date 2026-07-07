@@ -1,0 +1,30 @@
+# ── Integration environment ────────────────────────────────────────────────
+# Namespace: int   Host: https://int.beaconpulse.net
+# Secrets:   Vault  secret/beaconpulse/int/config
+env: int
+host: int.beaconpulse.net
+
+app:
+  beaconEnv: staging
+  logLevel: debug
+  promRetention: 7d
+  replicas:
+    api: 1
+    frontend: 1
+
+# AI alert enrichment (API key comes from Vault: BEACON_AI_API_KEY).
+ai:
+  enabled: true
+  baseURL: https://ollama.workstation.co.uk
+  model: qwen3:30b-a3b
+  timeout: 60s
+
+storage:
+  postgres: 5Gi
+  redis: 1Gi
+  prometheus: 5Gi
+  alertmanager: 1Gi
+
+ingress:
+  enabled: true
+  tls: true

@@ -1,0 +1,30 @@
+{{- /*
+Persistent volumes. The two control-plane surfaces (prom-generated,
+blackbox-config) are written by api/worker and read by prometheus/blackbox. On
+single-node k3s the RWO volumes are shared by pods on the same node; for
+multi-node clusters switch storage.className to an RWX provisioner (NFS/Longhorn)
+and set controlPlaneNodeSelector, or co-locate via affinity.
+*/}}
+{{- $vols := list
+  (dict "name" "beacon-postgres-data" "size" .Values.storage.postgres)
+  (dict "name" "beacon-redis-data" "size" .Values.storage.redis)
+  (dict "name" "beacon-prometheus-data" "size" .Values.storage.prometheus)
+  (dict "name" "beacon-alertmanager-data" "size" .Values.storage.alertmanager)
+  (dict "name" "beacon-prom-generated" "size" .Values.storage.promGenerated)
+  (dict "name" "beacon-blackbox-config" "size" .Values.storage.blackboxConfig)
+}}
+{{- range $v := $vols }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $v.name }}
+  labels:
+    {{- include "beacon.labels" $ | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ $.Values.storage.className }}
+  resources:
+    requests:
+      storage: {{ $v.size }}
+{{- end }}

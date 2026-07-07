@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+    {{- include "beacon.selector" "alertmanager" | nindent 4 }}
+  annotations:
+    # Roll when the webhook token (in beacon-secrets) rotates.
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "beacon.selector" "alertmanager" | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "beacon.labels" . | nindent 8 }}
+        {{- include "beacon.selector" "alertmanager" | nindent 8 }}
+    spec:
+      securityContext:
+        fsGroup: 10001
+      containers:
+        - name: alertmanager
+          image: {{ .Values.images.alertmanager }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+            - --web.external-url=https://{{ .Values.host }}/alertmanager/
+            - --web.route-prefix=/
+          ports:
+            - containerPort: 9093
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9093
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.resources.alertmanager | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager/alertmanager.yml
+              subPath: alertmanager.yml
+            - name: webhook-token
+              mountPath: /etc/alertmanager/secret
+              readOnly: true
+            - name: data
+              mountPath: /alertmanager
+      volumes:
+        - name: config
+          configMap:
+            name: beacon-alertmanager-config
+        - name: webhook-token
+          secret:
+            secretName: beacon-secrets
+            items:
+              - key: BEACON_WEBHOOK_TOKEN
+                path: webhook-token
+        - name: data
+          persistentVolumeClaim:
+            claimName: beacon-alertmanager-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "beacon.selector" "alertmanager" | nindent 4 }}
+  ports:
+    - port: 9093
+      targetPort: 9093
