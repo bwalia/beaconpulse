@@ -12,15 +12,20 @@ env: int
 # ALWAYS overridden by the env values file, e.g. int.beaconpulse.net.
 host: int.beaconpulse.net
 
-# ── Beacon application images (built + pushed by CI to Docker Hub) ──────────
+# ── Beacon application images (built + pushed by CI to the SpectonCR registry) ─
 # api and worker are the same image (both binaries); they differ only by command.
 image:
-  api: bwalia/beacon-api
-  worker: bwalia/beacon-worker
-  frontend: bwalia/beacon-frontend
+  registry: spectoncr.workstation.co.uk
+  namespace: beacon
+  api: spectoncr.workstation.co.uk/beacon/api
+  worker: spectoncr.workstation.co.uk/beacon/worker
+  frontend: spectoncr.workstation.co.uk/beacon/frontend
   # Overridden per-deploy by CI with the git SHA for immutable, traceable rollouts.
   tag: latest
   pullPolicy: IfNotPresent
+  # dockerconfigjson pull secret the cluster uses to pull from the private
+  # registry (created by templates/registry-secret.yaml). Empty = public registry.
+  pullSecret: beacon-registry
 
 # ── Third-party images (pinned to match docker-compose) ────────────────────
 images:
@@ -98,6 +103,9 @@ secrets:
   webhookToken: ""
   postgresPassword: ""
   aiApiKey: ""
+  # SpectonCR registry pull credentials (fallback path only).
+  registryUsername: ""
+  registryPassword: ""
 
 # ── Ingress (single gateway host) ──────────────────────────────────────────
 ingress:

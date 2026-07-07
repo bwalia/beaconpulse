@@ -24,6 +24,7 @@ spec:
         {{- include "beacon.labels" . | nindent 8 }}
         {{- include "beacon.selector" "api" | nindent 8 }}
     spec:
+      {{- include "beacon.imagePullSecrets" . | nindent 6 }}
       # Run as the image's non-root beacon user; fsGroup lets it write the shared
       # control-plane volumes (Prometheus generated files + Blackbox config).
       securityContext:

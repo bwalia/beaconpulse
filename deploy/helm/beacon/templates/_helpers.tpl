@@ -114,6 +114,17 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
 {{- end -}}
 
 {{/*
+imagePullSecrets block for pods that pull Beacon images from the private
+SpectonCR registry. Renders nothing when no pullSecret is configured.
+*/}}
+{{- define "beacon.imagePullSecrets" -}}
+{{- if .Values.image.pullSecret }}
+imagePullSecrets:
+  - name: {{ .Values.image.pullSecret }}
+{{- end }}
+{{- end -}}
+
+{{/*
 Shared volumes + mounts for control-plane surfaces (api/worker).
 */}}
 {{- define "beacon.backendVolumeMounts" -}}

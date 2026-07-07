@@ -40,7 +40,9 @@ on:
         required: false
 
 env:
-  IMAGE_REGISTRY: bwalia
+  # Own SpectonCR registry (private OCI registry, https via the wslproxy ingress).
+  IMAGE_REGISTRY: spectoncr.workstation.co.uk
+  IMAGE_NAMESPACE: beacon
   TARGET_ENV: ${{ github.event.inputs.TARGET_ENV || 'int' }}
   DEPLOYMENT_TYPE: ${{ github.event.inputs.DEPLOYMENT_TYPE || 'build-and-deploy' }}
 
@@ -56,40 +58,39 @@ jobs:
         id: tag
         run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: Docker login
+      - name: Registry login (SpectonCR)
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
-        run: docker login -u "${{ secrets.DOCKER_USERNAME }}" -p "${{ secrets.DOCKER_PASSWD }}"
+        run: docker login "$IMAGE_REGISTRY" -u "${{ secrets.REGISTRY_USERNAME }}" -p "${{ secrets.REGISTRY_PASSWORD }}"
 
       - name: Build & push backend (api + worker share one image)
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         run: |
           set -euo pipefail
           SHA=${{ steps.tag.outputs.sha }}
+          NS="$IMAGE_REGISTRY/$IMAGE_NAMESPACE"
           # One backend image contains both binaries; api/worker differ by command.
           docker build -f deploy/docker/Dockerfile.backend \
-            -t "$IMAGE_REGISTRY/beacon-api:$SHA" \
-            -t "$IMAGE_REGISTRY/beacon-api:latest" \
-            -t "$IMAGE_REGISTRY/beacon-worker:$SHA" \
-            -t "$IMAGE_REGISTRY/beacon-worker:latest" .
-          docker push "$IMAGE_REGISTRY/beacon-api:$SHA"
-          docker push "$IMAGE_REGISTRY/beacon-api:latest"
-          docker push "$IMAGE_REGISTRY/beacon-worker:$SHA"
-          docker push "$IMAGE_REGISTRY/beacon-worker:latest"
+            -t "$NS/api:$SHA" -t "$NS/api:latest" \
+            -t "$NS/worker:$SHA" -t "$NS/worker:latest" .
+          docker push "$NS/api:$SHA"
+          docker push "$NS/api:latest"
+          docker push "$NS/worker:$SHA"
+          docker push "$NS/worker:latest"
 
       - name: Build & push frontend
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         run: |
           set -euo pipefail
           SHA=${{ steps.tag.outputs.sha }}
+          NS="$IMAGE_REGISTRY/$IMAGE_NAMESPACE"
           # Empty NEXT_PUBLIC_API_BASE_URL => the browser calls the API same-origin
           # (/api/...) through the gateway. No CORS.
           docker build -f frontend/Dockerfile \
             --build-arg NEXT_PUBLIC_API_BASE_URL="" \
-            -t "$IMAGE_REGISTRY/beacon-frontend:$SHA" \
-            -t "$IMAGE_REGISTRY/beacon-frontend:latest" \
+            -t "$NS/frontend:$SHA" -t "$NS/frontend:latest" \
             ./frontend
-          docker push "$IMAGE_REGISTRY/beacon-frontend:$SHA"
-          docker push "$IMAGE_REGISTRY/beacon-frontend:latest"
+          docker push "$NS/frontend:$SHA"
+          docker push "$NS/frontend:latest"
 
   deploy:
     runs-on: self-hosted

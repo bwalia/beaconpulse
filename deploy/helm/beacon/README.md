@@ -7,9 +7,9 @@ Deploys the full Beacon stack to a k3s cluster, one release per environment
 
 | Component | Kind | Image | Notes |
 |---|---|---|---|
-| api | Deployment + Service | `bwalia/beacon-api` | REST API; auto-runs migrations on start |
-| worker | Deployment | `bwalia/beacon-worker` | reconciles Prometheus/Blackbox config |
-| frontend | Deployment + Service | `bwalia/beacon-frontend` | Next.js dashboard |
+| api | Deployment + Service | `spectoncr.workstation.co.uk/beacon/api` | REST API; auto-runs migrations on start |
+| worker | Deployment | `spectoncr.workstation.co.uk/beacon/worker` | reconciles Prometheus/Blackbox config |
+| frontend | Deployment + Service | `spectoncr.workstation.co.uk/beacon/frontend` | Next.js dashboard |
 | prometheus | Deployment + Service | `prom/prometheus` | reads Beacon-generated scrape jobs/rules |
 | blackbox | Deployment + Service | `prom/blackbox-exporter` | probes; seeded then worker-managed |
 | alertmanager | Deployment + Service | `prom/alertmanager` | webhook → Beacon API |
@@ -51,6 +51,8 @@ syncs them into the `beacon-secrets` Secret:
 | `BEACON_WEBHOOK_TOKEN` | shared secret Alertmanager presents to the API webhook |
 | `POSTGRES_PASSWORD` | in-cluster Postgres password (also builds the API DSN) |
 | `BEACON_AI_API_KEY` | *(optional)* signing secret for the Ollama `x-api-key` JWT |
+| `REGISTRY_USERNAME` | SpectonCR registry user — builds the `beacon-registry` image pull secret |
+| `REGISTRY_PASSWORD` | SpectonCR registry password/token |
 
 `prod` runs with `BEACON_ENV=production`, which **refuses to start** with default
 ("change-me") secrets — provide real values.
@@ -61,9 +63,11 @@ Secret is templated instead).
 
 ## Deploy
 
-Via the GitHub Actions workflow (`.github/workflows/deploy-k3s.yml`) — manual
-`workflow_dispatch` with `TARGET_ENV` + `DEPLOYMENT_TYPE`. It builds/pushes the
-three images to Docker Hub (`bwalia/beacon-*`, tagged with the short SHA) and runs:
+Via the GitHub Actions workflow (`.github/workflows/deploy-k3s.yml`) — push to
+`main` auto build+deploys `int`; `workflow_dispatch` promotes to any env. It
+builds/pushes the three images to the SpectonCR registry
+(`spectoncr.workstation.co.uk/beacon/{api,worker,frontend}`, tagged with the
+short SHA) and runs:
 
 ```sh
 helm upgrade --install beacon ./deploy/helm/beacon \
@@ -72,8 +76,11 @@ helm upgrade --install beacon ./deploy/helm/beacon \
   --namespace <env> --create-namespace --wait
 ```
 
-Required GitHub Actions secrets: `DOCKER_USERNAME`, `DOCKER_PASSWD`,
-`KUBE_CONFIG_DATA_K3S` (base64 kubeconfig), `SLACK_WEBHOOK` (optional).
+Required GitHub Actions secrets: `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`
+(SpectonCR login), `KUBE_CONFIG_DATA_K3S` (base64 kubeconfig), `SLACK_WEBHOOK`
+(optional). The cluster also needs `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` in
+Vault (`secret/beaconpulse/<env>/config`) for the `beacon-registry` image pull
+secret.
 
 ### Manual deploy
 
