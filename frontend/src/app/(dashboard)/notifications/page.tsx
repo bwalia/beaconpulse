@@ -12,8 +12,9 @@ import {
   useTestChannel,
 } from "@/lib/hooks";
 import { ApiRequestError } from "@/lib/api";
-import { Button, Card, Field, Input } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton } from "@/components/ui";
 import type { NotificationChannel } from "@/lib/types";
+import { BellIcon, LockIcon, PlusIcon, XIcon } from "@/components/icons";
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -30,23 +31,25 @@ export default function NotificationsPage() {
   const [notice, setNotice] = useState<Notice>(null);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Notifications</h1>
-          <p className="text-sm text-slate-500">
-            Get alerted on Telegram the moment something goes down.
-          </p>
-        </div>
-        <Button onClick={() => setShowForm((v) => !v)}>{showForm ? "Close" : "Add Telegram"}</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Notifications"
+        subtitle="Get alerted on Telegram the moment something goes down."
+        actions={
+          <Button onClick={() => setShowForm((v) => !v)}>
+            {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
+            {showForm ? "Close" : "Add Telegram"}
+          </Button>
+        }
+      />
 
       {notice && (
         <div
-          className={`rounded-lg px-4 py-2 text-sm ${
+          role={notice.kind === "ok" ? "status" : "alert"}
+          className={`rounded-lg px-4 py-2 text-sm font-medium ${
             notice.kind === "ok"
-              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-              : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+              ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200"
+              : "bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-200"
           }`}
         >
           {notice.text}
@@ -56,13 +59,25 @@ export default function NotificationsPage() {
       {showForm && <CreateTelegramForm onDone={() => setShowForm(false)} setNotice={setNotice} />}
 
       {isLoading ? (
-        <p className="text-slate-500">Loading…</p>
+        <div className="space-y-3">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-xl" />
+          ))}
+        </div>
       ) : !data?.data.length ? (
-        <Card>
-          <p className="text-center text-slate-500">
-            No channels yet. Add a Telegram channel to start receiving alerts.
-          </p>
-        </Card>
+        <EmptyState
+          icon={<BellIcon className="h-5 w-5" />}
+          title="No channels yet"
+          action={
+            <Button onClick={() => setShowForm(true)}>
+              <PlusIcon className="h-4 w-4" />
+              Add Telegram
+            </Button>
+          }
+        >
+          Connect a Telegram channel and Beacon will message you the moment a monitor goes down — enriched with AI
+          triage when enabled.
+        </EmptyState>
       ) : (
         <div className="space-y-3">
           {data.data.map((c) => (
@@ -99,8 +114,15 @@ function ChannelRow({
             </span>
           )}
         </div>
-        <p className="mt-0.5 text-xs text-slate-400">
-          chat: {channel.config.chat_id} · token {channel.has_secret ? "stored 🔒" : "missing"}
+        <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+          chat: {channel.config.chat_id} · token{" "}
+          {channel.has_secret ? (
+            <span className="inline-flex items-center gap-1">
+              stored <LockIcon className="h-3 w-3" />
+            </span>
+          ) : (
+            "missing"
+          )}
         </p>
       </div>
       <div className="flex gap-2">
@@ -173,7 +195,7 @@ function CreateTelegramForm({
 
   return (
     <Card>
-      <div className="mb-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/50">
+      <div className="mb-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
         <p className="font-medium text-slate-600 dark:text-slate-300">How to set up a Telegram bot:</p>
         <ol className="mt-1 list-decimal space-y-0.5 pl-4">
           <li>Message <span className="font-mono">@BotFather</span>, send <span className="font-mono">/newbot</span>, copy the token.</li>

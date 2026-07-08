@@ -171,11 +171,17 @@ export function useActiveAlerts() {
   });
 }
 
-export function useOverview() {
+// useOverview fetches the org dashboard rollup for one window. `hours` must be a
+// value the API allowlists (1, 6, 24, 168, 720) and is part of the query key, so
+// switching range refetches instead of serving the previous window's data.
+export function useOverview(hours: number = 24) {
   return useQuery({
-    queryKey: ["overview"],
-    queryFn: () => api.get<Overview>("/api/v1/overview"),
+    queryKey: ["overview", hours],
+    queryFn: () => api.get<Overview>(`/api/v1/overview?hours=${hours}`),
     refetchInterval: 30000,
+    // Keep the previous window on screen while the new one loads, so switching
+    // range dissolves rather than flashing a skeleton.
+    placeholderData: (previous) => previous,
   });
 }
 

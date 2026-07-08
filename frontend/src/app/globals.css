@@ -2,8 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light dark;
+/* Tailwind runs in `darkMode: "class"`, so `color-scheme` must follow that class
+   rather than the OS. Declaring `light dark` here made the browser paint native
+   controls and scrollbars dark while the page stayed light. The inline script in
+   layout.tsx also sets this on <html> before first paint; these rules are the
+   no-JS fallback. */
+html {
+  color-scheme: light;
+  /* 17px base (16 x 1.0625). Tailwind's type scale AND its spacing scale are in
+     rem, so one line lifts every size proportionally instead of us hand-editing
+     hundreds of classes. Anything hard-coded in px (chart heights, the 1600px
+     container) deliberately stays put. */
+  font-size: 106.25%;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 html,
@@ -11,6 +25,29 @@ body {
   height: 100%;
 }
 
+/* Fira Code ships programming ligatures — it fuses `www` into a single glyph, and
+   monitor targets are URLs. Data must render exactly as stored, so turn them off
+   everywhere we use the mono face. */
+.font-mono {
+  font-variant-ligatures: none;
+  font-feature-settings:
+    "liga" 0,
+    "calt" 0;
+}
+
 body {
   @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+}
+
+/* Global safety net: even if a component forgets `motion-safe:`, users who ask the
+   OS for reduced motion get none. Belt-and-braces alongside the utility variants. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

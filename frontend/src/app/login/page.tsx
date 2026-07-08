@@ -8,6 +8,7 @@ import { z } from "zod";
 import { useAuth } from "@/lib/auth";
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, Field, Input } from "@/components/ui";
+import { BeaconMark } from "@/components/icons";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -31,23 +32,27 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 p-4 dark:from-slate-950 dark:to-slate-900">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 text-2xl">
-            🛰️
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-brand-600 text-white shadow-lg shadow-brand-600/20 ring-1 ring-brand-700/20">
+            <BeaconMark className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-bold">Beacon</h1>
-          <p className="text-sm text-slate-500">Self-hosted infrastructure monitoring</p>
+          <h1 className="text-2xl font-bold tracking-tight">Beacon</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Self-hosted infrastructure monitoring</p>
         </div>
 
         <Card>
-          <div className="mb-4 flex rounded-lg bg-slate-100 p-1 text-sm dark:bg-slate-800">
+          {/* Tab semantics: aria-pressed tells AT which mode is active — the styling
+              alone would not. */}
+          <div role="group" aria-label="Authentication mode" className="mb-4 flex rounded-lg bg-slate-100 p-1 text-sm dark:bg-slate-800">
             {(["login", "register"] as const).map((m) => (
               <button
                 key={m}
+                type="button"
                 onClick={() => setMode(m)}
-                className={`flex-1 rounded-md px-3 py-1.5 font-medium capitalize transition ${
+                aria-pressed={mode === m}
+                className={`flex-1 rounded-md px-3 py-1.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 motion-reduce:transition-none ${
                   mode === m
                     ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
-                    : "text-slate-500"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
                 }`}
               >
                 {m === "login" ? "Sign in" : "Create account"}

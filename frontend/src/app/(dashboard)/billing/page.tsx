@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useBilling, useChangePlan } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
 import { ApiRequestError } from "@/lib/api";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, PageHeader, Skeleton } from "@/components/ui";
 import type { PlanInfo } from "@/lib/types";
+import { CheckIcon } from "@/components/icons";
 
 export default function BillingPage() {
   const { data, isLoading } = useBilling();
@@ -28,18 +29,16 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Plans &amp; billing</h1>
-        <p className="text-sm text-slate-500">Choose the plan that fits your monitoring needs.</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Plans & billing" subtitle="Choose the plan that fits your monitoring needs." />
 
       {notice && (
         <div
-          className={`rounded-lg px-4 py-2 text-sm ${
+          role={notice.kind === "ok" ? "status" : "alert"}
+          className={`rounded-lg px-4 py-2 text-sm font-medium ${
             notice.kind === "ok"
-              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-              : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+              ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200"
+              : "bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-200"
           }`}
         >
           {notice.text}
@@ -47,7 +46,11 @@ export default function BillingPage() {
       )}
 
       {isLoading ? (
-        <p className="text-slate-500">Loading…</p>
+        <div className="grid gap-4 md:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-80 w-full rounded-xl" />
+          ))}
+        </div>
       ) : (
         <div className="grid gap-5 md:grid-cols-3">
           {data?.plans.map((p, idx) => {
@@ -68,12 +71,12 @@ export default function BillingPage() {
                 <h2 className="text-lg font-bold">{p.name}</h2>
                 <p className="mt-1">
                   <span className="text-3xl font-bold">${p.price_monthly}</span>
-                  <span className="text-sm text-slate-500">/mo</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">/mo</span>
                 </p>
                 <ul className="mt-4 flex-1 space-y-2 text-sm">
                   {p.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-slate-600 dark:text-slate-300">
-                      <span className="text-emerald-500">✓</span>
+                      <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                       {f}
                     </li>
                   ))}
@@ -104,7 +107,7 @@ export default function BillingPage() {
         </div>
       )}
 
-      <p className="text-center text-xs text-slate-400">
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400">
         This is a self-serve switch for the demo. A production deployment routes upgrades through a payment
         provider (e.g. Stripe Checkout) and sets the plan from the billing webhook.
       </p>
