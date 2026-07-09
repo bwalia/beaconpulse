@@ -37,7 +37,7 @@ spec:
       {{- end }}
       containers:
         - name: api
-          image: {{ include "beacon.image" (dict "repo" .Values.image.api "tag" .Values.image.tag) }}
+          image: {{ include "beacon.image" (dict "root" . "name" "api") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["api"]
           ports:
