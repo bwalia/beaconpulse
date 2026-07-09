@@ -21,6 +21,10 @@ spec:
     spec:
       securityContext:
         fsGroup: 999
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: postgres
           image: {{ .Values.images.postgres }}

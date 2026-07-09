@@ -1,9 +1,10 @@
 {{- /*
 Persistent volumes. The two control-plane surfaces (prom-generated,
 blackbox-config) are written by api/worker and read by prometheus/blackbox. On
-single-node k3s the RWO volumes are shared by pods on the same node; for
-multi-node clusters switch storage.className to an RWX provisioner (NFS/Longhorn)
-and set controlPlaneNodeSelector, or co-locate via affinity.
+single-node k3s the RWO volumes are shared by pods on the same node. The global
+nodeSelector (values.yaml) pins every pod to one node, so RWO stays valid on
+multi-node clusters too; for true multi-node spread switch storage.className to an
+RWX provisioner (NFS/Longhorn) and drop the nodeSelector.
 */}}
 {{- $vols := list
   (dict "name" "beacon-postgres-data" "size" .Values.storage.postgres)

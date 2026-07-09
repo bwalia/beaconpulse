@@ -22,7 +22,7 @@ spec:
       # them, read here) needs no per-pod ownership dance.
       securityContext:
         fsGroup: 10001
-      {{- with .Values.controlPlaneNodeSelector }}
+      {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
