@@ -13,8 +13,8 @@ name: Register WSL Proxy Domains (Beaconpulse)
 #
 # Chain once live:
 #   browser -> <host> --(Cloudflare CNAME, see deploy-k3s.yml dns job)-->
-#   pop0.wslproxy.com (this edge terminates TLS) -> 192.168.11.121/132:32100
-#   (the k3s in-cluster wslproxy ingress) -> beacon nginx gateway -> app
+#   pop0.wslproxy.com (== prod-our edge, 187.124.112.155; terminates TLS)
+#   -> http://193.237.176.232:32100 (k3s0 ingress NodePort) -> beacon nginx -> app
 #
 # Push method — /api/projects/import (same as the diy-tax-return-uk workflow this
 # is modelled on). Import writes each record verbatim under
@@ -22,9 +22,11 @@ name: Register WSL Proxy Domains (Beaconpulse)
 # the server->rule link (server.rules == rule.id) stays intact. A plain POST
 # /api/rules would mint a fresh UUID and break that link.
 #
-# Runner: ubuntu-latest (has curl + jq, needs only egress to the control plane).
-# If your WSL Proxy control plane is not reachable from GitHub-hosted runners,
-# change runs-on to your Linux self-hosted runner.
+# Runner: self-hosted. The WSL Proxy control plane (prod-our.wslproxy.com) is NOT
+# reachable from GitHub-hosted runners — it only answers on the operator's network
+# — so a hosted runner's login times out (curl exit 28). The self-hosted runner
+# sits on that network and reaches it in milliseconds. This is the same reason the
+# diy-tax-return-uk workflow runs self-hosted.
 #
 # Auth (either works):
 #   • Secret WSLPROXY_TOKEN present -> used directly as the JWT bearer.
@@ -69,13 +71,18 @@ on:
 jobs:
   push-domains:
     name: "Push ${{ inputs.TARGET_ENV }} domains to WSL Proxy"
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ensure jq
-        run: command -v jq >/dev/null || { sudo apt-get update && sudo apt-get install -y jq; }
+      - name: Ensure jq + curl
+        # The runner already has both; fail with a clear message rather than
+        # assume a package manager (this runner is macOS, not Debian).
+        run: |
+          for t in jq curl; do
+            command -v "$t" >/dev/null || { echo "::error::$t is not installed on the self-hosted runner"; exit 1; }
+          done
 
       - name: Validate inputs and data dir
         env:
@@ -124,9 +131,12 @@ jobs:
           else
             [ -n "$ADMIN_EMAIL" ] || { echo "::error::No WSLPROXY_TOKEN and no admin email (set ADMIN_EMAIL input or WSLPROXY_ADMIN_EMAIL var)."; exit 1; }
             echo "Logging in to $GATEWAY_DOMAIN as $ADMIN_EMAIL ..."
-            RESPONSE=$(curl -s -X POST "${GATEWAY_DOMAIN%/}/api/user/login" \
+            # --max-time so an unreachable control plane fails in seconds, not after
+            # a 2-minute hang (the original ubuntu-latest failure mode: curl exit 28).
+            RESPONSE=$(curl -sS --max-time 30 --connect-timeout 10 -X POST "${GATEWAY_DOMAIN%/}/api/user/login" \
               -H "Content-Type: application/json" \
-              -d "{\"email\": \"$ADMIN_EMAIL\", \"password\": \"$ADMIN_PASSWORD\"}")
+              -d "{\"email\": \"$ADMIN_EMAIL\", \"password\": \"$ADMIN_PASSWORD\"}") || {
+                echo "::error::Could not reach the control plane at $GATEWAY_DOMAIN (curl failed). Is the runner on a network that can reach it?"; exit 1; }
             TOKEN=$(echo "$RESPONSE" | jq -r '.data.accessToken')
             if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
               echo "::error::Login failed"; echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"; exit 1
@@ -160,7 +170,7 @@ jobs:
               echo "$arr" | jq '[.[] | {id, name: (.name // .server_name), profile_id, config_status}]'
               return 0
             fi
-            resp=$(curl -sS -w "\n%{http_code}" -X POST "${GATEWAY_DOMAIN%/}/api/projects/import?_format=json" \
+            resp=$(curl -sS --max-time 60 --connect-timeout 10 -w "\n%{http_code}" -X POST "${GATEWAY_DOMAIN%/}/api/projects/import?_format=json" \
               -H "Authorization: Bearer $TOKEN" \
               -H "x-platform: react-admin" \
               -H "Content-Type: application/json" \
