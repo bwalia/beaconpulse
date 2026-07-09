@@ -34,14 +34,15 @@ on:
   workflow_dispatch:
     inputs:
       TARGET_ENV:
-        description: "Environment to push (only this env's data dir is sent)"
+        description: "Profile dir to push. All beaconpulse hosts live under 'prod'."
         required: true
+        default: prod
         type: choice
         options:
+          - prod
           - int
           - test
           - acc
-          - prod
       GATEWAY_DOMAIN:
         description: "WSL Proxy control-plane API base URL. Blank -> WSLPROXY_GATEWAY_DOMAIN repo variable."
         required: false

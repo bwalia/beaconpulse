@@ -34,6 +34,9 @@
     }
   },
   "servers": [
+    "host:int.beaconpulse.net",
+    "host:test.beaconpulse.net",
+    "host:acc.beaconpulse.net",
     "host:beaconpulse.net"
   ]
 }

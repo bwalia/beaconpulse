@@ -1,14 +1,14 @@
 {
-  "id": "host:int.beaconpulse.net",
-  "server_name": "int.beaconpulse.net",
-  "proxy_server_name": "int.beaconpulse.net",
+  "id": "host:acc.beaconpulse.net",
+  "server_name": "acc.beaconpulse.net",
+  "proxy_server_name": "acc.beaconpulse.net",
   "root": "/var/www/html",
   "index": "index.html",
-  "access_log": "logs/int.beaconpulse.net.access.log",
-  "error_log": "logs/int.beaconpulse.net.error.log",
+  "access_log": "logs/acc.beaconpulse.net.access.log",
+  "error_log": "logs/acc.beaconpulse.net.error.log",
   "config_status": false,
-  "profile_id": "int",
-  "rules": "beaconpulse-int-default",
+  "profile_id": "prod",
+  "rules": "beaconpulse-prod-default",
   "listens": [
     {
       "listen": "80"
