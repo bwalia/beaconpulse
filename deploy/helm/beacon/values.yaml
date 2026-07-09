@@ -13,13 +13,17 @@ env: int
 host: int.beaconpulse.net
 
 # ── Beacon application images (built + pushed by CI to the SpectonCR registry) ─
+# Full refs are composed as <registry>/<namespace>/<name>:<tag>, so the registry
+# host is stated exactly once and cannot drift between the three images.
 # api and worker are the same image (both binaries); they differ only by command.
 image:
-  registry: spectoncr.workstation.co.uk
+  # SpectonCR resolves per environment, matching the platform's other charts:
+  # prod lives at the bare host, every other env gets the env prefix.
+  #   int  -> int-spectoncr.diytaxreturn.co.uk
+  #   prod -> spectoncr.diytaxreturn.co.uk
+  # CI passes --set image.registry=<resolved> and asserts it matches this file.
+  registry: int-spectoncr.diytaxreturn.co.uk
   namespace: beacon
-  api: spectoncr.workstation.co.uk/beacon/api
-  worker: spectoncr.workstation.co.uk/beacon/worker
-  frontend: spectoncr.workstation.co.uk/beacon/frontend
   # Overridden per-deploy by CI with the git SHA for immutable, traceable rollouts.
   tag: latest
   pullPolicy: IfNotPresent

@@ -1,6 +1,6 @@
 name: ->Beacon Build/Push Docker Images and Deploy to K3S
 
-# Build the three Beacon images (api, worker, frontend) to Docker Hub and deploy
+# Build the three Beacon images (api, worker, frontend) to SpectonCR and deploy
 # the Helm chart to the chosen environment's namespace on k3s. Manual trigger so
 # environment promotion is deliberate — same pattern as the opsapi platform.
 on:
@@ -40,8 +40,10 @@ on:
         required: false
 
 env:
-  # Own SpectonCR registry (private OCI registry, https via the wslproxy ingress).
-  IMAGE_REGISTRY: spectoncr.workstation.co.uk
+  # SpectonCR (private OCI registry, https via the wslproxy ingress). The host is
+  # resolved per environment in the `Resolve registry` step below rather than being
+  # hardcoded here — prod sits on the bare host, every other env gets the env
+  # prefix. Same convention as the platform's other charts.
   IMAGE_NAMESPACE: beacon
   TARGET_ENV: ${{ github.event.inputs.TARGET_ENV || 'int' }}
   DEPLOYMENT_TYPE: ${{ github.event.inputs.DEPLOYMENT_TYPE || 'build-and-deploy' }}
@@ -86,6 +88,8 @@ jobs:
   build:
     # Self-hosted runner (must have Docker available to build + push images).
     runs-on: self-hosted
+    outputs:
+      registry: ${{ steps.reg.outputs.registry }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,16 +98,42 @@ jobs:
         id: tag
         run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
+      # Not gated on DEPLOYMENT_TYPE: `deploy`-only runs still need this output.
+      - name: Resolve registry for this environment
+        id: reg
+        run: |
+          set -euo pipefail
+          case "$TARGET_ENV" in
+            prod) REGISTRY="spectoncr.diytaxreturn.co.uk" ;;
+            *)    REGISTRY="${TARGET_ENV}-spectoncr.diytaxreturn.co.uk" ;;
+          esac
+
+          # Drift guard: the chart must pull from the same host we push to.
+          # Without this you can publish to int-spectoncr and have the cluster
+          # quietly ImagePullBackOff against a stale registry from the values file.
+          VALUES="deploy/helm/beacon/values-${TARGET_ENV}.yaml"
+          CHART_REG="$(awk '/^image:/{f=1;next} f && /^  registry:/{print $2; exit}' "$VALUES")"
+          if [ "$CHART_REG" != "$REGISTRY" ]; then
+            echo "::error::registry drift — workflow resolves '$REGISTRY' but ${VALUES} declares '${CHART_REG}'"
+            exit 1
+          fi
+
+          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+          echo "Registry for '${TARGET_ENV}': ${REGISTRY}"
+
       - name: Registry login (SpectonCR)
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
-        run: docker login "$IMAGE_REGISTRY" -u "${{ secrets.REGISTRY_USERNAME }}" -p "${{ secrets.REGISTRY_PASSWORD }}"
+        run: |
+          docker login "${{ steps.reg.outputs.registry }}" \
+            -u "${{ secrets.NEBULACR_USERNAME }}" \
+            -p "${{ secrets.NEBULACR_PASSWORD }}"
 
       - name: Build & push backend (api + worker share one image)
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         run: |
           set -euo pipefail
           SHA=${{ steps.tag.outputs.sha }}
-          NS="$IMAGE_REGISTRY/$IMAGE_NAMESPACE"
+          NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
           # One backend image contains both binaries; api/worker differ by command.
           docker build -f deploy/docker/Dockerfile.backend \
             -t "$NS/api:$SHA" -t "$NS/api:latest" \
@@ -118,7 +148,7 @@ jobs:
         run: |
           set -euo pipefail
           SHA=${{ steps.tag.outputs.sha }}
-          NS="$IMAGE_REGISTRY/$IMAGE_NAMESPACE"
+          NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
           # Empty NEXT_PUBLIC_API_BASE_URL => the browser calls the API same-origin
           # (/api/...) through the gateway. No CORS.
           docker build -f frontend/Dockerfile \
@@ -167,8 +197,11 @@ jobs:
           TAG="${{ github.event.inputs.IMAGE_TAG }}"
           [ -z "$TAG" ] && TAG="${GITHUB_SHA::7}"
           echo "Deploying beacon to '$TARGET_ENV' namespace with image tag '$TAG'..."
+          # image.registry is pinned to the host the build job actually pushed to,
+          # so a values-file edit can never send the cluster to a different registry.
           helm upgrade --install beacon ./deploy/helm/beacon \
             -f ./deploy/helm/beacon/values-${TARGET_ENV}.yaml \
+            --set image.registry="${{ needs.build.outputs.registry }}" \
             --set image.tag="$TAG" \
             --namespace "$TARGET_ENV" --create-namespace \
             --wait --timeout 10m

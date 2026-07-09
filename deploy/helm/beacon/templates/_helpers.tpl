@@ -17,11 +17,14 @@ app: beacon-{{ . }}
 {{- end -}}
 
 {{/*
-Fully-qualified Beacon backend image reference (api or worker share a tag).
-Usage: {{ include "beacon.image" (dict "repo" .Values.image.api "tag" .Values.image.tag) }}
+Fully-qualified image reference: <registry>/<namespace>/<name>:<tag>.
+The registry host lives in exactly one value, so the three images can never point
+at different registries.
+Usage: {{ include "beacon.image" (dict "root" . "name" "api") }}
 */}}
 {{- define "beacon.image" -}}
-{{ .repo }}:{{ .tag }}
+{{- $img := .root.Values.image -}}
+{{ $img.registry }}/{{ $img.namespace }}/{{ .name }}:{{ $img.tag }}
 {{- end -}}
 
 {{/*
