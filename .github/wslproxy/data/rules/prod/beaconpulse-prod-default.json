@@ -1,0 +1,39 @@
+{
+  "id": "beaconpulse-prod-default",
+  "name": "beaconpulse-prod-default",
+  "profile_id": "prod",
+  "priority": 1,
+  "rules_tags": [
+    "beaconpulse",
+    "prod"
+  ],
+  "match": {
+    "rules": {
+      "path": "/",
+      "path_key": "starts_with"
+    },
+    "response": {
+      "code": 305,
+      "redirect_uri": "192.168.11.121:32100",
+      "strip_path": false,
+      "backends": [
+        {
+          "address": "192.168.11.121:32100",
+          "weight": 50,
+          "label": "k3s-node-0"
+        },
+        {
+          "address": "192.168.11.132:32100",
+          "weight": 50,
+          "label": "k3s-node-1"
+        }
+      ],
+      "routing": {
+        "mode": "weighted"
+      }
+    }
+  },
+  "servers": [
+    "host:beaconpulse.net"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "host:int.beaconpulse.net",
+  "server_name": "int.beaconpulse.net",
+  "proxy_server_name": "int.beaconpulse.net",
+  "root": "/var/www/html",
+  "index": "index.html",
+  "access_log": "logs/int.beaconpulse.net.access.log",
+  "error_log": "logs/int.beaconpulse.net.error.log",
+  "config_status": false,
+  "profile_id": "int",
+  "rules": "beaconpulse-int-default",
+  "listens": [
+    {
+      "listen": "80"
+    }
+  ],
+  "ssl_enabled": true,
+  "ssl_force_https": true,
+  "ssl_staging": false,
+  "ssl_auto_renew": true,
+  "ssl_email": "admin@beaconpulse.net",
+  "cache_enabled": false,
+  "match_cases": {},
+  "custom_headers": []
+}
