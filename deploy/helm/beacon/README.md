@@ -99,5 +99,38 @@ helm upgrade --install beacon ./deploy/helm/beacon \
 | acc | `acc` | acc.beaconpulse.net | staging | on |
 | prod | `prod` | beaconpulse.net | production | on |
 
-Point a DNS record for each host at the wslproxy ingress; cert-manager issues the
-TLS cert via `main-issuer`.
+## DNS
+
+DNS is automated. The `dns` job in `.github/workflows/deploy-k3s.yml` runs before
+`helm upgrade` and upserts a CNAME in Cloudflare:
+
+```
+<host from values-<env>.yaml>  CNAME  pop0.wslproxy.com   (proxied=false)
+```
+
+It reads the hostname straight out of the environment's values file, so the record
+can never drift from the host the Ingress actually claims. The upsert is idempotent
+— re-deploying is a no-op, and changing `host:` moves the record rather than
+creating a duplicate. cert-manager then issues TLS via `main-issuer`.
+
+`prod` is the zone apex (`beaconpulse.net`). A CNAME at the apex is illegal in
+plain DNS; Cloudflare accepts it and serves it via CNAME flattening.
+
+Records stay **DNS-only** (grey cloud, `proxied=false`) so cert-manager can solve
+the HTTP-01 challenge and wslproxy terminates TLS itself.
+
+Required GitHub Actions secrets:
+
+| Secret | Purpose |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Scoped token — `Zone:DNS:Edit` on `beaconpulse.net` |
+| `CLOUDFLARE_ZONE_ID` | *(recommended)* skips the zone lookup, so the token doesn't need `Zone:Read` |
+
+For one-off records (previews, TXT challenges) use the manual
+`.github/workflows/cloudflare-dns.yml` workflow, or run the script directly:
+
+```sh
+CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ZONE=beaconpulse.net \
+  ./deploy/scripts/cloudflare-dns.sh --name preview.beaconpulse.net \
+    --content pop0.wslproxy.com --dry-run
+```

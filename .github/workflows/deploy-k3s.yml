@@ -45,8 +45,44 @@ env:
   IMAGE_NAMESPACE: beacon
   TARGET_ENV: ${{ github.event.inputs.TARGET_ENV || 'int' }}
   DEPLOYMENT_TYPE: ${{ github.event.inputs.DEPLOYMENT_TYPE || 'build-and-deploy' }}
+  # DNS: every environment host is a CNAME to the wslproxy edge, same as the rest
+  # of the platform. The hostname itself is read from the env's Helm values file so
+  # DNS can never drift from what the Ingress actually serves.
+  DNS_ZONE: beaconpulse.net
+  DNS_TARGET: pop0.wslproxy.com
+  DNS_PROXIED: "false" # DNS-only: cert-manager solves HTTP-01 and wslproxy terminates TLS
 
 jobs:
+  # Runs before `deploy` so the record exists (and has had a moment to propagate)
+  # before cert-manager attempts its HTTP-01 challenge against the new host.
+  # Cloudflare only needs egress, not the cluster, so this runs on a hosted runner.
+  dns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure the CNAME for this environment
+        if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_ZONE: ${{ env.DNS_ZONE }}
+        run: |
+          set -euo pipefail
+          VALUES="deploy/helm/beacon/values-${TARGET_ENV}.yaml"
+          [ -f "$VALUES" ] || { echo "no values file for env '${TARGET_ENV}'"; exit 1; }
+
+          # Single source of truth: whatever host the chart's Ingress claims.
+          HOST="$(awk '/^host:/{print $2; exit}' "$VALUES")"
+          [ -n "$HOST" ] || { echo "no 'host:' in $VALUES"; exit 1; }
+
+          echo "Ensuring ${HOST} -> ${DNS_TARGET} (proxied=${DNS_PROXIED})"
+          ./deploy/scripts/cloudflare-dns.sh \
+            --name "$HOST" \
+            --content "$DNS_TARGET" \
+            --proxied "$DNS_PROXIED"
+
   build:
     # Self-hosted runner (must have Docker available to build + push images).
     runs-on: self-hosted
@@ -94,7 +130,9 @@ jobs:
 
   deploy:
     runs-on: self-hosted
-    needs: [build]
+    # `dns` must land before helm, so the record is resolvable by the time
+    # cert-manager tries to solve the HTTP-01 challenge for the new host.
+    needs: [build, dns]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
