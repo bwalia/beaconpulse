@@ -39,3 +39,7 @@ resources:
 ingress:
   enabled: true
   tls: true
+
+# Images for this environment live on its own SpectonCR host.
+image:
+  registry: spectoncr.diytaxreturn.co.uk

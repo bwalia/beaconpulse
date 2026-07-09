@@ -19,7 +19,7 @@ spec:
       {{- include "beacon.imagePullSecrets" . | nindent 6 }}
       containers:
         - name: frontend
-          image: {{ include "beacon.image" (dict "repo" .Values.image.frontend "tag" .Values.image.tag) }}
+          image: {{ include "beacon.image" (dict "root" . "name" "frontend") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           # The image is built with NEXT_PUBLIC_API_BASE_URL="" so the browser
           # calls the API same-origin (/api/...) through the gateway.

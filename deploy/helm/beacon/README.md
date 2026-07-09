@@ -7,9 +7,9 @@ Deploys the full Beacon stack to a k3s cluster, one release per environment
 
 | Component | Kind | Image | Notes |
 |---|---|---|---|
-| api | Deployment + Service | `spectoncr.workstation.co.uk/beacon/api` | REST API; auto-runs migrations on start |
-| worker | Deployment | `spectoncr.workstation.co.uk/beacon/worker` | reconciles Prometheus/Blackbox config |
-| frontend | Deployment + Service | `spectoncr.workstation.co.uk/beacon/frontend` | Next.js dashboard |
+| api | Deployment + Service | `<registry>/beacon/api` | REST API; auto-runs migrations on start |
+| worker | Deployment | `<registry>/beacon/worker` | reconciles Prometheus/Blackbox config |
+| frontend | Deployment + Service | `<registry>/beacon/frontend` | Next.js dashboard |
 | prometheus | Deployment + Service | `prom/prometheus` | reads Beacon-generated scrape jobs/rules |
 | blackbox | Deployment + Service | `prom/blackbox-exporter` | probes; seeded then worker-managed |
 | alertmanager | Deployment + Service | `prom/alertmanager` | webhook → Beacon API |
@@ -65,9 +65,8 @@ Secret is templated instead).
 
 Via the GitHub Actions workflow (`.github/workflows/deploy-k3s.yml`) — push to
 `main` auto build+deploys `int`; `workflow_dispatch` promotes to any env. It
-builds/pushes the three images to the SpectonCR registry
-(`spectoncr.workstation.co.uk/beacon/{api,worker,frontend}`, tagged with the
-short SHA) and runs:
+builds/pushes the three images to the **per-environment SpectonCR registry** and
+runs:
 
 ```sh
 helm upgrade --install beacon ./deploy/helm/beacon \
@@ -76,11 +75,32 @@ helm upgrade --install beacon ./deploy/helm/beacon \
   --namespace <env> --create-namespace --wait
 ```
 
-Required GitHub Actions secrets: `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`
-(SpectonCR login), `KUBE_CONFIG_DATA_K3S` (base64 kubeconfig), `SLACK_WEBHOOK`
-(optional). The cluster also needs `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` in
-Vault (`secret/beaconpulse/<env>/config`) for the `beacon-registry` image pull
-secret.
+### Registry
+
+SpectonCR resolves per environment — prod on the bare host, every other env with
+the env prefix — matching the convention the platform's other charts use:
+
+| Env | Registry | Images |
+|---|---|---|
+| int | `int-spectoncr.diytaxreturn.co.uk` | `<registry>/beacon/{api,worker,frontend}` |
+| test | `test-spectoncr.diytaxreturn.co.uk` | ⇡ |
+| acc | `acc-spectoncr.diytaxreturn.co.uk` | ⇡ |
+| prod | `spectoncr.diytaxreturn.co.uk` | ⇡ |
+
+The host is declared **once** per env, as `image.registry` in `values-<env>.yaml`.
+The workflow resolves the same host independently and **fails the build if the two
+disagree** — otherwise you can publish to one registry and have the cluster
+ImagePullBackOff against another. At deploy time it also pins
+`--set image.registry=<the host it actually pushed to>`.
+
+Required GitHub Actions secrets: `NEBULACR_USERNAME`, `NEBULACR_PASSWORD`
+(SpectonCR login — the same names the platform's other repos use),
+`KUBE_CONFIG_DATA_K3S` (base64 kubeconfig), `CLOUDFLARE_API_TOKEN` +
+`CLOUDFLARE_ZONE_ID` (DNS), `SLACK_WEBHOOK` (optional).
+
+The cluster pulls with the `beacon-registry` secret, built by ESO from
+`REGISTRY_USERNAME`/`REGISTRY_PASSWORD` in Vault
+(`secret/beaconpulse/<env>/config`) — set those to the same SpectonCR credentials.
 
 ### Manual deploy
 

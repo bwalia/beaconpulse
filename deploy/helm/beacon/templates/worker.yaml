@@ -33,7 +33,7 @@ spec:
       {{- end }}
       containers:
         - name: worker
-          image: {{ include "beacon.image" (dict "repo" .Values.image.worker "tag" .Values.image.tag) }}
+          image: {{ include "beacon.image" (dict "root" . "name" "worker") }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["worker"]
           env:
