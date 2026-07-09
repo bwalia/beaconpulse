@@ -34,9 +34,11 @@ The single public entry point is the nginx gateway, exposed at
 - **Single node (or co-located control plane).** api/worker *write* the
   Prometheus generated files + Blackbox config to RWO PVCs that prometheus and
   blackbox *read*. On single-node k3s these share fine (all pods use
-  `fsGroup: 10001`, no ownership conflict). For multi-node, set
-  `storage.className` to an RWX provisioner (NFS/Longhorn) **or** pin the control
-  plane with `controlPlaneNodeSelector`.
+  `fsGroup: 10001`, no ownership conflict). Every pod is pinned to one node via the
+  global `nodeSelector` (default `kubernetes.io/hostname: debworker00`), so RWO
+  stays valid on multi-node clusters too. For true multi-node spread, set
+  `storage.className` to an RWX provisioner (NFS/Longhorn) and drop the
+  `nodeSelector`.
 
 ## Secrets (Vault)
 

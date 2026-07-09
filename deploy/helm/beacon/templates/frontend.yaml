@@ -17,6 +17,10 @@ spec:
         {{- include "beacon.selector" "frontend" | nindent 8 }}
     spec:
       {{- include "beacon.imagePullSecrets" . | nindent 6 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: frontend
           image: {{ include "beacon.image" (dict "root" . "name" "frontend") }}

@@ -31,7 +31,7 @@ spec:
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
-      {{- with .Values.controlPlaneNodeSelector }}
+      {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}

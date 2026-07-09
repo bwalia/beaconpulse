@@ -19,6 +19,10 @@ spec:
         {{- include "beacon.labels" . | nindent 8 }}
         {{- include "beacon.selector" "nginx" | nindent 8 }}
     spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: nginx
           image: {{ .Values.images.nginx }}

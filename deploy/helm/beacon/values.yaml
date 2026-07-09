@@ -152,7 +152,10 @@ resources:
     requests: { cpu: 25m, memory: 32Mi }
     limits: { cpu: 250m, memory: 256Mi }
 
-# nodeSelector applied to the control-plane pods (api, worker, prometheus,
-# blackbox) so they co-locate and can share RWO volumes on multi-node clusters.
-# Leave empty for single-node k3s.
-controlPlaneNodeSelector: {}
+# nodeSelector applied to EVERY Beacon pod. All components are pinned to a single
+# node so the RWO PVCs (postgres, redis, prometheus, alertmanager, generated
+# config) are always co-located and the workload has a stable home. Pinned via the
+# built-in kubernetes.io/hostname label, so no custom node labelling is required.
+# Override per-env in values-<env>.yaml if a different node is wanted.
+nodeSelector:
+  kubernetes.io/hostname: debworker00
