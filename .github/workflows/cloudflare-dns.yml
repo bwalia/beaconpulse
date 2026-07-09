@@ -1,0 +1,68 @@
+name: ->Cloudflare DNS (manual record)
+
+# Ad-hoc DNS record management for the beaconpulse.net zone.
+#
+# Environment hosts are handled automatically by the `dns` job in deploy-k3s.yml,
+# which reads the hostname straight out of the env's Helm values file. Use this
+# workflow for one-offs: a preview host, a redirect, an ACME DNS-01 TXT, etc.
+#
+# The underlying script (deploy/scripts/cloudflare-dns.sh) is an idempotent upsert,
+# so re-running with the same values is a no-op rather than a duplicate record.
+
+on:
+  workflow_dispatch:
+    inputs:
+      RECORD_NAME:
+        description: "Full record name, e.g. preview.beaconpulse.net (apex: beaconpulse.net)"
+        required: true
+        type: string
+      RECORD_CONTENT:
+        description: "Record value, e.g. pop0.wslproxy.com"
+        required: true
+        default: "pop0.wslproxy.com"
+        type: string
+      RECORD_TYPE:
+        description: "Record type"
+        required: true
+        default: "CNAME"
+        type: choice
+        options:
+          - CNAME
+          - A
+          - AAAA
+          - TXT
+      PROXIED:
+        description: "Proxy through Cloudflare (orange cloud). Leave false so cert-manager can solve HTTP-01."
+        required: false
+        default: false
+        type: boolean
+      DRY_RUN:
+        description: "Show what would change without writing"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  dns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upsert DNS record
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_ZONE: beaconpulse.net
+        run: |
+          set -euo pipefail
+          ARGS=(
+            --name "${{ inputs.RECORD_NAME }}"
+            --content "${{ inputs.RECORD_CONTENT }}"
+            --type "${{ inputs.RECORD_TYPE }}"
+            --proxied "${{ inputs.PROXIED }}"
+          )
+          if [ "${{ inputs.DRY_RUN }}" = "true" ]; then
+            ARGS+=(--dry-run)
+          fi
+          ./deploy/scripts/cloudflare-dns.sh "${ARGS[@]}"
