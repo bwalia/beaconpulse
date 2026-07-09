@@ -182,7 +182,14 @@ jobs:
 
           # Rules first so the servers' rule references resolve.
           if [ "$(echo "$RULES_ARR" | jq 'length')" -gt 0 ]; then import rules "$RULES_ARR"; else echo "No rule files for $TARGET_ENV — skipping."; fi
-          import server "$SERVERS_ARR"
+          # dataType MUST be "servers" (plural). The gateway builds the write path
+          # straight from dataType (data/<dataType>/<profile_id>/) AND serves vhosts
+          # by reading data/servers/<profile>/host:<host>.json (rule_loader.load_server).
+          # "server" (singular) writes to a dir the gateway never reads and, being new
+          # under /opt/nginx/data, can't even be created -> HTTP 400 "Permission denied
+          # while creating .../data/server/prod". "servers" hits the existing, writable
+          # canonical dir.
+          import servers "$SERVERS_ARR"
 
           echo "============================================"
           echo "  WSL Proxy import — ${TARGET_ENV}"
