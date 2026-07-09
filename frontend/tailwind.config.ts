@@ -1,10 +1,19 @@
 import type { Config } from "tailwindcss";
+import defaultTheme from "tailwindcss/defaultTheme";
 
 const config: Config = {
   darkMode: "class",
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      // Fira Sans (UI) + Fira Code (data/mono) — the "Dashboard Data" pairing.
+      // Loaded via next/font in app/layout.tsx, which self-hosts the files at build
+      // time and exposes them as CSS variables: no runtime request to Google, and
+      // no layout shift. The system stack remains as the fallback.
+      fontFamily: {
+        sans: ["var(--font-sans)", ...defaultTheme.fontFamily.sans],
+        mono: ["var(--font-mono)", ...defaultTheme.fontFamily.mono],
+      },
       colors: {
         brand: {
           50: "#eef7ff",

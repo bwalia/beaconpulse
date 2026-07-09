@@ -14,8 +14,8 @@ export default function Home() {
   }, [user, loading, router]);
 
   return (
-    <div className="flex h-screen items-center justify-center text-slate-500">
-      <span className="animate-pulse">Loading Beacon…</span>
+    <div className="flex h-screen items-center justify-center text-slate-500 dark:text-slate-400">
+      <span className="motion-safe:animate-pulse">Loading Beacon…</span>
     </div>
   );
 }

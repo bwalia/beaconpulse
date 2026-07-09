@@ -15,7 +15,19 @@ import {
   useUsage,
 } from "@/lib/hooks";
 import { ApiRequestError } from "@/lib/api";
-import { Button, Card, Field, Input, Select, Textarea, StatusBadge } from "@/components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Skeleton,
+  StatusBadge,
+  Textarea,
+} from "@/components/ui";
+import { ActivityIcon, PlusIcon, XIcon } from "@/components/icons";
 import type { MetricPoint, Monitor } from "@/lib/types";
 
 const schema = z.object({
@@ -111,36 +123,44 @@ export default function MonitorsPage() {
   const pct = usage ? Math.min(100, Math.round((usage.monitors_used / usage.monitors_limit) * 100)) : 0;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Monitors</h1>
-          <p className="text-sm text-slate-500">
-            Websites, APIs, ports and certificates — probed by Prometheus + Blackbox.
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          {usage && (
-            <div className="text-right">
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  {usage.plan}
-                </span>
-                <span>
-                  {usage.monitors_used} / {usage.monitors_limit} monitors
-                </span>
-              </div>
-              <div className="mt-1 h-1.5 w-32 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+    <div className="space-y-6">
+      <PageHeader
+        title="Monitors"
+        subtitle="Websites, APIs, ports and certificates — probed by Prometheus + Blackbox."
+        actions={
+          <>
+            {usage && (
+              <div className="mr-2 text-right">
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium uppercase text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    {usage.plan}
+                  </span>
+                  <span className="tabular-nums">
+                    {usage.monitors_used} / {usage.monitors_limit} monitors
+                  </span>
+                </div>
                 <div
-                  className={`h-full rounded-full ${atLimit ? "bg-red-500" : "bg-brand-500"}`}
-                  style={{ width: `${pct}%` }}
-                />
+                  className="mt-1 h-1.5 w-32 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+                  role="progressbar"
+                  aria-label="Monitor quota used"
+                  aria-valuenow={usage.monitors_used}
+                  aria-valuemin={0}
+                  aria-valuemax={usage.monitors_limit}
+                >
+                  <div
+                    className={`h-full rounded-full ${atLimit ? "bg-red-600" : "bg-brand-600"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-          <Button onClick={() => setShowForm((v) => !v)}>{showForm ? "Close" : "Add monitor"}</Button>
-        </div>
-      </div>
+            )}
+            <Button onClick={() => setShowForm((v) => !v)}>
+              {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
+              {showForm ? "Close" : "Add monitor"}
+            </Button>
+          </>
+        }
+      />
 
       {atLimit && !showForm && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
@@ -152,24 +172,36 @@ export default function MonitorsPage() {
       {showForm && <CreateMonitorForm onDone={() => setShowForm(false)} />}
 
       {isLoading ? (
-        <p className="text-slate-500">Loading…</p>
+        <div className="space-y-2">
+          <Skeleton className="h-11 w-full rounded-t-xl" />
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-14 w-full" />
+          ))}
+        </div>
       ) : !data?.data.length ? (
-        <Card>
-          <p className="text-center text-slate-500">
-            No monitors yet. Add your first website or endpoint to start monitoring.
-          </p>
-        </Card>
+        <EmptyState
+          icon={<ActivityIcon className="h-5 w-5" />}
+          title="No monitors yet"
+          action={
+            <Button onClick={() => setShowForm(true)}>
+              <PlusIcon className="h-4 w-4" />
+              Add monitor
+            </Button>
+          }
+        >
+          Add your first website, API or port and Beacon starts probing it within seconds.
+        </EmptyState>
       ) : (
         <Card className="overflow-x-auto p-0">
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 text-left text-xs uppercase text-slate-500 dark:border-slate-800">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-left text-xs uppercase tracking-wide text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
               <tr>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Target</th>
-                <th className="px-4 py-3">Interval</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th scope="col" className="px-4 py-3 font-semibold">Status</th>
+                <th scope="col" className="px-4 py-3 font-semibold">Name</th>
+                <th scope="col" className="px-4 py-3 font-semibold">Type</th>
+                <th scope="col" className="px-4 py-3 font-semibold">Target</th>
+                <th scope="col" className="px-4 py-3 font-semibold">Interval</th>
+                <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -205,35 +237,47 @@ function MonitorRow({
   const deleteMonitor = useDeleteMonitor();
 
   return (
-    <tr className="border-b border-slate-100 last:border-0 dark:border-slate-800/60">
+    <tr className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40">
       <td className="px-4 py-3">
         <StatusBadge status={monitor.enabled ? monitor.last_status : "paused"} />
       </td>
       <td className="px-4 py-3 font-medium">
-        <button onClick={onMetrics} className="hover:text-brand-600 hover:underline">
+        <button
+          onClick={onMetrics}
+          className="rounded text-left hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:text-brand-400"
+        >
           {monitor.name}
         </button>
       </td>
-      <td className="px-4 py-3 uppercase text-slate-500">{monitor.type}</td>
-      <td className="max-w-xs truncate px-4 py-3 font-mono text-xs text-slate-500">{monitor.target}</td>
-      <td className="px-4 py-3 text-slate-500">{monitor.interval_seconds}s</td>
+      <td className="px-4 py-3 uppercase text-slate-500 dark:text-slate-400">{monitor.type}</td>
+      <td className="max-w-[32rem] truncate px-4 py-3 font-mono text-sm text-slate-500 dark:text-slate-400">
+        {monitor.target}
+      </td>
+      <td className="px-4 py-3 tabular-nums text-slate-500 dark:text-slate-400">{monitor.interval_seconds}s</td>
       <td className="px-4 py-3">
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onMetrics}>
+        {/* Safe actions recede; the destructive one keeps its danger colour but is
+            separated and de-emphasised, so `Delete` isn't the loudest thing on the
+            page six times over. */}
+        <div className="flex items-center justify-end gap-1">
+          <Button size="sm" variant="ghost" onClick={onMetrics}>
             Metrics
           </Button>
-          <Button variant="secondary" onClick={onEdit}>
+          <Button size="sm" variant="ghost" onClick={onEdit}>
             Edit
           </Button>
           <Button
-            variant="secondary"
+            size="sm"
+            variant="ghost"
             onClick={() => setEnabled.mutate({ id: monitor.id, enabled: !monitor.enabled })}
             disabled={setEnabled.isPending}
           >
             {monitor.enabled ? "Pause" : "Resume"}
           </Button>
+          <span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
           <Button
-            variant="danger"
+            size="sm"
+            variant="ghost"
+            className="text-red-700 hover:bg-red-50 hover:text-red-800 focus-visible:ring-red-500 dark:text-red-400 dark:hover:bg-red-950/50 dark:hover:text-red-300"
             onClick={() => {
               if (confirm(`Delete monitor "${monitor.name}"?`)) deleteMonitor.mutate(monitor.id);
             }}
@@ -249,7 +293,7 @@ function MonitorRow({
 
 function Sparkline({ points, color = "#328cff" }: { points: MetricPoint[]; color?: string }) {
   if (points.length < 2) {
-    return <p className="py-6 text-center text-xs text-slate-400">Not enough data yet.</p>;
+    return <p className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">Not enough data yet.</p>;
   }
   const w = 320;
   const h = 60;
@@ -286,36 +330,40 @@ function MonitorMetricsModal({ monitor, onClose }: { monitor: Monitor; onClose: 
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold">{monitor.name}</h2>
-            <p className="font-mono text-xs text-slate-400">{monitor.target}</p>
+            <p className="font-mono text-xs text-slate-500 dark:text-slate-400">{monitor.target}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            ✕
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 motion-reduce:transition-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          >
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
 
         {isLoading ? (
-          <p className="text-slate-500">Loading metrics…</p>
+          <p className="text-slate-500 dark:text-slate-400">Loading metrics…</p>
         ) : (
           <>
             <div className="mb-4 grid grid-cols-3 gap-3 text-center">
               <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                <p className="text-xs text-slate-500">Uptime (24h)</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Uptime (24h)</p>
                 <p className="text-xl font-bold text-emerald-600">
                   {data ? `${data.uptime_percent}%` : "—"}
                 </p>
               </div>
               <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                <p className="text-xs text-slate-500">Response now</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Response now</p>
                 <p className="text-xl font-bold">{data ? `${Math.round(data.response_ms_current)}ms` : "—"}</p>
               </div>
               <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                <p className="text-xs text-slate-500">Avg (24h)</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Avg (24h)</p>
                 <p className="text-xl font-bold">{data ? `${Math.round(data.response_ms_avg)}ms` : "—"}</p>
               </div>
             </div>
-            <p className="mb-1 text-xs font-medium text-slate-500">Response time (24h)</p>
+            <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">Response time (24h)</p>
             <Sparkline points={data?.response_ms ?? []} />
-            <p className="mt-3 text-xs text-slate-400">Your organization&apos;s data only, from Prometheus.</p>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Your organization&apos;s data only, from Prometheus.</p>
           </>
         )}
       </div>
@@ -404,10 +452,14 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold">Edit monitor</h2>
-            <p className="text-xs uppercase text-slate-400">{monitor.type}</p>
+            <p className="text-xs uppercase text-slate-500 dark:text-slate-400">{monitor.type}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            ✕
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 motion-reduce:transition-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          >
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -543,7 +595,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
   if (!projects?.data.length) {
     return (
       <Card>
-        <p className="text-slate-500">
+        <p className="text-slate-500 dark:text-slate-400">
           Create a <span className="font-medium">project</span> first — monitors belong to a project.
         </p>
       </Card>
@@ -585,7 +637,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
             ))}
           </Select>
           {usage && minInterval > 30 && (
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Your {usage.plan} plan&apos;s fastest interval is {minInterval}s.
             </p>
           )}
@@ -606,7 +658,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
               ))}
             </Select>
           </Field>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             How long the target must be down before you&apos;re alerted. Immediate catches brief dips; relaxed
             avoids noise from short blips.
           </p>
@@ -667,7 +719,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Creating…" : "Create monitor"}
           </Button>
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-slate-500 dark:text-slate-400">
             Prometheus & Blackbox are configured automatically.
           </span>
         </div>
