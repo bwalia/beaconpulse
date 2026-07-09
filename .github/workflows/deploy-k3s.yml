@@ -141,7 +141,12 @@ jobs:
           SHA=${{ steps.tag.outputs.sha }}
           NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
           # One backend image contains both binaries; api/worker differ by command.
-          docker build -f deploy/docker/Dockerfile.backend \
+          # --provenance=false --sbom=false: modern docker/buildkit otherwise
+          # attaches provenance/SBOM attestations and wraps the image in an OCI
+          # index. The SpectonCR registry 500s on the attestation manifest HEAD
+          # during push ("unexpected status from HEAD .../manifests/...: 500").
+          # A plain single manifest pushes fine.
+          docker build --provenance=false --sbom=false -f deploy/docker/Dockerfile.backend \
             -t "$NS/api:$SHA" -t "$NS/api:latest" \
             -t "$NS/worker:$SHA" -t "$NS/worker:latest" .
           docker push "$NS/api:$SHA"
@@ -157,7 +162,9 @@ jobs:
           NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
           # Empty NEXT_PUBLIC_API_BASE_URL => the browser calls the API same-origin
           # (/api/...) through the gateway. No CORS.
-          docker build -f frontend/Dockerfile \
+          # --provenance=false --sbom=false: see the backend build above — avoids
+          # the attestation-manifest push that the SpectonCR registry 500s on.
+          docker build --provenance=false --sbom=false -f frontend/Dockerfile \
             --build-arg NEXT_PUBLIC_API_BASE_URL="" \
             -t "$NS/frontend:$SHA" -t "$NS/frontend:latest" \
             ./frontend
