@@ -45,6 +45,12 @@ env:
   # hardcoded here — prod sits on the bare host, every other env gets the env
   # prefix. Same convention as the platform's other charts.
   IMAGE_NAMESPACE: beacon
+  # Force Docker's LEGACY builder (schema-2 manifest) instead of BuildKit's
+  # containerd image store, which pushes an OCI image index. SpectonCR mishandles
+  # the manifest HEAD for an OCI index and the push fails with
+  #   'unexpected status from HEAD request to .../manifests/<digest>'.
+  # Verified: BuildKit push fails on every retry; legacy-builder push succeeds.
+  DOCKER_BUILDKIT: "0"
   TARGET_ENV: ${{ github.event.inputs.TARGET_ENV || 'int' }}
   DEPLOYMENT_TYPE: ${{ github.event.inputs.DEPLOYMENT_TYPE || 'build-and-deploy' }}
   # DNS: every environment host is a CNAME to the wslproxy edge, same as the rest
