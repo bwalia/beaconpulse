@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: api
+  name: {{ include "beacon.name" "api" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
     {{- include "beacon.selector" "api" | nindent 4 }}
@@ -72,7 +72,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: api
+  name: {{ include "beacon.name" "api" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
 spec:

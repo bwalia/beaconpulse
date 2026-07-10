@@ -18,7 +18,7 @@ data:
     alerting:
       alertmanagers:
         - static_configs:
-            - targets: ['alertmanager:9093']
+            - targets: ['{{ include "beacon.name" "alertmanager" }}:9093']
 
     rule_files:
       - /etc/prometheus/generated/rules_*.yml
@@ -33,11 +33,11 @@ data:
       - job_name: beacon-api
         metrics_path: /metrics
         static_configs:
-          - targets: ['api:8080']
+          - targets: ['{{ include "beacon.name" "api" }}:8080']
       - job_name: blackbox-exporter
         metrics_path: /metrics
         static_configs:
-          - targets: ['blackbox:9115']
+          - targets: ['{{ include "beacon.name" "blackbox" }}:9115']
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -63,7 +63,7 @@ data:
     receivers:
       - name: beacon
         webhook_configs:
-          - url: http://api:8080/api/v1/alerts/webhook
+          - url: http://{{ include "beacon.name" "api" }}:8080/api/v1/alerts/webhook
             send_resolved: true
             http_config:
               authorization:
@@ -136,7 +136,7 @@ data:
             # ---- gateway auth subrequest (validates the beacon_proxy cookie) ----
             location = /__beacon_authz {
                 internal;
-                proxy_pass              http://api:8080/api/v1/proxy/authorize;
+                proxy_pass              http://{{ include "beacon.name" "api" }}:8080/api/v1/proxy/authorize;
                 proxy_pass_request_body off;
                 proxy_set_header        Content-Length "";
             }
@@ -144,10 +144,10 @@ data:
             location @needs_login { return 302 /; }
 
             # ---- Beacon API ----
-            location /api/     { proxy_pass http://api:8080; }
-            location = /healthz { proxy_pass http://api:8080; }
-            location = /readyz  { proxy_pass http://api:8080; }
-            location = /livez   { proxy_pass http://api:8080; }
+            location /api/     { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
+            location = /healthz { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
+            location = /readyz  { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
+            location = /livez   { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
 
             # ================= Prometheus (tenant-filtered) =================
             location = /prometheus { return 301 /prometheus/; }
@@ -157,12 +157,12 @@ data:
                 auth_request_set $org_id $upstream_http_x_org_id;
                 proxy_set_header X-Org-Id $org_id;
                 rewrite ^/prometheus/(.*)$ /$1 break;
-                proxy_pass http://prom-label-proxy-prom:8080;
+                proxy_pass http://{{ include "beacon.name" "prom-label-proxy-prom" }}:8080;
             }
             location /prometheus/ {
                 auth_request /__beacon_authz;
                 rewrite ^/prometheus/(.*)$ /$1 break;
-                proxy_pass http://prometheus:9090;
+                proxy_pass http://{{ include "beacon.name" "prometheus" }}:9090;
             }
 
             # ================= Alertmanager (tenant-filtered) =================
@@ -172,12 +172,12 @@ data:
                 auth_request_set $org_id $upstream_http_x_org_id;
                 proxy_set_header X-Org-Id $org_id;
                 rewrite ^/alertmanager/(.*)$ /$1 break;
-                proxy_pass http://prom-label-proxy-am:8080;
+                proxy_pass http://{{ include "beacon.name" "prom-label-proxy-am" }}:8080;
             }
             location /alertmanager/ {
                 auth_request /__beacon_authz;
                 rewrite ^/alertmanager/(.*)$ /$1 break;
-                proxy_pass http://alertmanager:9093;
+                proxy_pass http://{{ include "beacon.name" "alertmanager" }}:9093;
             }
 
             # ================= Blackbox — NOT exposed to tenants =============
@@ -185,7 +185,7 @@ data:
 
             # ---- Dashboard (Next.js) — everything else ----
             location / {
-                proxy_pass http://frontend:3000;
+                proxy_pass http://{{ include "beacon.name" "frontend" }}:3000;
                 proxy_set_header Upgrade    $http_upgrade;
                 proxy_set_header Connection "upgrade";
             }

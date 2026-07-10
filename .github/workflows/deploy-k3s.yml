@@ -217,8 +217,9 @@ jobs:
       - name: Rollout status
         if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         run: |
-          kubectl -n "$TARGET_ENV" rollout status deploy/api --timeout=5m || true
-          kubectl -n "$TARGET_ENV" get pods -o wide
+          kubectl -n "$TARGET_ENV" rollout status deploy/beacon-api --timeout=5m || true
+          # The namespace is shared with other products, so scope the listing to ours.
+          kubectl -n "$TARGET_ENV" get pods -o wide -l app.kubernetes.io/part-of=beacon
 
       - name: Slack notification
         if: ${{ always() && (env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy') }}

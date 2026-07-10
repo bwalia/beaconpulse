@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: blackbox
+  name: {{ include "beacon.name" "blackbox" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
     {{- include "beacon.selector" "blackbox" | nindent 4 }}
@@ -73,7 +73,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: blackbox
+  name: {{ include "beacon.name" "blackbox" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
 spec:

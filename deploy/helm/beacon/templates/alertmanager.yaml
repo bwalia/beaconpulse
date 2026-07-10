@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: alertmanager
+  name: {{ include "beacon.name" "alertmanager" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
     {{- include "beacon.selector" "alertmanager" | nindent 4 }}
@@ -71,7 +71,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: alertmanager
+  name: {{ include "beacon.name" "alertmanager" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
 spec:
