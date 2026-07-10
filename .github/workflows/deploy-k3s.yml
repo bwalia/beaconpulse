@@ -178,7 +178,11 @@ jobs:
       - name: Decode kubeconfig
         if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         env:
-          KUBECONFIG_BASE64: ${{ secrets.KUBE_CONFIG_DATA_K3S }}
+          # MY_K3S1_CONFIG is the current k3s1 cluster kubeconfig (base64). The
+          # old KUBE_CONFIG_DATA_K3S pointed at the decommissioned k3s0
+          # (k3s0.diytaxreturn.co.uk:6443 → connection refused). Same secret the
+          # diytaxreturn platform workflows use.
+          KUBECONFIG_BASE64: ${{ secrets.MY_K3S1_CONFIG }}
         run: |
           echo "$KUBECONFIG_BASE64" | base64 -d > kubeconfig
           echo "KUBECONFIG=$(pwd)/kubeconfig" >> "$GITHUB_ENV"
