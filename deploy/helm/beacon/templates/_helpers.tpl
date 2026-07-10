@@ -17,6 +17,18 @@ app: beacon-{{ . }}
 {{- end -}}
 
 {{/*
+Kubernetes resource name for a Beacon component: beacon-<component>.
+Every Deployment, Service, and in-cluster DNS reference goes through this helper,
+so a rename can never leave a dangling reference behind. The namespace is shared
+with other products (diytaxreturn-*), so the beacon- prefix is what makes our
+workloads identifiable at a glance in `kubectl get pods`.
+Usage: {{ include "beacon.name" "api" }} -> beacon-api
+*/}}
+{{- define "beacon.name" -}}
+beacon-{{ . }}
+{{- end -}}
+
+{{/*
 Fully-qualified image reference: <registry>/<namespace>/<name>:<tag>.
 The registry host lives in exactly one value, so the three images can never point
 at different registries.
@@ -47,7 +59,7 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
       name: beacon-secrets
       key: POSTGRES_PASSWORD
 - name: BEACON_DB_DSN
-  value: "postgres://{{ .Values.postgres.user }}:$(POSTGRES_PASSWORD)@postgres:5432/{{ .Values.postgres.database }}?sslmode=disable"
+  value: "postgres://{{ .Values.postgres.user }}:$(POSTGRES_PASSWORD)@{{ include "beacon.name" "postgres" }}:5432/{{ .Values.postgres.database }}?sslmode=disable"
 - name: BEACON_JWT_ACCESS_SECRET
   valueFrom:
     secretKeyRef:
@@ -75,7 +87,7 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
 - name: BEACON_LOG_FORMAT
   value: {{ .Values.app.logFormat | quote }}
 - name: BEACON_REDIS_ADDR
-  value: "redis:6379"
+  value: "{{ include "beacon.name" "redis" }}:6379"
 - name: BEACON_CORS_ORIGINS
   value: {{ include "beacon.baseURL" . | quote }}
 - name: BEACON_DASHBOARD_URL
@@ -85,15 +97,15 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
 - name: BEACON_PROM_RULES_FILE
   value: "/etc/prometheus/generated/rules_monitors.yml"
 - name: BEACON_PROM_RELOAD_URL
-  value: "http://prometheus:9090/-/reload"
+  value: "http://{{ include "beacon.name" "prometheus" }}:9090/-/reload"
 - name: BEACON_PROM_QUERY_URL
-  value: "http://prometheus:9090"
+  value: "http://{{ include "beacon.name" "prometheus" }}:9090"
 - name: BEACON_BLACKBOX_CONFIG_FILE
   value: "/etc/blackbox/blackbox.yml"
 - name: BEACON_BLACKBOX_RELOAD_URL
-  value: "http://blackbox:9115/-/reload"
+  value: "http://{{ include "beacon.name" "blackbox" }}:9115/-/reload"
 - name: BEACON_BLACKBOX_ADDR
-  value: "blackbox:9115"
+  value: "{{ include "beacon.name" "blackbox" }}:9115"
 - name: BEACON_DNS_RESOLVER
   value: {{ .Values.app.dnsResolver | quote }}
 - name: BEACON_AI_ENABLED

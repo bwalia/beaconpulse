@@ -22,7 +22,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: nginx
+                name: {{ include "beacon.name" "nginx" }}
                 port:
                   number: 80
   {{- if .Values.ingress.tls }}

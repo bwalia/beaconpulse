@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: worker
+  name: {{ include "beacon.name" "worker" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
     {{- include "beacon.selector" "worker" | nindent 4 }}

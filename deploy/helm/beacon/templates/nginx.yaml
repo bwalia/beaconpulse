@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx
+  name: {{ include "beacon.name" "nginx" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
     {{- include "beacon.selector" "nginx" | nindent 4 }}
@@ -53,7 +53,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: nginx
+  name: {{ include "beacon.name" "nginx" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
 spec:

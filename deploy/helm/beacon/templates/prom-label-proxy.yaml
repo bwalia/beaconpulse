@@ -4,7 +4,7 @@ authenticated proxy cookie. */ -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: prom-label-proxy-prom
+  name: {{ include "beacon.name" "prom-label-proxy-prom" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
     {{- include "beacon.selector" "prom-label-proxy-prom" | nindent 4 }}
@@ -29,7 +29,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - -label=org_id
-            - -upstream=http://prometheus:9090
+            - -upstream=http://{{ include "beacon.name" "prometheus" }}:9090
             - -insecure-listen-address=0.0.0.0:8080
             - -header-name=X-Org-Id
             - -error-on-replace
@@ -44,7 +44,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: prom-label-proxy-prom
+  name: {{ include "beacon.name" "prom-label-proxy-prom" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
 spec:
@@ -57,7 +57,7 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: prom-label-proxy-am
+  name: {{ include "beacon.name" "prom-label-proxy-am" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
     {{- include "beacon.selector" "prom-label-proxy-am" | nindent 4 }}
@@ -82,7 +82,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - -label=org_id
-            - -upstream=http://alertmanager:9093
+            - -upstream=http://{{ include "beacon.name" "alertmanager" }}:9093
             - -insecure-listen-address=0.0.0.0:8080
             - -header-name=X-Org-Id
             - -unsafe-passthrough-paths=/api/v2/status
@@ -94,7 +94,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: prom-label-proxy-am
+  name: {{ include "beacon.name" "prom-label-proxy-am" }}
   labels:
     {{- include "beacon.labels" . | nindent 4 }}
 spec:
