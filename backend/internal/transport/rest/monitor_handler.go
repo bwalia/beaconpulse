@@ -86,6 +86,7 @@ type createMonitorRequest struct {
 	Type            string             `json:"type" validate:"required,oneof=http https ssl tcp icmp dns"`
 	Target          string             `json:"target" validate:"required,max=2048"`
 	Enabled         *bool              `json:"enabled"`
+	Public          *bool              `json:"public"`
 	IntervalSeconds int                `json:"interval_seconds" validate:"omitempty,gte=10,lte=86400"`
 	TimeoutSeconds  int                `json:"timeout_seconds" validate:"omitempty,gte=1,lte=300"`
 	Settings        monitorSettingsDTO `json:"settings"`
@@ -95,6 +96,7 @@ type updateMonitorRequest struct {
 	Name            *string             `json:"name" validate:"omitempty,min=1,max=200"`
 	Target          *string             `json:"target" validate:"omitempty,max=2048"`
 	Enabled         *bool               `json:"enabled"`
+	Public          *bool               `json:"public"`
 	IntervalSeconds *int                `json:"interval_seconds" validate:"omitempty,gte=10,lte=86400"`
 	TimeoutSeconds  *int                `json:"timeout_seconds" validate:"omitempty,gte=1,lte=300"`
 	Settings        *monitorSettingsDTO `json:"settings"`
@@ -108,6 +110,7 @@ type monitorResponse struct {
 	Type            string           `json:"type"`
 	Target          string           `json:"target"`
 	Enabled         bool             `json:"enabled"`
+	Public          bool             `json:"public"`
 	IntervalSeconds int              `json:"interval_seconds"`
 	TimeoutSeconds  int              `json:"timeout_seconds"`
 	Settings        monitor.Settings `json:"settings"`
@@ -126,6 +129,7 @@ func presentMonitor(m *monitor.Monitor) monitorResponse {
 		Type:            string(m.Type),
 		Target:          m.Target,
 		Enabled:         m.Enabled,
+		Public:          m.Public,
 		IntervalSeconds: m.IntervalSeconds,
 		TimeoutSeconds:  m.TimeoutSeconds,
 		Settings:        m.Settings,
@@ -231,6 +235,7 @@ func (h *MonitorHandler) create(w http.ResponseWriter, r *http.Request) {
 		Type:            monitor.Type(req.Type),
 		Target:          req.Target,
 		Enabled:         req.Enabled,
+		Public:          req.Public,
 		IntervalSeconds: req.IntervalSeconds,
 		TimeoutSeconds:  req.TimeoutSeconds,
 		Settings:        req.Settings.toDomain(),
@@ -261,6 +266,7 @@ func (h *MonitorHandler) update(w http.ResponseWriter, r *http.Request) {
 		Name:            req.Name,
 		Target:          req.Target,
 		Enabled:         req.Enabled,
+		Public:          req.Public,
 		IntervalSeconds: req.IntervalSeconds,
 		TimeoutSeconds:  req.TimeoutSeconds,
 	}

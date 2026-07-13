@@ -94,13 +94,17 @@ type Settings struct {
 
 // Monitor is a single monitored resource.
 type Monitor struct {
-	ID              uuid.UUID
-	OrgID           uuid.UUID
-	ProjectID       uuid.UUID
-	Name            string
-	Type            Type
-	Target          string
-	Enabled         bool
+	ID        uuid.UUID
+	OrgID     uuid.UUID
+	ProjectID uuid.UUID
+	Name      string
+	Type      Type
+	Target    string
+	Enabled   bool
+	// Public publishes this monitor onto the org's public status page.
+	// Defaults to false: enabling a status page must never retroactively
+	// expose an endpoint that was added before the page existed.
+	Public          bool
 	IntervalSeconds int
 	TimeoutSeconds  int
 	Settings        Settings

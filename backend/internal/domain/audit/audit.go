@@ -24,7 +24,11 @@ const (
 
 	ActionProjectCreated Action = "project.created"
 	ActionProjectUpdated Action = "project.updated"
-	ActionProjectDeleted Action = "project.deleted"
+	// ActionStatusPageUpdated — the org published/unpublished its public status
+	// page, or renamed it. Security-relevant: it changes what anonymous visitors
+	// can see.
+	ActionStatusPageUpdated Action = "status_page.updated"
+	ActionProjectDeleted    Action = "project.deleted"
 
 	ActionMonitorCreated Action = "monitor.created"
 	ActionMonitorUpdated Action = "monitor.updated"

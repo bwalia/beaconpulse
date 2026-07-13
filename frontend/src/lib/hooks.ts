@@ -14,6 +14,7 @@ import type {
   NotificationChannel,
   Overview,
   Project,
+  StatusPageSettings,
   Usage,
 } from "./types";
 
@@ -82,6 +83,8 @@ export interface UpdateMonitorInput {
   target?: string;
   interval_seconds?: number;
   settings?: Record<string, unknown>;
+  /** Publish (or unpublish) this monitor on the org's public status page. */
+  public?: boolean;
 }
 
 export function useUpdateMonitor() {
@@ -209,5 +212,41 @@ export function useMonitorMetrics(id: string | null) {
     queryFn: () => api.get<MonitorMetrics>(`/api/v1/monitors/${id}/metrics`),
     enabled: !!id,
     refetchInterval: 30000,
+  });
+}
+
+// ---- Public status page settings ----
+
+export function useStatusPageSettings() {
+  return useQuery({
+    queryKey: ["status-page"],
+    queryFn: () => api.get<StatusPageSettings>("/api/v1/status-page"),
+  });
+}
+
+export function useUpdateStatusPageSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { enabled?: boolean; title?: string }) =>
+      api.patch<StatusPageSettings>("/api/v1/status-page", input),
+    // Publishing changes the monitor list's meaning too (the "Public" toggles),
+    // so refresh both rather than leaving a stale count on screen.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["status-page"] });
+      qc.invalidateQueries({ queryKey: ["monitors"] });
+    },
+  });
+}
+
+/** Publish or unpublish one monitor on the status page. */
+export function useSetMonitorPublic() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isPublic }: { id: string; isPublic: boolean }) =>
+      api.patch<Monitor>(`/api/v1/monitors/${id}`, { public: isPublic }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["monitors"] });
+      qc.invalidateQueries({ queryKey: ["status-page"] });
+    },
   });
 }

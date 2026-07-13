@@ -29,11 +29,14 @@ const (
 
 // CreateInput is the validated payload for creating a monitor.
 type CreateInput struct {
-	ProjectID       uuid.UUID
-	Name            string
-	Type            Type
-	Target          string
-	Enabled         *bool
+	ProjectID uuid.UUID
+	Name      string
+	Type      Type
+	Target    string
+	Enabled   *bool
+	// Public publishes the monitor on the org's status page. Nil => false: a new
+	// monitor is never published by accident.
+	Public          *bool
 	IntervalSeconds int
 	TimeoutSeconds  int
 	Settings        Settings
@@ -44,6 +47,7 @@ type UpdateInput struct {
 	Name            *string
 	Target          *string
 	Enabled         *bool
+	Public          *bool
 	IntervalSeconds *int
 	TimeoutSeconds  *int
 	Settings        *Settings
@@ -139,6 +143,11 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Mon
 	if in.Enabled != nil {
 		enabled = *in.Enabled
 	}
+	// Safe by default: unpublished unless explicitly asked for.
+	public := false
+	if in.Public != nil {
+		public = *in.Public
+	}
 	now := s.now().UTC()
 	m := &Monitor{
 		ID:              uuid.New(),
@@ -148,6 +157,7 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Mon
 		Type:            in.Type,
 		Target:          target,
 		Enabled:         enabled,
+		Public:          public,
 		IntervalSeconds: interval,
 		TimeoutSeconds:  timeout,
 		Settings:        settings,
@@ -223,6 +233,12 @@ func (s *Service) Update(ctx context.Context, actor Actor, id uuid.UUID, in Upda
 	if in.Enabled != nil {
 		m.Enabled = *in.Enabled
 		changed["enabled"] = m.Enabled
+	}
+	// Publishing (or unpublishing) a monitor changes what anonymous visitors can
+	// see, so it lands in the audit log like any other security-relevant change.
+	if in.Public != nil {
+		m.Public = *in.Public
+		changed["public"] = m.Public
 	}
 	// Target/settings are re-validated together because settings defaults depend
 	// on the (possibly new) target.

@@ -58,6 +58,8 @@ export interface Monitor {
   type: MonitorType;
   target: string;
   enabled: boolean;
+  /** Published on the org's public status page. Defaults to false. */
+  public: boolean;
   interval_seconds: number;
   timeout_seconds: number;
   settings: MonitorSettings;
@@ -165,4 +167,41 @@ export interface ApiError {
   message: string;
   fields?: ApiFieldError[];
   request_id?: string;
+}
+
+// ---- Public status page ----
+// Mirrors the backend's deliberately narrow public projection
+// (internal/domain/statuspage). There is no `target` here, and there must never
+// be: this data is served to anyone with the URL.
+
+export type StatusOverall = "operational" | "degraded" | "outage" | "unknown";
+
+export interface PublicStatusMonitor {
+  name: string;
+  status: "up" | "down" | "degraded" | "unknown" | "paused";
+  last_checked_at: string | null;
+}
+
+export interface PublicStatusGroup {
+  name: string;
+  environment: string;
+  monitors: PublicStatusMonitor[];
+}
+
+export interface PublicStatusPage {
+  org_name: string;
+  title: string;
+  overall: StatusOverall;
+  groups: PublicStatusGroup[];
+  updated_at: string;
+}
+
+export interface StatusPageSettings {
+  slug: string;
+  org_name: string;
+  enabled: boolean;
+  title: string;
+  published_count: number;
+  /** Server-provided public path, so the UI never reconstructs the route. */
+  url: string;
 }
