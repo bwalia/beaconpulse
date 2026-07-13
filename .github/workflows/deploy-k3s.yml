@@ -45,12 +45,20 @@ env:
   # hardcoded here — prod sits on the bare host, every other env gets the env
   # prefix. Same convention as the platform's other charts.
   IMAGE_NAMESPACE: beacon
-  # Force Docker's LEGACY builder (schema-2 manifest) instead of BuildKit's
-  # containerd image store, which pushes an OCI image index. SpectonCR mishandles
-  # the manifest HEAD for an OCI index and the push fails with
-  #   'unexpected status from HEAD request to .../manifests/<digest>'.
-  # Verified: BuildKit push fails on every retry; legacy-builder push succeeds.
-  DOCKER_BUILDKIT: "0"
+  # The architecture the CLUSTER runs, which is NOT the architecture of the build
+  # host. The self-hosted runner is an arm64 Mac; every k3s1 node is amd64. Images
+  # must be built for this, or the kubelet dies with "exec format error" and helm
+  # reports only an opaque "Progress deadline exceeded" ten minutes later.
+  BUILD_PLATFORM: linux/amd64
+  # We build with buildx (the legacy builder cannot cross-compile), so the old
+  # DOCKER_BUILDKIT=0 workaround is gone. That existed because BuildKit pushed an
+  # OCI image *index*, whose manifest HEAD SpectonCR mishandles:
+  #   'unexpected status from HEAD request to .../manifests/<digest>'
+  # --provenance=false --sbom=false suppresses the attestation manifests that
+  # create that index, so buildx emits a single manifest and `docker push` sends
+  # exactly what the registry accepted before. Verified on the runner: with the
+  # flags, zero attestation/manifest-list lines in the build output.
+  BUILDX_FLAGS: --provenance=false --sbom=false
   TARGET_ENV: ${{ github.event.inputs.TARGET_ENV || 'int' }}
   DEPLOYMENT_TYPE: ${{ github.event.inputs.DEPLOYMENT_TYPE || 'build-and-deploy' }}
   # DNS: every environment host is a CNAME to the wslproxy edge, same as the rest
@@ -117,8 +125,8 @@ jobs:
 
   build:
     # Self-hosted runner (must have Docker available to build + push images).
-    # DOCKER_BUILDKIT=0 (workflow env above) forces the legacy builder so pushes
-    # are schema-2 manifests SpectonCR accepts — see the note there.
+    # It is an arm64 Mac, so every image is cross-built for BUILD_PLATFORM
+    # (linux/amd64) and the arch is asserted before push — see the env notes above.
     runs-on: self-hosted
     outputs:
       registry: ${{ steps.reg.outputs.registry }}
@@ -167,9 +175,18 @@ jobs:
           SHA=${{ steps.tag.outputs.sha }}
           NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
           # One backend image contains both binaries; api/worker differ by command.
-          docker build -f deploy/docker/Dockerfile.backend \
+          # --platform is MANDATORY: this runner is an arm64 Mac, the k3s nodes are
+          # amd64. A plain `docker build` targets the builder and the kubelet dies
+          # with "exec format error". Dockerfile.backend cross-compiles via
+          # $BUILDPLATFORM/$TARGETARCH, so this stays native speed (no QEMU).
+          # --load lands a plain schema-2 image in the docker store, so the existing
+          # `docker push` path still sends a manifest SpectonCR accepts (BuildKit's
+          # direct --push emits an OCI index, which it mishandles).
+          docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
+            -f deploy/docker/Dockerfile.backend \
             -t "$NS/api:$SHA" -t "$NS/api:latest" \
             -t "$NS/worker:$SHA" -t "$NS/worker:latest" .
+          ./deploy/scripts/assert-image-arch.sh "$NS/api:$SHA"
           docker push "$NS/api:$SHA"
           docker push "$NS/api:latest"
           docker push "$NS/worker:$SHA"
@@ -183,10 +200,15 @@ jobs:
           NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
           # Empty NEXT_PUBLIC_API_BASE_URL => the browser calls the API same-origin
           # (/api/...) through the gateway. No CORS.
-          docker build -f frontend/Dockerfile \
+          # Built fully under amd64 emulation (no $BUILDPLATFORM shortcut): npm
+          # installs arch-specific native modules (next/swc, sharp) that get traced
+          # into .next/standalone, so the deps must be built for the target arch.
+          docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
+            -f frontend/Dockerfile \
             --build-arg NEXT_PUBLIC_API_BASE_URL="" \
             -t "$NS/frontend:$SHA" -t "$NS/frontend:latest" \
             ./frontend
+          ./deploy/scripts/assert-image-arch.sh "$NS/frontend:$SHA"
           docker push "$NS/frontend:$SHA"
           docker push "$NS/frontend:latest"
 
