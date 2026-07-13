@@ -3,8 +3,18 @@
 #
 # Build context is the repository root: `docker build -f deploy/docker/Dockerfile.backend .`
 
-FROM golang:1.22-alpine AS build
+# Compile on the BUILD host's native architecture and cross-compile to the TARGET.
+# The CI runner is an arm64 Mac but the k3s nodes are amd64: without this the Go
+# toolchain silently targets the builder's arch and the amd64 kubelet dies with
+# "exec /usr/local/bin/api: exec format error". Cross-compiling (rather than
+# emulating the whole build under QEMU) keeps this stage running at native speed —
+# Go needs only GOARCH to retarget.
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS build
 WORKDIR /src
+
+# Populated by buildx from --platform (e.g. linux/amd64).
+ARG TARGETOS
+ARG TARGETARCH
 
 # Cache dependencies separately from source for faster rebuilds.
 COPY backend/go.mod backend/go.sum ./
@@ -12,8 +22,10 @@ RUN go mod download
 
 COPY backend/ ./
 # Static binaries so they run on a scratch/alpine base without libc.
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w -X main.version=${BEACON_VERSION:-docker}" -o /out/api ./cmd/api \
- && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w -X main.version=${BEACON_VERSION:-docker}" -o /out/worker ./cmd/worker
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+      go build -trimpath -ldflags "-s -w -X main.version=${BEACON_VERSION:-docker}" -o /out/api ./cmd/api \
+ && CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+      go build -trimpath -ldflags "-s -w -X main.version=${BEACON_VERSION:-docker}" -o /out/worker ./cmd/worker
 
 FROM alpine:3.20
 # ca-certificates for outbound HTTPS (reload endpoints, future notifications);
