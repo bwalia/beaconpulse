@@ -35,3 +35,11 @@ next-env.d.ts
 .vscode/*
 !.vscode/extensions.json
 *.swp
+
+# Plaintext behind the SealedSecrets (seal-secrets.sh). NEVER commit.
+deploy/.secrets/
+
+# The sealed-secrets PUBLIC sealing certificate. Safe (and necessary) to commit:
+# sealing is asymmetric, so this lets anyone re-seal without cluster access. The
+# matching PRIVATE key never leaves the in-cluster controller.
+!deploy/sealed/sealing-cert.pem

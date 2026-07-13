@@ -27,9 +27,13 @@ image:
   # Overridden per-deploy by CI with the git SHA for immutable, traceable rollouts.
   tag: latest
   pullPolicy: IfNotPresent
-  # dockerconfigjson pull secret the cluster uses to pull from the private
-  # registry (created by templates/registry-secret.yaml). Empty = public registry.
+  # dockerconfigjson pull secret the pods reference. Empty = public registry.
   pullSecret: beacon-registry
+  # true  — this chart creates the pull secret (from Vault, or from a sealed file).
+  # false — the secret already exists in the namespace and is managed elsewhere;
+  #         the chart only references it. Used in int, where the shared
+  #         `nebulacr-login` secret already carries auth for the SpectonCR host.
+  pullSecretCreate: true
 
 # ── Third-party images (pinned to match docker-compose) ────────────────────
 images:
@@ -87,9 +91,19 @@ storage:
   promGenerated: 128Mi
   blackboxConfig: 64Mi
 
-# ── Secrets via External Secrets Operator (Vault) ──────────────────────────
+# ── How the beacon-secrets Secret gets provisioned ─────────────────────────
+# One of:
+#   external — External Secrets Operator pulls from Vault. Needs a Vault policy
+#              granting read on secret/data/beaconpulse/* (NOT yet granted).
+#   sealed   — a committed, encrypted SealedSecret under sealed/<env>/ is
+#              decrypted in-cluster by the sealed-secrets controller. Only that
+#              controller's private key can decrypt it, so the file is safe to
+#              commit. Generate with deploy/scripts/seal-secrets.sh <env>.
+#   plain    — a plain Secret from .Values.secrets.* below. Local testing ONLY;
+#              never commit real values.
+secretsSource: external
+
 externalSecret:
-  enabled: true
   refreshInterval: "1m"
   storeName: vault-backend
   storeKind: ClusterSecretStore
@@ -98,7 +112,7 @@ externalSecret:
   vaultKeyPrefix: secret/beaconpulse
   vaultKeySuffix: config
 
-# Only used when externalSecret.enabled=false (local testing without Vault).
+# Only used when secretsSource=plain (local testing without Vault/sealed).
 # Inject real values with `--set secrets.jwtAccess=...`; never commit them.
 secrets:
   jwtAccess: ""
