@@ -57,12 +57,12 @@ env:
   # of the platform. The hostname itself is read from the env's Helm values file so
   # DNS can never drift from what the Ingress actually serves.
   DNS_ZONE: beaconpulse.net
-  # The WSL Proxy edge that actually serves prod-profile vhosts — the same one the
-  # working diytaxreturn env subdomains (int./acc./int-spectoncr.) CNAME to.
-  # NOT pop1.wslproxy.com: that host does not answer HTTP (probe times out), so
-  # pointing here would take the site down. pop0.wslproxy.com also serves, but this
-  # is the edge the platform standardises on for env subdomains.
-  DNS_TARGET: pop1.diytaxreturn.co.uk
+  # Traffic path: Cloudflare CNAMEs the host to pop0 (the WSL Proxy edge, and the
+  # same IP as the prod-our control plane we register the vhost on). pop0 then
+  # applies the beaconpulse-prod-default rule, which proxies to the k3s1 Traefik
+  # ingress at 13.42.188.136:80, which routes to the beacon pods on debworker00.
+  #   browser -> pop0.wslproxy.com -> 13.42.188.136:80 (traefik) -> beacon-nginx
+  DNS_TARGET: pop0.wslproxy.com
   DNS_PROXIED: "false" # DNS-only: cert-manager solves HTTP-01 and wslproxy terminates TLS
 
 jobs:
