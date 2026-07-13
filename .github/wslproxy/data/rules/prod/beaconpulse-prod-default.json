@@ -3,10 +3,7 @@
   "name": "beaconpulse-prod-default",
   "profile_id": "prod",
   "priority": 1,
-  "rules_tags": [
-    "beaconpulse",
-    "prod"
-  ],
+  "rules_tags": ["beaconpulse", "prod"],
   "match": {
     "rules": {
       "path": "/",
@@ -15,14 +12,18 @@
     },
     "response": {
       "code": 305,
-      "redirect_uri": "http://193.237.176.232:32100",
+      "redirect_uri": "10.8.0.2:80",
       "strip_path": false,
       "backends": [
-        {
-          "address": "http://193.237.176.232:32100",
-          "weight": 100,
-          "label": "stable, ingress, wslproxy, nodeport, kube-vip"
-        }
+        { "address": "10.8.0.2:80", "weight": 100, "label": "k3s1 debworker00 (beacon pods pinned here)" },
+        { "address": "10.8.0.3:80", "weight": 100, "label": "k3s1 control-plane" },
+        { "address": "10.8.0.4:80", "weight": 100, "label": "k3s1 debian001" },
+        { "address": "10.8.0.5:80", "weight": 100, "label": "k3s1 debian002" },
+        { "address": "10.8.0.6:80", "weight": 100, "label": "k3s1 debian003" },
+        { "address": "10.8.0.7:80", "weight": 100, "label": "k3s1 debian004" },
+        { "address": "10.8.0.8:80", "weight": 100, "label": "k3s1 debian005" },
+        { "address": "10.8.0.10:80", "weight": 100, "label": "k3s1 debian006" },
+        { "address": "10.8.0.11:80", "weight": 100, "label": "k3s1 debian007" }
       ],
       "routing": {
         "mode": "least_conn"
