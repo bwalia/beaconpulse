@@ -57,7 +57,7 @@ function LiveCard() {
 
   return (
     <TiltCard className="w-full">
-      <div className="rounded-2xl border border-slate-900/10 bg-white/70 p-5 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/60 dark:shadow-black/40">
+      <div className="rounded-2xl border border-slate-900/10 bg-white/70 p-7 shadow-2xl shadow-slate-900/10 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/60 dark:shadow-black/40">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
@@ -68,9 +68,9 @@ function LiveCard() {
               )}
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-600" />
             </span>
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Live</span>
+            <span className="text-base font-medium text-slate-700 dark:text-slate-200">Live</span>
           </div>
-          <span className="font-mono text-xs text-slate-500 dark:text-slate-400">30s interval</span>
+          <span className="font-mono text-sm text-slate-500 dark:text-slate-400">30s interval</span>
         </div>
 
         <ul className="space-y-2">
@@ -80,20 +80,20 @@ function LiveCard() {
               initial={{ opacity: 0, x: reduce ? 0 : -8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 + i * 0.08, duration: DUR.base, ease: EASE_OUT }}
-              className="flex items-center justify-between rounded-lg bg-slate-900/[0.03] px-3 py-2.5 dark:bg-white/[0.04]"
+              className="flex items-center justify-between rounded-lg bg-slate-900/[0.03] px-4 py-3 dark:bg-white/[0.04]"
             >
               <span className="flex items-center gap-2.5 truncate">
                 <span
                   aria-hidden
                   className={`h-2 w-2 shrink-0 rounded-full ${r.up ? "bg-emerald-600" : "bg-red-600"}`}
                 />
-                <span className="truncate font-mono text-sm text-slate-700 dark:text-slate-200">
+                <span className="truncate font-mono text-base text-slate-700 dark:text-slate-200">
                   {r.name}
                 </span>
               </span>
               {/* Status is never conveyed by colour alone — the label carries it. */}
               <span
-                className={`ml-3 shrink-0 font-mono text-xs font-medium ${
+                className={`ml-3 shrink-0 font-mono text-sm font-medium ${
                   r.up ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"
                 }`}
               >
@@ -103,7 +103,7 @@ function LiveCard() {
           ))}
         </ul>
 
-        <div className="mt-4 flex items-center gap-2 border-t border-slate-900/10 pt-4 text-sm text-slate-600 dark:border-white/10 dark:text-slate-300">
+        <div className="mt-4 flex items-center gap-2 border-t border-slate-900/10 pt-5 text-base text-slate-600 dark:border-white/10 dark:text-slate-300">
           <CheckCircleIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           <span>3 of 4 operational — alert sent 12s ago</span>
         </div>
@@ -130,10 +130,10 @@ export function Hero() {
         className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-blue-500/10 blur-3xl dark:bg-blue-500/15"
       />
 
-      <div className="relative mx-auto grid w-full max-w-[1200px] items-center gap-14 px-6 lg:grid-cols-2">
+      <div className="relative mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16 grid items-center gap-16 lg:grid-cols-2 xl:gap-24">
         <motion.div initial="hidden" animate="show" variants={stagger}>
           <motion.div variants={reveal}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-slate-900/10 bg-white/60 px-3 py-1.5 text-sm font-medium text-slate-700 backdrop-blur dark:border-white/15 dark:bg-white/5 dark:text-slate-200">
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-900/10 bg-white/60 px-3 py-1.5 text-base font-medium text-slate-700 backdrop-blur dark:border-white/15 dark:bg-white/5 dark:text-slate-200">
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
               Self-hosted &amp; multi-tenant
             </span>
@@ -141,7 +141,7 @@ export function Hero() {
 
           <motion.h1
             variants={reveal}
-            className="mt-6 text-balance text-5xl font-semibold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl dark:text-white"
+            className="mt-7 text-balance text-6xl font-semibold leading-[1.03] tracking-tight text-slate-900 sm:text-7xl xl:text-[5.25rem] dark:text-white"
           >
             Know it&apos;s down
             <br />
@@ -152,7 +152,7 @@ export function Hero() {
 
           <motion.p
             variants={reveal}
-            className="mt-6 max-w-xl text-lg leading-relaxed text-slate-600 dark:text-slate-300"
+            className="mt-7 max-w-2xl text-xl leading-relaxed text-slate-600 xl:text-2xl dark:text-slate-300"
           >
             Beacon watches your endpoints, certificates and DNS every 30 seconds — then
             tells the right person the moment something breaks. Own your data, run it
@@ -161,15 +161,15 @@ export function Hero() {
 
           <motion.div variants={reveal} className="mt-9 flex flex-wrap items-center gap-3">
             <Link
-              href="/login?mode=register"
-              className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-base font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
+              href="/register"
+              className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-7 py-4 text-lg font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
             >
               Start monitoring free
               <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
             </Link>
             <a
               href="#status"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-900/15 bg-white/60 px-6 py-3.5 text-base font-medium text-slate-800 backdrop-blur transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-900/15 bg-white/60 px-7 py-4 text-lg font-medium text-slate-800 backdrop-blur transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
             >
               See a status page
             </a>
@@ -177,7 +177,7 @@ export function Hero() {
 
           <motion.dl
             variants={reveal}
-            className="mt-12 grid max-w-md grid-cols-3 gap-6 border-t border-slate-900/10 pt-8 dark:border-white/10"
+            className="mt-14 grid max-w-xl grid-cols-3 gap-8 border-t border-slate-900/10 pt-9 dark:border-white/10"
           >
             {[
               { v: <CountUp to={99.99} decimals={2} suffix="%" />, l: "Uptime tracked" },
@@ -186,8 +186,8 @@ export function Hero() {
             ].map((s, i) => (
               <div key={i}>
                 <dt className="sr-only">{s.l}</dt>
-                <dd className="text-2xl font-semibold text-slate-900 dark:text-white">{s.v}</dd>
-                <dd className="mt-1 text-sm text-slate-500 dark:text-slate-400">{s.l}</dd>
+                <dd className="text-3xl font-semibold text-slate-900 xl:text-4xl dark:text-white">{s.v}</dd>
+                <dd className="mt-1.5 text-base text-slate-500 dark:text-slate-400">{s.l}</dd>
               </div>
             ))}
           </motion.dl>

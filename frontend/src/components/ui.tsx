@@ -21,7 +21,7 @@ import {
 /* ---------------- button ---------------- */
 
 type Variant = "primary" | "secondary" | "danger" | "ghost";
-type Size = "sm" | "md";
+type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
   primary: "bg-brand-600 text-white hover:bg-brand-700 focus-visible:ring-brand-500",
@@ -35,6 +35,9 @@ const variants: Record<Variant, string> = {
 const sizes: Record<Size, string> = {
   sm: "h-8 px-3 text-xs",
   md: "h-10 px-4 text-sm",
+  // lg is the CTA size used on the auth screens: 48px clears the 44px touch
+  // minimum comfortably, and 16px text avoids iOS's auto-zoom-on-focus.
+  lg: "h-12 px-6 text-base",
 };
 
 export function Button({

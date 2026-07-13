@@ -41,14 +41,14 @@ export function MarketingNav() {
 
       <nav
         aria-label="Primary"
-        className="relative mx-auto flex w-full max-w-[1200px] items-center gap-6 px-6 py-4"
+        className="relative mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16 flex items-center gap-8 py-5"
       >
         <Link
           href="/"
           className="flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
         >
-          <BeaconMark className="h-7 w-7 text-blue-600 dark:text-blue-400" />
-          <span className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+          <BeaconMark className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+          <span className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
             Beacon
           </span>
         </Link>
@@ -58,7 +58,7 @@ export function MarketingNav() {
             <li key={l.href}>
               <a
                 href={l.href}
-                className="rounded-lg px-3 py-2 text-base text-slate-600 transition-colors hover:bg-slate-900/5 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+                className="rounded-lg px-3.5 py-2 text-lg text-slate-600 transition-colors hover:bg-slate-900/5 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
               >
                 {l.label}
               </a>
@@ -74,7 +74,7 @@ export function MarketingNav() {
             (user ? (
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-base font-medium text-white transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-lg font-medium text-white transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
               >
                 Go to dashboard
               </Link>
@@ -82,13 +82,13 @@ export function MarketingNav() {
               <>
                 <Link
                   href="/login"
-                  className="hidden rounded-lg px-4 py-2 text-base font-medium text-slate-700 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none sm:inline-flex dark:text-slate-300 dark:hover:text-white"
+                  className="hidden rounded-lg px-4 py-2.5 text-lg font-medium text-slate-700 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none sm:inline-flex dark:text-slate-300 dark:hover:text-white"
                 >
                   Sign in
                 </Link>
                 <Link
-                  href="/login?mode=register"
-                  className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-base font-medium text-white transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
+                  href="/register"
+                  className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-lg font-medium text-white transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
                   style={{ transitionDuration: `${DUR.micro}s` }}
                 >
                   Start free
