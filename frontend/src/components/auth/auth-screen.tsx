@@ -4,8 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
-import { useForm } from "react-hook-form";
+import { forwardRef, useEffect, useId, useState, type InputHTMLAttributes } from "react";
+import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { z } from "zod";
 
 import {
@@ -39,15 +39,24 @@ type LoginValues = z.infer<typeof loginSchema>;
 type RegisterValues = z.infer<typeof registerSchema>;
 type Mode = "login" | "register";
 
-/** Shared input. 44px+ tall (touch target) and 16px+ text (no iOS auto-zoom). */
-function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-lg text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
-    />
-  );
-}
+const inputBase =
+  "w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-lg text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50 aria-[invalid=true]:border-red-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
+
+/**
+ * Shared input. 44px+ tall (touch target) and 16px+ text (no iOS auto-zoom).
+ *
+ * MUST forward its ref. react-hook-form's register() returns a `ref`, and React
+ * does NOT pass refs to plain function components — it silently drops them. With
+ * the ref lost, RHF has no handle on the DOM node, reads `undefined` on submit,
+ * and zod reports its default "Required" even though the field visibly contains
+ * text. It breaks browser autofill hardest of all, since autofill never fires
+ * React's onChange, so the DOM value is the ONLY place the value exists.
+ */
+const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function TextInput({ className = "", ...props }, ref) {
+    return <input ref={ref} className={`${inputBase} ${className}`} {...props} />;
+  },
+);
 
 /**
  * Password input with a show/hide toggle.
@@ -60,20 +69,28 @@ function PasswordInput({
   register,
   autoComplete,
   placeholder,
+  ...field
 }: {
-  register: Record<string, unknown>;
+  // Typed as the real RHF return value rather than a loose record: that keeps the
+  // `ref` in the type, so it cannot be quietly dropped the way TextInput's was.
+  register: UseFormRegisterReturn;
   autoComplete: "current-password" | "new-password";
   placeholder: string;
-}) {
+} & InputHTMLAttributes<HTMLInputElement>) {
   const [shown, setShown] = useState(false);
   return (
     <div className="relative">
+      {/* `field` carries the id / aria-invalid / aria-describedby that <Field>
+          clones onto its child. Without spreading them onto the real <input>,
+          the <label htmlFor> would point at nothing and the field would be
+          unlabelled for screen readers. */}
       <input
+        {...field}
         {...register}
         type={shown ? "text" : "password"}
         autoComplete={autoComplete}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 pr-14 text-lg text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
+        className={`${inputBase} pr-14`}
       />
       <button
         type="button"
