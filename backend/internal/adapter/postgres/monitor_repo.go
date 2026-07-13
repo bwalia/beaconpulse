@@ -26,7 +26,7 @@ func NewMonitorRepository(pool *pgxpool.Pool) *MonitorRepository {
 
 var _ monitor.Repository = (*MonitorRepository)(nil)
 
-const monitorColumns = `id, org_id, project_id, name, type, target, enabled,
+const monitorColumns = `id, org_id, project_id, name, type, target, enabled, public,
 	interval_seconds, timeout_seconds, config, last_status, last_checked_at,
 	created_by, updated_by, created_at, updated_at`
 
@@ -37,7 +37,9 @@ func scanMonitor(row pgx.Row) (*monitor.Monitor, error) {
 		status    string
 		configRaw []byte
 	)
-	if err := row.Scan(&m.ID, &m.OrgID, &m.ProjectID, &m.Name, &typ, &m.Target, &m.Enabled,
+	// Scan order must track monitorColumns exactly — `public` sits between
+	// `enabled` and `interval_seconds`.
+	if err := row.Scan(&m.ID, &m.OrgID, &m.ProjectID, &m.Name, &typ, &m.Target, &m.Enabled, &m.Public,
 		&m.IntervalSeconds, &m.TimeoutSeconds, &configRaw, &status, &m.LastCheckedAt,
 		&m.CreatedBy, &m.UpdatedBy, &m.CreatedAt, &m.UpdatedAt); err != nil {
 		return nil, err
@@ -60,9 +62,9 @@ func (r *MonitorRepository) Create(ctx context.Context, m *monitor.Monitor) erro
 	}
 	_, err = r.pool.Exec(ctx,
 		`INSERT INTO monitors
-		 (id, org_id, project_id, name, type, target, enabled, interval_seconds, timeout_seconds, config, last_status, created_by, updated_by, created_at, updated_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-		m.ID, m.OrgID, m.ProjectID, m.Name, string(m.Type), m.Target, m.Enabled,
+		 (id, org_id, project_id, name, type, target, enabled, public, interval_seconds, timeout_seconds, config, last_status, created_by, updated_by, created_at, updated_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+		m.ID, m.OrgID, m.ProjectID, m.Name, string(m.Type), m.Target, m.Enabled, m.Public,
 		m.IntervalSeconds, m.TimeoutSeconds, cfg, string(m.LastStatus),
 		m.CreatedBy, m.UpdatedBy, m.CreatedAt, m.UpdatedAt)
 	if err != nil {
@@ -154,9 +156,9 @@ func (r *MonitorRepository) Update(ctx context.Context, m *monitor.Monitor) erro
 		return apperror.Internal(fmt.Errorf("marshal settings: %w", err))
 	}
 	tag, err := r.pool.Exec(ctx,
-		`UPDATE monitors SET name=$3, target=$4, enabled=$5, interval_seconds=$6, timeout_seconds=$7, config=$8, updated_by=$9
+		`UPDATE monitors SET name=$3, target=$4, enabled=$5, interval_seconds=$6, timeout_seconds=$7, config=$8, updated_by=$9, public=$10
 		 WHERE id=$1 AND org_id=$2 AND deleted_at IS NULL`,
-		m.ID, m.OrgID, m.Name, m.Target, m.Enabled, m.IntervalSeconds, m.TimeoutSeconds, cfg, m.UpdatedBy)
+		m.ID, m.OrgID, m.Name, m.Target, m.Enabled, m.IntervalSeconds, m.TimeoutSeconds, cfg, m.UpdatedBy, m.Public)
 	if err != nil {
 		return apperror.Internal(fmt.Errorf("update monitor: %w", err))
 	}

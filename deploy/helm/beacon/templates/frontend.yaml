@@ -32,6 +32,12 @@ spec:
               value: "3000"
             - name: NODE_ENV
               value: "production"
+            # Server-side only. The public status page is server-rendered, so it
+            # needs a real API host to fetch from — the browser's base URL is
+            # deliberately empty (same-origin through the gateway) and would make
+            # a server-side fetch throw "Invalid URL".
+            - name: BEACON_INTERNAL_API_URL
+              value: "http://{{ include "beacon.name" "api" }}:8080"
           ports:
             - containerPort: 3000
           readinessProbe:

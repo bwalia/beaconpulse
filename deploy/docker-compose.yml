@@ -170,6 +170,11 @@ services:
         # Empty => the browser calls the API same-origin (/api/...) through the
         # gateway. No host, no port, no CORS.
         NEXT_PUBLIC_API_BASE_URL: ""
+    environment:
+      # Server-side only. The status page is rendered on the server, which cannot
+      # use the empty same-origin base above — it needs a real host to fetch from.
+      # This is the in-network API service, never exposed to the browser.
+      BEACON_INTERNAL_API_URL: http://api:8080
     # No host port — reached through the nginx gateway at /.
     depends_on:
       - api

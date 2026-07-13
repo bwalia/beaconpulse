@@ -30,6 +30,7 @@ import (
 	"beacon/internal/domain/monitor"
 	"beacon/internal/domain/notification"
 	"beacon/internal/domain/project"
+	"beacon/internal/domain/statuspage"
 	"beacon/internal/platform/cache"
 	"beacon/internal/platform/crypto"
 	"beacon/internal/platform/database"
@@ -113,6 +114,8 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	monitorRepo := postgres.NewMonitorRepository(pool)
 	orgPlanRepo := postgres.NewOrgPlanRepository(pool)
 	notificationRepo := postgres.NewNotificationRepository(pool)
+	statusPageRepo := postgres.NewStatusPageRepository(pool)
+	statusPageSettingsRepo := postgres.NewStatusPageSettingsRepository(pool)
 
 	// Cross-cutting.
 	auditRec := audit.NewRecorder(auditRepo)
@@ -146,6 +149,10 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	authSvc := auth.NewService(userRepo, refreshRepo, tokens, hasher, auditRec)
 	projectSvc := project.NewService(projectRepo, syncEnqueuer, auditRec)
 	monitorSvc := monitor.NewService(monitorRepo, syncEnqueuer, orgPlanRepo, auditRec)
+	// Public status page: the one unauthenticated read. Takes no auditor and no
+	// enqueuer — it is read-only and cannot mutate anything by construction.
+	statusPageSvc := statuspage.NewService(statusPageRepo)
+	statusPageSettingsSvc := statuspage.NewSettingsService(statusPageSettingsRepo, auditRec)
 
 	// Transport.
 	m := metrics.New()
@@ -156,18 +163,20 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	)
 
 	return rest.NewRouter(rest.RouterDeps{
-		Logger:        log,
-		Metrics:       m,
-		CORSOrigins:   cfg.HTTP.CORSOrigins,
-		Authenticator: authn,
-		Health:        health,
-		Auth:          rest.NewAuthHandler(authSvc, validator, cfg.IsProduction()),
-		Project:       rest.NewProjectHandler(projectSvc, validator, authn),
-		Monitor:       rest.NewMonitorHandler(monitorSvc, insightSvc, validator, authn),
-		Notification:  rest.NewNotificationHandler(notifySvc, validator, authn),
-		Alert:         rest.NewAlertHandler(dispatcher, cfg.Notify.WebhookToken),
-		Insight:       rest.NewInsightHandler(insightSvc),
-		Billing:       rest.NewBillingHandler(billingSvc, validator, authn),
+		Logger:             log,
+		Metrics:            m,
+		CORSOrigins:        cfg.HTTP.CORSOrigins,
+		Authenticator:      authn,
+		Health:             health,
+		Auth:               rest.NewAuthHandler(authSvc, validator, cfg.IsProduction()),
+		Project:            rest.NewProjectHandler(projectSvc, validator, authn),
+		Monitor:            rest.NewMonitorHandler(monitorSvc, insightSvc, validator, authn),
+		Notification:       rest.NewNotificationHandler(notifySvc, validator, authn),
+		Alert:              rest.NewAlertHandler(dispatcher, cfg.Notify.WebhookToken),
+		Insight:            rest.NewInsightHandler(insightSvc),
+		Billing:            rest.NewBillingHandler(billingSvc, validator, authn),
+		StatusPage:         rest.NewStatusPageHandler(statusPageSvc),
+		StatusPageSettings: rest.NewStatusPageSettingsHandler(statusPageSettingsSvc, validator, authn),
 	}), nil
 }
 

@@ -14,6 +14,7 @@ import {
   CreditCardIcon,
   DashboardIcon,
   FolderIcon,
+  GlobeIcon,
   SettingsIcon,
 } from "@/components/icons";
 
@@ -24,6 +25,7 @@ const baseNav: NavItem[] = [
   { href: "/monitors", label: "Monitors", Icon: ActivityIcon },
   { href: "/alerts", label: "Alerts", Icon: AlertTriangleIcon },
   { href: "/projects", label: "Projects", Icon: FolderIcon },
+  { href: "/status-page", label: "Status page", Icon: GlobeIcon },
   { href: "/notifications", label: "Notifications", Icon: BellIcon },
   { href: "/billing", label: "Billing", Icon: CreditCardIcon },
 ];
