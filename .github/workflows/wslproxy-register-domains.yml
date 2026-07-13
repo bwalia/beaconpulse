@@ -33,6 +33,28 @@ name: Register WSL Proxy Domains (Beaconpulse)
 #   • Otherwise -> POST /api/user/login with the admin email + password.
 
 on:
+  # Callable from deploy-k3s.yml so a push to main does DNS -> register vhost ->
+  # helm deploy with no manual step. Secrets arrive via `secrets: inherit`, so
+  # ADMIN_PASSWORD / WSLPROXY_TOKEN resolve exactly as they do on a manual run.
+  workflow_call:
+    inputs:
+      TARGET_ENV:
+        description: "WSL Proxy profile dir to push (beaconpulse hosts all live under 'prod')."
+        required: true
+        type: string
+      ACTIVATE_CONFIG:
+        description: "Push servers with config_status=true so the gateway writes the vhost."
+        required: false
+        default: false
+        type: boolean
+      DRY_RUN:
+        required: false
+        default: false
+        type: boolean
+      GATEWAY_DOMAIN:
+        required: false
+        type: string
+
   workflow_dispatch:
     inputs:
       TARGET_ENV:
