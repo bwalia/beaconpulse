@@ -45,19 +45,21 @@ env:
   # hardcoded here — prod sits on the bare host, every other env gets the env
   # prefix. Same convention as the platform's other charts.
   IMAGE_NAMESPACE: beacon
-  # The architecture the CLUSTER runs, which is NOT the architecture of the build
-  # host. The self-hosted runner is an arm64 Mac; every k3s1 node is amd64. Images
-  # must be built for this, or the kubelet dies with "exec format error" and helm
-  # reports only an opaque "Progress deadline exceeded" ten minutes later.
+  # The architecture the CLUSTER runs. Every k3s1 node is amd64, and the `build`
+  # job runs on ubuntu-latest (also amd64), so this is a NATIVE build — stated
+  # explicitly, and asserted before every push, because getting it wrong is
+  # silent: the registry accepts the image, helm rolls it out, and only then does
+  # the kubelet die with "exec format error", which helm reports ten minutes later
+  # as nothing more useful than "Progress deadline exceeded".
   BUILD_PLATFORM: linux/amd64
-  # We build with buildx (the legacy builder cannot cross-compile), so the old
-  # DOCKER_BUILDKIT=0 workaround is gone. That existed because BuildKit pushed an
-  # OCI image *index*, whose manifest HEAD SpectonCR mishandles:
+  # DOCKER_BUILDKIT=0 (the old legacy-builder workaround) is gone. It existed
+  # because BuildKit pushed an OCI image *index*, whose manifest HEAD SpectonCR
+  # mishandles:
   #   'unexpected status from HEAD request to .../manifests/<digest>'
   # --provenance=false --sbom=false suppresses the attestation manifests that
   # create that index, so buildx emits a single manifest and `docker push` sends
-  # exactly what the registry accepted before. Verified on the runner: with the
-  # flags, zero attestation/manifest-list lines in the build output.
+  # exactly what the registry already accepted. Verified against the real registry:
+  # zero attestation/manifest-list lines, and the push succeeds.
   BUILDX_FLAGS: --provenance=false --sbom=false
   TARGET_ENV: ${{ github.event.inputs.TARGET_ENV || 'int' }}
   DEPLOYMENT_TYPE: ${{ github.event.inputs.DEPLOYMENT_TYPE || 'build-and-deploy' }}
@@ -124,10 +126,18 @@ jobs:
     secrets: inherit
 
   build:
-    # Self-hosted runner (must have Docker available to build + push images).
-    # It is an arm64 Mac, so every image is cross-built for BUILD_PLATFORM
-    # (linux/amd64) and the arch is asserted before push — see the env notes above.
-    runs-on: self-hosted
+    # GitHub-hosted, and deliberately NOT self-hosted. The k3s nodes are amd64 but
+    # the self-hosted runner is an arm64 Mac, so building there produced arm64
+    # images and every pod died with "exec format error". Emulating the build for
+    # amd64 on that Mac works but is unusably slow (the Next.js stage ran >20min
+    # under QEMU and had not finished). ubuntu-latest is already amd64, so the
+    # build is NATIVE — correct and fast, with no emulation or cross-compilation.
+    #
+    # This is only viable because the registry is public: int-spectoncr answers
+    # from outside the operator network (HTTP 401 = reachable, needs auth). The
+    # `deploy` job must stay self-hosted, because the k3s API does NOT answer from
+    # outside (it times out), and neither does the wslproxy control plane.
+    runs-on: ubuntu-latest
     outputs:
       registry: ${{ steps.reg.outputs.registry }}
     steps:
@@ -175,13 +185,12 @@ jobs:
           SHA=${{ steps.tag.outputs.sha }}
           NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
           # One backend image contains both binaries; api/worker differ by command.
-          # --platform is MANDATORY: this runner is an arm64 Mac, the k3s nodes are
-          # amd64. A plain `docker build` targets the builder and the kubelet dies
-          # with "exec format error". Dockerfile.backend cross-compiles via
-          # $BUILDPLATFORM/$TARGETARCH, so this stays native speed (no QEMU).
-          # --load lands a plain schema-2 image in the docker store, so the existing
-          # `docker push` path still sends a manifest SpectonCR accepts (BuildKit's
-          # direct --push emits an OCI index, which it mishandles).
+          # --platform is stated explicitly (and asserted below) rather than left
+          # implicit: it is the one thing that, if it silently follows the builder
+          # instead of the cluster, ships an unrunnable image. On ubuntu-latest this
+          # is native. --load lands a plain image in the docker store so the
+          # existing `docker push` path sends a manifest SpectonCR accepts
+          # (BuildKit's direct --push emits an OCI index, which it mishandles).
           docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
             -f deploy/docker/Dockerfile.backend \
             -t "$NS/api:$SHA" -t "$NS/api:latest" \
@@ -200,9 +209,10 @@ jobs:
           NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
           # Empty NEXT_PUBLIC_API_BASE_URL => the browser calls the API same-origin
           # (/api/...) through the gateway. No CORS.
-          # Built fully under amd64 emulation (no $BUILDPLATFORM shortcut): npm
-          # installs arch-specific native modules (next/swc, sharp) that get traced
-          # into .next/standalone, so the deps must be built for the target arch.
+          # Native amd64: npm installs arch-specific native modules (next/swc,
+          # sharp) which get traced into .next/standalone, so the deps must match
+          # the target arch. Building this on the arm64 runner would mean emulating
+          # the whole npm/next stage under QEMU — measured at >20min and unfinished.
           docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
             -f frontend/Dockerfile \
             --build-arg NEXT_PUBLIC_API_BASE_URL="" \
