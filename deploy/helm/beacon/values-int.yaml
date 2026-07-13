@@ -29,6 +29,17 @@ ingress:
   enabled: true
   tls: true
 
+# Secrets come from the committed SealedSecret at sealed/int/, decrypted in-cluster
+# by the sealed-secrets controller. (Vault/ESO is not usable here yet: the ESO role
+# has no read policy on secret/data/beaconpulse/*, so it 403s.)
+secretsSource: sealed
+
 # Images for this environment live on its own SpectonCR host.
 image:
   registry: int-spectoncr.diytaxreturn.co.uk
+  # The int namespace is shared with the diytaxreturn workloads and already has a
+  # `nebulacr-login` dockerconfigjson whose auth covers int-spectoncr.diytaxreturn.co.uk
+  # — the exact host we pull from. Reuse it rather than duplicating registry creds:
+  # one place to rotate. The chart references it but does not own it.
+  pullSecret: nebulacr-login
+  pullSecretCreate: false

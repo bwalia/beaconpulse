@@ -3,10 +3,7 @@
   "name": "beaconpulse-prod-default",
   "profile_id": "prod",
   "priority": 1,
-  "rules_tags": [
-    "beaconpulse",
-    "prod"
-  ],
+  "rules_tags": ["beaconpulse", "prod"],
   "match": {
     "rules": {
       "path": "/",
@@ -15,13 +12,13 @@
     },
     "response": {
       "code": 305,
-      "redirect_uri": "http://193.237.176.232:32100",
+      "redirect_uri": "13.42.188.136:80",
       "strip_path": false,
       "backends": [
         {
-          "address": "http://193.237.176.232:32100",
+          "address": "13.42.188.136:80",
           "weight": 100,
-          "label": "stable, ingress, wslproxy, nodeport, kube-vip"
+          "label": "k3s1 traefik ingress (wslproxy class); beacon pods pinned to debworker00"
         }
       ],
       "routing": {

@@ -57,6 +57,11 @@ env:
   # of the platform. The hostname itself is read from the env's Helm values file so
   # DNS can never drift from what the Ingress actually serves.
   DNS_ZONE: beaconpulse.net
+  # Traffic path: Cloudflare CNAMEs the host to pop0 (the WSL Proxy edge, and the
+  # same IP as the prod-our control plane we register the vhost on). pop0 then
+  # applies the beaconpulse-prod-default rule, which proxies to the k3s1 Traefik
+  # ingress at 13.42.188.136:80, which routes to the beacon pods on debworker00.
+  #   browser -> pop0.wslproxy.com -> 13.42.188.136:80 (traefik) -> beacon-nginx
   DNS_TARGET: pop0.wslproxy.com
   DNS_PROXIED: "false" # DNS-only: cert-manager solves HTTP-01 and wslproxy terminates TLS
 
@@ -90,6 +95,25 @@ jobs:
             --name "$HOST" \
             --content "$DNS_TARGET" \
             --proxied "$DNS_PROXIED"
+
+  # DNS now resolves to the edge, so register the vhost + rule on the WSL Proxy
+  # control plane BEFORE helm rolls the app — otherwise the hostname resolves to an
+  # edge with no config for it. Reuses the manual workflow rather than duplicating
+  # the import logic. ACTIVATE_CONFIG=true writes the vhost and takes it live.
+  #
+  # TARGET_ENV is the WSL Proxy PROFILE, not the Beacon env: every beaconpulse host
+  # (int/test/acc + apex) lives under the 'prod' profile dir. The import is
+  # idempotent — records are keyed by their committed slug ids.
+  wslproxy:
+    name: Register WSL Proxy vhost
+    needs: [dns]
+    if: ${{ (github.event.inputs.DEPLOYMENT_TYPE || 'build-and-deploy') != 'build' }}
+    uses: ./.github/workflows/wslproxy-register-domains.yml
+    with:
+      TARGET_ENV: prod
+      ACTIVATE_CONFIG: true
+      DRY_RUN: false
+    secrets: inherit
 
   build:
     # Self-hosted runner (must have Docker available to build + push images).
@@ -170,7 +194,10 @@ jobs:
     runs-on: self-hosted
     # `dns` must land before helm, so the record is resolvable by the time
     # cert-manager tries to solve the HTTP-01 challenge for the new host.
-    needs: [build, dns]
+    # `wslproxy` must land too: the edge has to hold the vhost + rule before the
+    # HTTP-01 challenge (and real traffic) arrives at it. Full chain on push:
+    #   dns -> wslproxy -> deploy   (build runs alongside dns/wslproxy)
+    needs: [build, dns, wslproxy]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
