@@ -59,9 +59,17 @@ syncs them into the `beacon-secrets` Secret:
 `prod` runs with `BEACON_ENV=production`, which **refuses to start** with default
 ("change-me") secrets — provide real values.
 
-For **local testing without Vault**, set `externalSecret.enabled=false` and pass
-values with `--set secrets.jwtAccess=… secrets.postgresPassword=…` (a plain
-Secret is templated instead).
+### Where secrets come from — `secretsSource`
+
+| value | behaviour |
+| --- | --- |
+| `external` | External Secrets Operator pulls from Vault (default; used by `acc`/`test`/`prod`). |
+| `sealed` | The committed, encrypted SealedSecret in `sealed/<env>/` is decrypted in-cluster by the sealed-secrets controller. Used by **`int`**, because the ESO role currently has no Vault read policy on `secret/data/beaconpulse/*` (it 403s). Regenerate with `deploy/scripts/seal-secrets.sh <env>`. |
+| `plain` | A plain Secret from `.Values.secrets.*` — **local testing only**. Pass `--set secrets.jwtAccess=… secrets.postgresPassword=…`; never commit real values. |
+
+`image.pullSecretCreate: false` lets the chart *reference* a pull secret it doesn't
+own — `int` reuses the shared `nebulacr-login`, whose auth already covers the
+SpectonCR host, rather than duplicating registry credentials.
 
 ## Deploy
 
