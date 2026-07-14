@@ -178,11 +178,19 @@ export interface ApiError {
 // (internal/domain/statuspage). There is no `target` here, and there must never
 // be: this data is served to anyone with the URL.
 
-export type StatusOverall = "operational" | "degraded" | "outage" | "unknown";
+export type StatusOverall =
+  | "operational"
+  | "degraded"
+  | "outage"
+  | "under_maintenance"
+  | "unknown";
 
 export interface PublicStatusMonitor {
   name: string;
   status: "up" | "down" | "degraded" | "unknown" | "paused";
+  // True when an active maintenance window covers this monitor. The real probe
+  // `status` is still present so the row can show the true state underneath.
+  in_maintenance: boolean;
   last_checked_at: string | null;
 }
 
@@ -192,11 +200,20 @@ export interface PublicStatusGroup {
   monitors: PublicStatusMonitor[];
 }
 
+// PublicStatusMaintenance is one active planned-maintenance window, surfaced as a
+// banner. Only human-facing fields — never scope ids or internal identifiers.
+export interface PublicStatusMaintenance {
+  title: string;
+  starts_at: string;
+  ends_at: string;
+}
+
 export interface PublicStatusPage {
   org_name: string;
   title: string;
   overall: StatusOverall;
   groups: PublicStatusGroup[];
+  maintenances: PublicStatusMaintenance[];
   updated_at: string;
 }
 
@@ -208,4 +225,26 @@ export interface StatusPageSettings {
   published_count: number;
   /** Server-provided public path, so the UI never reconstructs the route. */
   url: string;
+}
+
+// ---- Maintenance windows ----
+// Planned downtime that suppresses alerts and relabels the status page. Mirrors
+// backend/internal/domain/maintenance.
+
+export type MaintenanceScope = "org" | "project" | "monitor";
+
+export interface MaintenanceWindow {
+  id: string;
+  org_id: string;
+  title: string;
+  description: string;
+  starts_at: string;
+  ends_at: string;
+  scope: MaintenanceScope;
+  /** Project ids (scope=project) or monitor ids (scope=monitor); empty for org. */
+  scope_ids: string[];
+  /** Whether the window covers "now" — the server's clock, not the browser's. */
+  active: boolean;
+  created_at: string;
+  updated_at: string;
 }

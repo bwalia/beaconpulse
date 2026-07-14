@@ -8,12 +8,14 @@ import {
   BeaconMark,
   CheckCircleIcon,
   ClockIcon,
+  WrenchIcon,
   XIcon,
 } from "@/components/icons";
 import { IN_VIEW, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { ThemeToggle } from "@/lib/theme";
 import type {
   PublicStatusGroup,
+  PublicStatusMaintenance,
   PublicStatusMonitor,
   PublicStatusPage,
   StatusOverall,
@@ -54,6 +56,12 @@ const OVERALL: Record<
     ring: "bg-red-600/10",
     Icon: XIcon,
   },
+  under_maintenance: {
+    label: "Under maintenance",
+    tone: "text-blue-700 dark:text-blue-300",
+    ring: "bg-blue-600/10",
+    Icon: WrenchIcon,
+  },
   unknown: {
     label: "Awaiting first checks",
     tone: "text-slate-600 dark:text-slate-300",
@@ -72,6 +80,15 @@ const MONITOR: Record<
   paused: { label: "Paused", dot: "bg-slate-400", tone: "text-slate-600 dark:text-slate-400" },
   unknown: { label: "No data", dot: "bg-slate-400", tone: "text-slate-600 dark:text-slate-400" },
 };
+
+// A monitor under an active window shows this neutral state as its headline pill.
+// Its true probe state is still rendered beside it (muted) so a real failure that
+// coincides with planned work is never hidden.
+const MAINT = {
+  label: "Under maintenance",
+  dot: "bg-blue-500",
+  tone: "text-blue-700 dark:text-blue-300",
+} as const;
 
 /** "2 minutes ago", rendered client-side to avoid an SSR/CSR clock mismatch. */
 function Ago({ iso }: { iso: string | null }) {
@@ -101,6 +118,51 @@ function Ago({ iso }: { iso: string | null }) {
     <span suppressHydrationWarning className="font-mono text-xs text-slate-500 dark:text-slate-400">
       {text}
     </span>
+  );
+}
+
+/** A calendar window rendered as "1 Jan, 14:00 → 16:00", client-side to dodge an
+ *  SSR/CSR locale mismatch. */
+function WindowWhen({ startsAt, endsAt }: { startsAt: string; endsAt: string }) {
+  const [text, setText] = useState<string>("");
+  useEffect(() => {
+    const fmt = (iso: string) =>
+      new Date(iso).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    setText(`${fmt(startsAt)} → ${fmt(endsAt)}`);
+  }, [startsAt, endsAt]);
+  return (
+    <span suppressHydrationWarning className="font-mono text-xs text-blue-700/80 dark:text-blue-300/80">
+      {text}
+    </span>
+  );
+}
+
+function MaintenanceBanner({ windows }: { windows: PublicStatusMaintenance[] }) {
+  const reveal = useRevealVariants();
+  return (
+    <motion.div
+      variants={reveal}
+      aria-live="polite"
+      className="mt-6 rounded-2xl border border-blue-600/20 bg-blue-50 p-5 dark:border-blue-400/20 dark:bg-blue-950/40"
+    >
+      <div className="flex items-center gap-2.5">
+        <WrenchIcon className="h-5 w-5 shrink-0 text-blue-700 dark:text-blue-300" />
+        <p className="font-semibold text-blue-800 dark:text-blue-200">Scheduled maintenance</p>
+      </div>
+      <ul className="mt-3 space-y-2">
+        {windows.map((mw, i) => (
+          <li key={`${mw.title}-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <span className="text-sm text-blue-900 dark:text-blue-100">{mw.title}</span>
+            <WindowWhen startsAt={mw.starts_at} endsAt={mw.ends_at} />
+          </li>
+        ))}
+      </ul>
+    </motion.div>
   );
 }
 
@@ -135,11 +197,26 @@ function Group({ group }: { group: PublicStatusGroup }) {
               </span>
               <span className="flex shrink-0 items-center gap-3">
                 <Ago iso={m.last_checked_at} />
-                {/* dot + word: never colour alone */}
-                <span className={`flex items-center gap-1.5 text-xs font-medium ${s.tone}`}>
-                  <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                  {s.label}
-                </span>
+                {m.in_maintenance ? (
+                  <>
+                    {/* True probe state, muted, so a real failure during planned
+                        work is still visible — just not the headline. */}
+                    <span className={`hidden items-center gap-1.5 text-xs font-medium opacity-60 sm:flex ${s.tone}`}>
+                      <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                      {s.label}
+                    </span>
+                    <span className={`flex items-center gap-1.5 text-xs font-medium ${MAINT.tone}`}>
+                      <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${MAINT.dot}`} />
+                      {MAINT.label}
+                    </span>
+                  </>
+                ) : (
+                  /* dot + word: never colour alone */
+                  <span className={`flex items-center gap-1.5 text-xs font-medium ${s.tone}`}>
+                    <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                    {s.label}
+                  </span>
+                )}
               </span>
             </li>
           );
@@ -186,6 +263,8 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
               </p>
             </div>
           </motion.div>
+
+          {page.maintenances.length > 0 && <MaintenanceBanner windows={page.maintenances} />}
 
           <motion.div
             variants={reveal}

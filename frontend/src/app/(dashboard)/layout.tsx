@@ -17,6 +17,7 @@ import {
   GlobeIcon,
   SettingsIcon,
   SearchIcon,
+  WrenchIcon,
 } from "@/components/icons";
 
 type NavItem = { href: string; label: string; Icon: (p: { className?: string }) => React.ReactElement };
@@ -29,6 +30,7 @@ const baseNav: NavItem[] = [
   { href: "/projects", label: "Projects", Icon: FolderIcon },
   { href: "/status-page", label: "Status page", Icon: GlobeIcon },
   { href: "/notifications", label: "Notifications", Icon: BellIcon },
+  { href: "/maintenance", label: "Maintenance", Icon: WrenchIcon },
   { href: "/billing", label: "Billing", Icon: CreditCardIcon },
 ];
 // The System page exposes the raw (global) Prometheus/Alertmanager tools and is

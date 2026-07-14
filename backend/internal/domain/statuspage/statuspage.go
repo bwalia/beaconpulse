@@ -43,6 +43,10 @@ const (
 	OverallDegraded Overall = "degraded"
 	// OverallOutage — every published monitor is down.
 	OverallOutage Overall = "outage"
+	// OverallMaintenance — planned work is in progress and nothing is genuinely
+	// down. A neutral state, distinct from an outage, so routine deploys never read
+	// as a failure to the customer's own users.
+	OverallMaintenance Overall = "under_maintenance"
 	// OverallUnknown — nothing has reported yet.
 	OverallUnknown Overall = "unknown"
 )
@@ -52,8 +56,13 @@ const (
 // Add nothing to this struct without asking: "am I willing to show this to an
 // anonymous stranger?". Target, IP, interval, and check config all fail that test.
 type Monitor struct {
-	Name          string
-	Status        monitor.Status
+	Name   string
+	Status monitor.Status
+	// InMaintenance is true when an active maintenance window covers this monitor.
+	// The true probe Status is still carried (and shown), so a real failure that
+	// coincides with planned work is not hidden — it is just relabelled in the
+	// headline so planned work does not read as an outage.
+	InMaintenance bool
 	LastCheckedAt *time.Time
 }
 
@@ -64,13 +73,25 @@ type Group struct {
 	Monitors    []Monitor
 }
 
+// MaintenanceNotice is a currently-active planned-maintenance window covering at
+// least one monitor on this page. Only the human-facing title and times are
+// exposed — never scope ids or internal identifiers.
+type MaintenanceNotice struct {
+	Title    string
+	StartsAt time.Time
+	EndsAt   time.Time
+}
+
 // Page is a whole rendered status page.
 type Page struct {
-	OrgName   string
-	Title     string
-	Overall   Overall
-	Groups    []Group
-	UpdatedAt time.Time
+	OrgName string
+	Title   string
+	Overall Overall
+	Groups  []Group
+	// Maintenances are the active planned-maintenance windows to surface as a
+	// banner. Empty when no window is active.
+	Maintenances []MaintenanceNotice
+	UpdatedAt    time.Time
 }
 
 // Repository loads the published projection for one org slug.
@@ -114,17 +135,27 @@ func (s *Service) Get(ctx context.Context, slug string) (*Page, error) {
 // outage is worse than useless:
 //
 //   - any monitor down, and not all of them  -> degraded
-//   - every monitor down                     -> outage
+//   - every live monitor down                -> outage
 //   - any monitor degraded                   -> degraded
+//   - otherwise-healthy with planned work    -> under_maintenance
 //   - nothing has ever reported              -> unknown
+//
+// Maintenance overrides down in the HEADLINE: a monitor covered by an active
+// window is excluded from the up/down/degraded tally, so planned work can never
+// push the page to "outage". Its true probe state is still shown on its own row —
+// this only changes the one-word summary, it does not hide a coincident failure.
 //
 // A monitor whose status is still "unknown" (never checked) is not counted as up:
 // silence is not evidence of health.
 func Summarise(groups []Group) Overall {
-	var total, up, down, degraded int
+	var total, up, down, degraded, maint int
 	for _, g := range groups {
 		for _, m := range g.Monitors {
 			total++
+			if m.InMaintenance {
+				maint++
+				continue
+			}
 			switch m.Status {
 			case monitor.StatusUp:
 				up++
@@ -135,14 +166,18 @@ func Summarise(groups []Group) Overall {
 			}
 		}
 	}
+	active := total - maint // monitors not shielded by a window
 	switch {
 	case total == 0:
 		return OverallUnknown
-	case down == total:
+	case active > 0 && down == active:
 		return OverallOutage
 	case down > 0 || degraded > 0:
 		return OverallDegraded
-	case up == total:
+	case maint > 0:
+		// Nothing genuinely down or degraded, but planned work is in progress.
+		return OverallMaintenance
+	case up == active:
 		return OverallOperational
 	default:
 		// Some monitors exist but have never reported.

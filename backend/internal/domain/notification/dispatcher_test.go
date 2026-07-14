@@ -39,7 +39,7 @@ func newDispatcherWith(t *testing.T, orgID uuid.UUID, analyzer Analyzer) (*Dispa
 	}
 	notif := &fakeNotifier{}
 	registry := map[ChannelType]Notifier{TypeTelegram: notif}
-	d := NewDispatcher(repo, cipher, registry, nil, noopRecorder{}, "http://dash", analyzer, time.Second)
+	d := NewDispatcher(repo, cipher, registry, nil, noopRecorder{}, nil, "http://dash", analyzer, time.Second)
 	return d, notif
 }
 

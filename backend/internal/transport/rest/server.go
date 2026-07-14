@@ -27,6 +27,7 @@ type RouterDeps struct {
 	Project            *ProjectHandler
 	Monitor            *MonitorHandler
 	Notification       *NotificationHandler
+	Maintenance        *MaintenanceHandler
 	Alert              *AlertHandler
 	Insight            *InsightHandler
 	Billing            *BillingHandler
@@ -73,6 +74,7 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Mount("/projects", d.Project.Routes())
 		api.Mount("/monitors", d.Monitor.Routes())
 		api.Mount("/notification-channels", d.Notification.Routes())
+		api.Mount("/maintenance-windows", d.Maintenance.Routes())
 		// Org-scoped active alerts (read from Prometheus, filtered by org_id).
 		api.With(d.Authenticator.Require).Get("/alerts", d.Insight.ActiveAlerts)
 		// Org-wide dashboard overview.

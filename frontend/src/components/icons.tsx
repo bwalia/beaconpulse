@@ -199,6 +199,14 @@ export function ClockIcon({ className }: IconProps) {
   );
 }
 
+export function WrenchIcon({ className }: IconProps) {
+  return (
+    <Icon className={className}>
+      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L4 16.8l3.2 3.2 5.3-5.3a4 4 0 0 0 5.2-5.4l-2.6 2.6-2.6-.7-.7-2.6z" />
+    </Icon>
+  );
+}
+
 export function SunIcon({ className }: IconProps) {
   return (
     <Icon className={className}>

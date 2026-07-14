@@ -15,6 +15,13 @@ func group(statuses ...monitor.Status) Group {
 	return g
 }
 
+// mon builds one projected monitor with an explicit maintenance flag; mixed wraps
+// a set of them in a single group. Used for the maintenance-override cases.
+func mon(s monitor.Status, maint bool) Monitor {
+	return Monitor{Name: "m", Status: s, InMaintenance: maint}
+}
+func mixed(ms ...Monitor) []Group { return []Group{{Name: "g", Monitors: ms}} }
+
 func TestSummarise(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -38,6 +45,19 @@ func TestSummarise(t *testing.T) {
 			[]Group{group(monitor.StatusUnknown, monitor.StatusUnknown)}, OverallUnknown},
 		{"one unknown among up is not operational",
 			[]Group{group(monitor.StatusUp, monitor.StatusUnknown)}, OverallUnknown},
+
+		// Maintenance overrides down in the HEADLINE: a covered monitor is excluded
+		// from the up/down tally so planned work never reads as an outage.
+		{"a down monitor under maintenance is not an outage",
+			mixed(mon(monitor.StatusDown, true)), OverallMaintenance},
+		{"planned work alongside healthy monitors reads as maintenance",
+			mixed(mon(monitor.StatusUp, false), mon(monitor.StatusDown, true)), OverallMaintenance},
+		{"a genuine outage still shows through a coincident window elsewhere",
+			mixed(mon(monitor.StatusDown, false), mon(monitor.StatusDown, true)), OverallOutage},
+		{"maintenance does not mask a real degrade on a live monitor",
+			mixed(mon(monitor.StatusDegraded, false), mon(monitor.StatusUp, false), mon(monitor.StatusDown, true)), OverallDegraded},
+		{"all monitors up with none in maintenance stays operational",
+			mixed(mon(monitor.StatusUp, false), mon(monitor.StatusUp, false)), OverallOperational},
 	}
 
 	for _, tc := range tests {

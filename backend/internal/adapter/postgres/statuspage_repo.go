@@ -45,7 +45,16 @@ SELECT o.name,
        p.environment,
        m.name,
        m.last_status,
-       m.last_checked_at
+       m.last_checked_at,
+       EXISTS (
+           SELECT 1 FROM maintenance_windows w
+            WHERE w.org_id = o.id
+              AND w.deleted_at IS NULL
+              AND w.starts_at <= now() AND w.ends_at > now()
+              AND ( w.scope = 'org'
+                 OR (w.scope = 'project' AND m.project_id = ANY(w.scope_ids))
+                 OR (w.scope = 'monitor' AND m.id = ANY(w.scope_ids)) )
+       ) AS in_maintenance
   FROM organizations o
   JOIN monitors      m ON m.org_id = o.id
   JOIN projects      p ON p.id = m.project_id
@@ -57,6 +66,29 @@ SELECT o.name,
    AND m.deleted_at IS NULL
    AND p.deleted_at IS NULL
  ORDER BY p.name, m.name`
+
+// statusPageMaintenanceQuery lists the currently-active windows that cover at
+// least one published monitor on this page — the banner source. Only title/times
+// are selected; scope ids and internal identifiers never leave the DB.
+const statusPageMaintenanceQuery = `
+SELECT w.title, w.starts_at, w.ends_at
+  FROM maintenance_windows w
+ WHERE w.org_id = (
+           SELECT id FROM organizations
+            WHERE slug = $1 AND status_page_enabled AND deleted_at IS NULL
+       )
+   AND w.deleted_at IS NULL
+   AND w.starts_at <= now() AND w.ends_at > now()
+   AND EXISTS (
+           SELECT 1 FROM monitors m
+             JOIN projects p ON p.id = m.project_id AND p.deleted_at IS NULL
+            WHERE m.org_id = w.org_id
+              AND m.public AND m.enabled AND m.deleted_at IS NULL
+              AND ( w.scope = 'org'
+                 OR (w.scope = 'project' AND m.project_id = ANY(w.scope_ids))
+                 OR (w.scope = 'monitor' AND m.id = ANY(w.scope_ids)) )
+       )
+ ORDER BY w.starts_at`
 
 // GetBySlug returns the published page, or (nil, nil) when the slug is unknown OR
 // the org has not published a page.
@@ -78,15 +110,16 @@ func (r *StatusPageRepository) GetBySlug(ctx context.Context, slug string) (*sta
 
 	for rows.Next() {
 		var (
-			orgName  string
-			title    string
-			projName string
-			env      string
-			monName  string
-			status   string
-			checked  *time.Time
+			orgName       string
+			title         string
+			projName      string
+			env           string
+			monName       string
+			status        string
+			checked       *time.Time
+			inMaintenance bool
 		)
-		if err := rows.Scan(&orgName, &title, &projName, &env, &monName, &status, &checked); err != nil {
+		if err := rows.Scan(&orgName, &title, &projName, &env, &monName, &status, &checked, &inMaintenance); err != nil {
 			return nil, fmt.Errorf("status page scan: %w", err)
 		}
 		page.OrgName = orgName
@@ -101,6 +134,7 @@ func (r *StatusPageRepository) GetBySlug(ctx context.Context, slug string) (*sta
 		page.Groups[i].Monitors = append(page.Groups[i].Monitors, statuspage.Monitor{
 			Name:          monName,
 			Status:        monitor.Status(status),
+			InMaintenance: inMaintenance,
 			LastCheckedAt: checked,
 		})
 	}
@@ -116,5 +150,31 @@ func (r *StatusPageRepository) GetBySlug(ctx context.Context, slug string) (*sta
 	if len(page.Groups) == 0 {
 		return nil, nil
 	}
+
+	notices, err := r.activeMaintenance(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+	page.Maintenances = notices
 	return page, nil
+}
+
+// activeMaintenance loads the banner notices for a page: the windows active right
+// now that cover at least one published monitor.
+func (r *StatusPageRepository) activeMaintenance(ctx context.Context, slug string) ([]statuspage.MaintenanceNotice, error) {
+	rows, err := r.pool.Query(ctx, statusPageMaintenanceQuery, slug)
+	if err != nil {
+		return nil, fmt.Errorf("status page maintenance query: %w", err)
+	}
+	defer rows.Close()
+
+	var out []statuspage.MaintenanceNotice
+	for rows.Next() {
+		var n statuspage.MaintenanceNotice
+		if err := rows.Scan(&n.Title, &n.StartsAt, &n.EndsAt); err != nil {
+			return nil, fmt.Errorf("status page maintenance scan: %w", err)
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
 }
