@@ -224,7 +224,7 @@ every 1–60 min, not per second).
 
 ---
 
-## F3 — Maintenance windows
+## F3 — Maintenance windows  ✅ SHIPPED
 
 ### Why now (not later)
 We just shipped public status pages. Without maintenance windows, every planned
