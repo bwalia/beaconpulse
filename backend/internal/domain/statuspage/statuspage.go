@@ -30,6 +30,7 @@ import (
 	"beacon/internal/domain/auth"
 	"beacon/internal/domain/monitor"
 	"beacon/internal/platform/apperror"
+	"beacon/internal/platform/slug"
 )
 
 // Overall summarises a whole page in one word, so the page can lead with an
@@ -195,12 +196,18 @@ func Summarise(groups []Group) Overall {
 
 // Settings is an org's status-page configuration.
 type Settings struct {
-	// Slug is read-only here: it is the org's identity, reused as the page URL
-	// rather than minted separately so the two cannot drift.
-	Slug    string
-	OrgName string
-	Enabled bool
-	Title   string
+	// Slug is the EFFECTIVE public slug the page is served at: the custom slug when
+	// one is set, otherwise the org slug. This is what the URL uses.
+	Slug string
+	// OrgSlug is the org's identity slug — the default the page falls back to when
+	// no custom slug is set. Never changes here.
+	OrgSlug string
+	// CustomSlug is the owner-chosen override, empty when using the default. Editing
+	// the page URL means setting this.
+	CustomSlug string
+	OrgName    string
+	Enabled    bool
+	Title      string
 	// PublishedCount is how many monitors are currently on the page. Surfaced so
 	// the UI can warn about the "enabled but empty" trap.
 	PublishedCount int
@@ -211,6 +218,10 @@ type SettingsRepository interface {
 	Get(ctx context.Context, orgID uuid.UUID) (*Settings, error)
 	Update(ctx context.Context, orgID uuid.UUID, s Settings) error
 	PublishedCount(ctx context.Context, orgID uuid.UUID) (int, error)
+	// SlugAvailable reports whether slug is free for orgID to claim as its custom
+	// status-page slug — i.e. no OTHER org already uses it as its org slug or its
+	// custom slug. The public URL namespace spans both, so both must be checked.
+	SlugAvailable(ctx context.Context, orgID uuid.UUID, slug string) (bool, error)
 }
 
 // SettingsService implements the owner-facing use cases.
@@ -242,6 +253,10 @@ func (s *SettingsService) Get(ctx context.Context, orgID uuid.UUID) (*Settings, 
 type UpdateInput struct {
 	Enabled *bool
 	Title   *string
+	// Slug sets the custom public slug. A non-empty value is normalised and claimed;
+	// an empty string clears the override, reverting the page to the org slug. Nil
+	// leaves the current slug unchanged.
+	Slug *string
 }
 
 // Update changes the org's status-page settings.
@@ -272,6 +287,11 @@ func (s *SettingsService) Update(ctx context.Context, actor auth.Role, orgID, us
 		cur.Title = title
 		changed["status_page_title"] = title
 	}
+	if in.Slug != nil {
+		if err := s.applySlug(ctx, orgID, cur, *in.Slug, changed); err != nil {
+			return nil, err
+		}
+	}
 
 	if err := s.repo.Update(ctx, orgID, *cur); err != nil {
 		return nil, err
@@ -292,4 +312,44 @@ func (s *SettingsService) Update(ctx context.Context, actor auth.Role, orgID, us
 	}
 
 	return s.Get(ctx, orgID)
+}
+
+// applySlug validates and applies a custom-slug change onto cur. An empty value
+// (or the org's own slug) clears the override; any other value is normalised,
+// checked for availability across the public slug namespace, and claimed.
+func (s *SettingsService) applySlug(ctx context.Context, orgID uuid.UUID, cur *Settings, raw string, changed map[string]any) error {
+	if strings.TrimSpace(raw) == "" {
+		if cur.CustomSlug != "" {
+			cur.CustomSlug, cur.Slug = "", cur.OrgSlug
+			changed["status_page_slug"] = nil
+		}
+		return nil
+	}
+	// Normalise so "Acme Cloud" becomes "acme-cloud" rather than being rejected.
+	candidate := slug.Make(raw, "")
+	if candidate == "" {
+		return apperror.Validation("invalid status page URL",
+			apperror.FieldError{Field: "slug", Message: "use letters, numbers and hyphens"})
+	}
+	if candidate == cur.CustomSlug {
+		return nil // unchanged
+	}
+	// Choosing the org's own slug is just "use the default" — clear the override.
+	if candidate == cur.OrgSlug {
+		if cur.CustomSlug != "" {
+			cur.CustomSlug, cur.Slug = "", cur.OrgSlug
+			changed["status_page_slug"] = nil
+		}
+		return nil
+	}
+	available, err := s.repo.SlugAvailable(ctx, orgID, candidate)
+	if err != nil {
+		return err
+	}
+	if !available {
+		return apperror.Conflict("that status page URL is already taken")
+	}
+	cur.CustomSlug, cur.Slug = candidate, candidate
+	changed["status_page_slug"] = candidate
+	return nil
 }

@@ -222,11 +222,16 @@ export interface PublicStatusPage {
 }
 
 export interface StatusPageSettings {
+  /** Effective public slug (custom if set, else the org slug). */
   slug: string;
   org_name: string;
   enabled: boolean;
   title: string;
   published_count: number;
+  /** The org's default slug — what the page falls back to with no custom slug. */
+  org_slug: string;
+  /** The owner-chosen slug, empty when using the default. */
+  custom_slug: string;
   /** Server-provided public path, so the UI never reconstructs the route. */
   url: string;
 }

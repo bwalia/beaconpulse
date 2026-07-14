@@ -119,7 +119,10 @@ func (r *UserRepository) TouchLastLogin(ctx context.Context, userID uuid.UUID) e
 func (r *UserRepository) SlugExists(ctx context.Context, slug string) (bool, error) {
 	var exists bool
 	if err := r.pool.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM organizations WHERE slug = $1 AND deleted_at IS NULL)`, slug,
+		// Guard the whole public slug namespace: a new org must not take a slug that
+		// another org already serves its status page at (org slug OR custom slug).
+		`SELECT EXISTS(SELECT 1 FROM organizations
+		   WHERE deleted_at IS NULL AND ($1 = slug OR $1 = status_page_slug))`, slug,
 	).Scan(&exists); err != nil {
 		return false, apperror.Internal(fmt.Errorf("slug exists: %w", err))
 	}

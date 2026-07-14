@@ -58,7 +58,7 @@ SELECT o.name,
   FROM organizations o
   JOIN monitors      m ON m.org_id = o.id
   JOIN projects      p ON p.id = m.project_id
- WHERE o.slug = $1
+ WHERE (o.status_page_slug = $1 OR (o.status_page_slug IS NULL AND o.slug = $1))
    AND o.status_page_enabled
    AND o.deleted_at IS NULL
    AND m.public
@@ -75,7 +75,8 @@ SELECT w.title, w.starts_at, w.ends_at
   FROM maintenance_windows w
  WHERE w.org_id = (
            SELECT id FROM organizations
-            WHERE slug = $1 AND status_page_enabled AND deleted_at IS NULL
+            WHERE (status_page_slug = $1 OR (status_page_slug IS NULL AND slug = $1))
+              AND status_page_enabled AND deleted_at IS NULL
        )
    AND w.deleted_at IS NULL
    AND w.starts_at <= now() AND w.ends_at > now()

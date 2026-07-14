@@ -232,7 +232,7 @@ export function useStatusPageSettings() {
 export function useUpdateStatusPageSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { enabled?: boolean; title?: string }) =>
+    mutationFn: (input: { enabled?: boolean; title?: string; slug?: string }) =>
       api.patch<StatusPageSettings>("/api/v1/status-page", input),
     // Publishing changes the monitor list's meaning too (the "Public" toggles),
     // so refresh both rather than leaving a stale count on screen.
