@@ -63,7 +63,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-white">
             <BeaconMark className="h-5 w-5" />
           </span>
-          <span className="text-xl font-bold tracking-tight">Beacon</span>
+          <span className="text-xl font-bold tracking-tight">Beacon Pulse</span>
         </div>
         <nav className="space-y-1">
           {[...baseNav, ...(user.role === "owner" || user.role === "admin" ? adminNav : [])].map((item) => {

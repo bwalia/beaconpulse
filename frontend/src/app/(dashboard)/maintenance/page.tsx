@@ -65,7 +65,7 @@ function HowItWorks() {
     {
       n: "2",
       title: "While it’s active",
-      body: "Beacon pauses alerts for those monitors and shows “Under maintenance” on your public status page — instead of a red outage.",
+      body: "Beacon Pulse pauses alerts for those monitors and shows “Under maintenance” on your public status page — instead of a red outage.",
     },
     {
       n: "3",
@@ -109,7 +109,7 @@ export default function MaintenancePage() {
     <div className="space-y-6">
       <PageHeader
         title="Maintenance windows"
-        subtitle="Planning a deploy or known downtime? Tell Beacon in advance so it doesn’t cry wolf."
+        subtitle="Planning a deploy or known downtime? Tell Beacon Pulse in advance so it doesn’t cry wolf."
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
@@ -152,7 +152,7 @@ export default function MaintenancePage() {
             </Button>
           }
         >
-          Before a deploy or planned outage, schedule a window so Beacon holds back the alerts and your
+          Before a deploy or planned outage, schedule a window so Beacon Pulse holds back the alerts and your
           public status page shows planned work rather than a red “major outage”.
         </EmptyState>
       ) : (
@@ -425,7 +425,7 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
         {/* Live plain-language summary, so the person scheduling sees exactly what
             it will do before they commit. */}
         <p className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
-          While active, Beacon will <span className="font-medium text-slate-900 dark:text-slate-100">pause alerts</span>{" "}
+          While active, Beacon Pulse will <span className="font-medium text-slate-900 dark:text-slate-100">pause alerts</span>{" "}
           for {coverage} and mark them{" "}
           <span className="font-medium text-slate-900 dark:text-slate-100">“Under maintenance”</span> on your public
           status page.

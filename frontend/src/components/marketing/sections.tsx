@@ -102,7 +102,7 @@ function Features() {
         <SectionHead
           eyebrow="Everything, one place"
           title="Replace the five tools you're duct-taping together"
-          blurb="Beacon is one control plane for uptime, latency, certificates and alerting — self-hosted, so the data never leaves your infrastructure."
+          blurb="Beacon Pulse is one control plane for uptime, latency, certificates and alerting — self-hosted, so the data never leaves your infrastructure."
         />
 
         <motion.ul
@@ -151,7 +151,7 @@ const STEPS = [
   {
     icon: ActivityIcon,
     title: "Add your endpoints",
-    body: "Point Beacon at a URL, host or cluster. It starts probing on your interval within seconds — no agent to install.",
+    body: "Point Beacon Pulse at a URL, host or cluster. It starts probing on your interval within seconds — no agent to install.",
   },
   {
     icon: ChartLineIcon,
@@ -340,7 +340,7 @@ function FinalCTA() {
           Stop finding out from your customers.
         </motion.h2>
         <motion.p variants={reveal} className="mt-5 text-xl text-slate-600 dark:text-slate-300">
-          Spin up Beacon, add your first domain, and get alerted before anyone opens a ticket.
+          Spin up Beacon Pulse, add your first domain, and get alerted before anyone opens a ticket.
         </motion.p>
         <motion.div variants={reveal} className="mt-9 flex flex-wrap justify-center gap-3">
           <Link
@@ -369,7 +369,7 @@ function Footer() {
       <div className="mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
         <div className="flex items-center gap-2.5">
           <BeaconMark className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          <span className="font-semibold text-slate-900 dark:text-white">Beacon</span>
+          <span className="font-semibold text-slate-900 dark:text-white">Beacon Pulse</span>
           <span className="text-sm text-slate-500 dark:text-slate-400">
             — infrastructure monitoring
           </span>

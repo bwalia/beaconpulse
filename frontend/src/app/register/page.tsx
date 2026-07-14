@@ -6,9 +6,9 @@ import { AuthScreen } from "@/components/auth/auth-screen";
 // (no blank flash), it is a clean URL to point a campaign or ad at, and it can
 // carry its own metadata.
 export const metadata: Metadata = {
-  title: "Start monitoring free — Beacon",
+  title: "Start monitoring free — Beacon Pulse",
   description:
-    "Create your Beacon account. Self-hosted, multi-tenant infrastructure monitoring. No credit card.",
+    "Create your Beacon Pulse account. Self-hosted, multi-tenant infrastructure monitoring. No credit card.",
 };
 
 export default function RegisterPage() {

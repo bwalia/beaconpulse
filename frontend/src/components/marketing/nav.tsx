@@ -49,7 +49,7 @@ export function MarketingNav() {
         >
           <BeaconMark className="h-8 w-8 text-blue-600 dark:text-blue-400" />
           <span className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-            Beacon
+            Beacon Pulse
           </span>
         </Link>
 

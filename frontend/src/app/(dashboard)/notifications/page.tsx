@@ -73,7 +73,7 @@ export default function NotificationsPage() {
             </Button>
           }
         >
-          Connect Slack, email, a webhook or Telegram and Beacon will alert you the moment a monitor
+          Connect Slack, email, a webhook or Telegram and Beacon Pulse will alert you the moment a monitor
           goes down — enriched with AI triage when enabled.
         </EmptyState>
       ) : (
