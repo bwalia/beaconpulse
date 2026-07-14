@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui";
+import { ConfirmProvider } from "@/components/confirm";
 import { ThemeToggle } from "@/lib/theme";
 import {
   ActivityIcon,
@@ -17,6 +18,7 @@ import {
   GlobeIcon,
   SettingsIcon,
   SearchIcon,
+  WrenchIcon,
 } from "@/components/icons";
 
 type NavItem = { href: string; label: string; Icon: (p: { className?: string }) => React.ReactElement };
@@ -29,6 +31,7 @@ const baseNav: NavItem[] = [
   { href: "/projects", label: "Projects", Icon: FolderIcon },
   { href: "/status-page", label: "Status page", Icon: GlobeIcon },
   { href: "/notifications", label: "Notifications", Icon: BellIcon },
+  { href: "/maintenance", label: "Maintenance", Icon: WrenchIcon },
   { href: "/billing", label: "Billing", Icon: CreditCardIcon },
 ];
 // The System page exposes the raw (global) Prometheus/Alertmanager tools and is
@@ -53,13 +56,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
+    <ConfirmProvider>
     <div className="flex min-h-screen">
       <aside className="hidden w-64 flex-shrink-0 border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 md:block">
         <div className="mb-6 flex items-center gap-2.5 px-2">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-white">
             <BeaconMark className="h-5 w-5" />
           </span>
-          <span className="text-xl font-bold tracking-tight">Beacon</span>
+          <span className="text-xl font-bold tracking-tight">Beacon Pulse</span>
         </div>
         <nav className="space-y-1">
           {[...baseNav, ...(user.role === "owner" || user.role === "admin" ? adminNav : [])].map((item) => {
@@ -106,5 +110,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
     </div>
+    </ConfirmProvider>
   );
 }

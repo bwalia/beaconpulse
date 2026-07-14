@@ -28,6 +28,7 @@ import (
 	"beacon/internal/domain/billing"
 	"beacon/internal/domain/heartbeat"
 	"beacon/internal/domain/insight"
+	"beacon/internal/domain/maintenance"
 	"beacon/internal/domain/monitor"
 	"beacon/internal/domain/notification"
 	"beacon/internal/domain/project"
@@ -116,6 +117,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	monitorRepo := postgres.NewMonitorRepository(pool)
 	orgPlanRepo := postgres.NewOrgPlanRepository(pool)
 	notificationRepo := postgres.NewNotificationRepository(pool)
+	maintenanceRepo := postgres.NewMaintenanceRepository(pool)
 	statusPageRepo := postgres.NewStatusPageRepository(pool)
 	heartbeatRepo := postgres.NewHeartbeatRepository(pool)
 	statusPageSettingsRepo := postgres.NewStatusPageSettingsRepository(pool)
@@ -144,6 +146,9 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	}
 	projectLookup := postgres.NewProjectLookupAdapter(projectRepo)
 	notifySvc := notification.NewService(notificationRepo, cipher, notifierRegistry, auditRec, cfg.Notify.DashboardURL)
+	// Maintenance windows both CRUD (below) and suppress alerts: the same service
+	// is the Dispatcher's suppression checker, so planned downtime never pages.
+	maintenanceSvc := maintenance.NewService(maintenanceRepo, auditRec)
 
 	// Optional AI alert enrichment: when enabled, firing alerts are triaged by an
 	// LLM (assessed severity + likely cause + suggested fix) before delivery.
@@ -153,7 +158,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		log.Info("AI alert enrichment enabled",
 			slog.String("endpoint", cfg.AI.BaseURL), slog.String("model", cfg.AI.Model))
 	}
-	dispatcher := notification.NewDispatcher(notificationRepo, cipher, notifierRegistry, projectLookup, auditRec, cfg.Notify.DashboardURL, analyzer, cfg.AI.Timeout)
+	dispatcher := notification.NewDispatcher(notificationRepo, cipher, notifierRegistry, projectLookup, auditRec, maintenanceSvc, cfg.Notify.DashboardURL, analyzer, cfg.AI.Timeout)
 
 	// Tenant-scoped insight reads over Prometheus.
 	insightQuerier := promapi.NewInsightQuerier(promapi.New(cfg.CtrlPlane.PromQueryURL))
@@ -186,10 +191,11 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Health:             health,
 		Auth:               rest.NewAuthHandler(authSvc, validator, cfg.IsProduction()),
 		Project:            rest.NewProjectHandler(projectSvc, validator, authn),
-		Monitor:            rest.NewMonitorHandler(monitorSvc, insightSvc, validator, authn),
+		Monitor:            rest.NewMonitorHandler(monitorSvc, insightSvc, maintenanceSvc, validator, authn),
 		Notification:       rest.NewNotificationHandler(notifySvc, validator, authn),
+		Maintenance:        rest.NewMaintenanceHandler(maintenanceSvc, validator, authn),
 		Alert:              rest.NewAlertHandler(dispatcher, cfg.Notify.WebhookToken),
-		Insight:            rest.NewInsightHandler(insightSvc),
+		Insight:            rest.NewInsightHandler(insightSvc, maintenanceSvc),
 		Billing:            rest.NewBillingHandler(billingSvc, validator, authn),
 		StatusPage:         rest.NewStatusPageHandler(statusPageSvc),
 		Heartbeat:          rest.NewHeartbeatHandler(heartbeatSvc),

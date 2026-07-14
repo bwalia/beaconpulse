@@ -154,7 +154,7 @@ export function Hero() {
             variants={reveal}
             className="mt-7 max-w-2xl text-xl leading-relaxed text-slate-600 xl:text-2xl dark:text-slate-300"
           >
-            Beacon watches your endpoints, certificates and DNS every 30 seconds — then
+            Beacon Pulse watches your endpoints, certificates and DNS every 30 seconds — then
             tells the right person the moment something breaks. Own your data, run it
             anywhere, and give customers a status page they actually trust.
           </motion.p>

@@ -13,37 +13,48 @@ import (
 	"beacon/internal/platform/logger"
 )
 
+// MaintenanceChecker reports whether alerts for a monitor are currently
+// suppressed by an active maintenance window. It is the single suppression point
+// for every alert source (probed monitors and heartbeats alike). Optional — a nil
+// checker disables suppression and every alert dispatches.
+type MaintenanceChecker interface {
+	IsSuppressed(ctx context.Context, orgID, monitorID uuid.UUID, at time.Time) (bool, error)
+}
+
 // Dispatcher fans an Alertmanager webhook's alerts out to the notification
 // channels of the owning organization. It is best-effort: a failed delivery to
 // one channel is logged and audited but never blocks the others.
 type Dispatcher struct {
-	repo      Repository
-	cipher    *crypto.Cipher
-	registry  map[ChannelType]Notifier
-	projects  ProjectLookup
-	auditlog  audit.Recorder
-	dashURL   string
-	analyzer  Analyzer      // optional AI enrichment; nil disables it
-	aiTimeout time.Duration // per-alert budget for the analyzer
-	now       func() time.Time
+	repo       Repository
+	cipher     *crypto.Cipher
+	registry   map[ChannelType]Notifier
+	projects   ProjectLookup
+	auditlog   audit.Recorder
+	suppressor MaintenanceChecker // optional maintenance-window suppression; nil disables it
+	dashURL    string
+	analyzer   Analyzer      // optional AI enrichment; nil disables it
+	aiTimeout  time.Duration // per-alert budget for the analyzer
+	now        func() time.Time
 }
 
-// NewDispatcher wires the dispatcher. analyzer may be nil, in which case alerts
-// are delivered without AI enrichment.
-func NewDispatcher(repo Repository, cipher *crypto.Cipher, registry map[ChannelType]Notifier, projects ProjectLookup, auditlog audit.Recorder, dashboardURL string, analyzer Analyzer, aiTimeout time.Duration) *Dispatcher {
+// NewDispatcher wires the dispatcher. analyzer and suppressor may each be nil, in
+// which case alerts are delivered without AI enrichment / without maintenance
+// suppression respectively.
+func NewDispatcher(repo Repository, cipher *crypto.Cipher, registry map[ChannelType]Notifier, projects ProjectLookup, auditlog audit.Recorder, suppressor MaintenanceChecker, dashboardURL string, analyzer Analyzer, aiTimeout time.Duration) *Dispatcher {
 	if aiTimeout <= 0 {
 		aiTimeout = 20 * time.Second
 	}
 	return &Dispatcher{
-		repo:      repo,
-		cipher:    cipher,
-		registry:  registry,
-		projects:  projects,
-		auditlog:  auditlog,
-		dashURL:   strings.TrimRight(dashboardURL, "/"),
-		analyzer:  analyzer,
-		aiTimeout: aiTimeout,
-		now:       time.Now,
+		repo:       repo,
+		cipher:     cipher,
+		registry:   registry,
+		projects:   projects,
+		auditlog:   auditlog,
+		suppressor: suppressor,
+		dashURL:    strings.TrimRight(dashboardURL, "/"),
+		analyzer:   analyzer,
+		aiTimeout:  aiTimeout,
+		now:        time.Now,
 	}
 }
 
@@ -56,6 +67,29 @@ func (d *Dispatcher) DispatchAlerts(ctx context.Context, events []AlertEvent) {
 	for _, ev := range events {
 		if ev.OrgID == uuid.Nil {
 			continue
+		}
+		// Maintenance suppression: if an active window covers this monitor, the
+		// alert is planned — record it (never silent) and skip delivery. Checked
+		// against "now" so a window ending re-arms alerting immediately, and
+		// fail-open so an infra error here can never silence a real alert.
+		if d.suppressor != nil {
+			if mid, err := uuid.Parse(ev.MonitorID); err == nil {
+				suppressed, err := d.suppressor.IsSuppressed(ctx, ev.OrgID, mid, d.now().UTC())
+				switch {
+				case err != nil:
+					log.Error("dispatch: maintenance check failed; delivering anyway",
+						slog.String("org_id", ev.OrgID.String()),
+						slog.String("monitor_id", ev.MonitorID),
+						slog.String("error", err.Error()))
+				case suppressed:
+					log.Info("dispatch: alert suppressed by maintenance window",
+						slog.String("org_id", ev.OrgID.String()),
+						slog.String("monitor_id", ev.MonitorID),
+						slog.String("alert", ev.AlertName))
+					d.recordSuppressed(ctx, ev)
+					continue
+				}
+			}
 		}
 		channels, ok := channelsByOrg[ev.OrgID]
 		if !ok {
@@ -161,6 +195,24 @@ func (d *Dispatcher) record(ctx context.Context, ch *Channel, action audit.Actio
 	_ = d.auditlog.Record(ctx, audit.Entry{
 		OrgID: &org, Action: action,
 		ResourceType: "notification_channel", ResourceID: ch.ID.String(), Metadata: md,
+	})
+}
+
+// recordSuppressed writes the audit trail for an alert withheld by a maintenance
+// window, keyed on the monitor. Best-effort, like every other audit call here.
+func (d *Dispatcher) recordSuppressed(ctx context.Context, ev AlertEvent) {
+	org := ev.OrgID
+	_ = d.auditlog.Record(ctx, audit.Entry{
+		OrgID:        &org,
+		Action:       audit.ActionAlertSuppressed,
+		ResourceType: "monitor",
+		ResourceID:   ev.MonitorID,
+		Metadata: map[string]any{
+			"alert":    ev.AlertName,
+			"status":   string(ev.Status),
+			"severity": ev.Severity,
+			"monitor":  ev.MonitorName,
+		},
 	})
 }
 

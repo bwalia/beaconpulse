@@ -260,7 +260,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           className="relative inline-flex items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
         >
           <BeaconMark className="h-9 w-9 text-blue-400" />
-          <span className="text-2xl font-semibold tracking-tight">Beacon</span>
+          <span className="text-2xl font-semibold tracking-tight">Beacon Pulse</span>
         </Link>
 
         <motion.div initial="hidden" animate="show" variants={stagger} className="relative max-w-xl">
@@ -307,7 +307,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           <Link href="/" className="mb-8 inline-flex items-center gap-2.5 lg:hidden">
             <BeaconMark className="h-8 w-8 text-blue-600 dark:text-blue-400" />
             <span className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-              Beacon
+              Beacon Pulse
             </span>
           </Link>
 
@@ -316,7 +316,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           </h2>
           <p className="mt-2.5 text-lg text-slate-600 dark:text-slate-300">
             {mode === "login"
-              ? "Sign in to your Beacon dashboard."
+              ? "Sign in to your Beacon Pulse dashboard."
               : "No credit card. Add your first domain in under a minute."}
           </p>
 
@@ -369,7 +369,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           </div>
 
           <p className="mt-8 text-center text-base text-slate-600 dark:text-slate-400">
-            {mode === "login" ? "New to Beacon?" : "Already have an account?"}{" "}
+            {mode === "login" ? "New to Beacon Pulse?" : "Already have an account?"}{" "}
             <button
               type="button"
               onClick={() => setMode(mode === "login" ? "register" : "login")}

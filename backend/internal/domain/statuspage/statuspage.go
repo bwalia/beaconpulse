@@ -30,6 +30,7 @@ import (
 	"beacon/internal/domain/auth"
 	"beacon/internal/domain/monitor"
 	"beacon/internal/platform/apperror"
+	"beacon/internal/platform/slug"
 )
 
 // Overall summarises a whole page in one word, so the page can lead with an
@@ -43,6 +44,10 @@ const (
 	OverallDegraded Overall = "degraded"
 	// OverallOutage — every published monitor is down.
 	OverallOutage Overall = "outage"
+	// OverallMaintenance — planned work is in progress and nothing is genuinely
+	// down. A neutral state, distinct from an outage, so routine deploys never read
+	// as a failure to the customer's own users.
+	OverallMaintenance Overall = "under_maintenance"
 	// OverallUnknown — nothing has reported yet.
 	OverallUnknown Overall = "unknown"
 )
@@ -52,8 +57,13 @@ const (
 // Add nothing to this struct without asking: "am I willing to show this to an
 // anonymous stranger?". Target, IP, interval, and check config all fail that test.
 type Monitor struct {
-	Name          string
-	Status        monitor.Status
+	Name   string
+	Status monitor.Status
+	// InMaintenance is true when an active maintenance window covers this monitor.
+	// The true probe Status is still carried (and shown), so a real failure that
+	// coincides with planned work is not hidden — it is just relabelled in the
+	// headline so planned work does not read as an outage.
+	InMaintenance bool
 	LastCheckedAt *time.Time
 }
 
@@ -64,13 +74,25 @@ type Group struct {
 	Monitors    []Monitor
 }
 
+// MaintenanceNotice is a currently-active planned-maintenance window covering at
+// least one monitor on this page. Only the human-facing title and times are
+// exposed — never scope ids or internal identifiers.
+type MaintenanceNotice struct {
+	Title    string
+	StartsAt time.Time
+	EndsAt   time.Time
+}
+
 // Page is a whole rendered status page.
 type Page struct {
-	OrgName   string
-	Title     string
-	Overall   Overall
-	Groups    []Group
-	UpdatedAt time.Time
+	OrgName string
+	Title   string
+	Overall Overall
+	Groups  []Group
+	// Maintenances are the active planned-maintenance windows to surface as a
+	// banner. Empty when no window is active.
+	Maintenances []MaintenanceNotice
+	UpdatedAt    time.Time
 }
 
 // Repository loads the published projection for one org slug.
@@ -114,17 +136,27 @@ func (s *Service) Get(ctx context.Context, slug string) (*Page, error) {
 // outage is worse than useless:
 //
 //   - any monitor down, and not all of them  -> degraded
-//   - every monitor down                     -> outage
+//   - every live monitor down                -> outage
 //   - any monitor degraded                   -> degraded
+//   - otherwise-healthy with planned work    -> under_maintenance
 //   - nothing has ever reported              -> unknown
+//
+// Maintenance overrides down in the HEADLINE: a monitor covered by an active
+// window is excluded from the up/down/degraded tally, so planned work can never
+// push the page to "outage". Its true probe state is still shown on its own row —
+// this only changes the one-word summary, it does not hide a coincident failure.
 //
 // A monitor whose status is still "unknown" (never checked) is not counted as up:
 // silence is not evidence of health.
 func Summarise(groups []Group) Overall {
-	var total, up, down, degraded int
+	var total, up, down, degraded, maint int
 	for _, g := range groups {
 		for _, m := range g.Monitors {
 			total++
+			if m.InMaintenance {
+				maint++
+				continue
+			}
 			switch m.Status {
 			case monitor.StatusUp:
 				up++
@@ -135,14 +167,18 @@ func Summarise(groups []Group) Overall {
 			}
 		}
 	}
+	active := total - maint // monitors not shielded by a window
 	switch {
 	case total == 0:
 		return OverallUnknown
-	case down == total:
+	case active > 0 && down == active:
 		return OverallOutage
 	case down > 0 || degraded > 0:
 		return OverallDegraded
-	case up == total:
+	case maint > 0:
+		// Nothing genuinely down or degraded, but planned work is in progress.
+		return OverallMaintenance
+	case up == active:
 		return OverallOperational
 	default:
 		// Some monitors exist but have never reported.
@@ -160,12 +196,18 @@ func Summarise(groups []Group) Overall {
 
 // Settings is an org's status-page configuration.
 type Settings struct {
-	// Slug is read-only here: it is the org's identity, reused as the page URL
-	// rather than minted separately so the two cannot drift.
-	Slug    string
-	OrgName string
-	Enabled bool
-	Title   string
+	// Slug is the EFFECTIVE public slug the page is served at: the custom slug when
+	// one is set, otherwise the org slug. This is what the URL uses.
+	Slug string
+	// OrgSlug is the org's identity slug — the default the page falls back to when
+	// no custom slug is set. Never changes here.
+	OrgSlug string
+	// CustomSlug is the owner-chosen override, empty when using the default. Editing
+	// the page URL means setting this.
+	CustomSlug string
+	OrgName    string
+	Enabled    bool
+	Title      string
 	// PublishedCount is how many monitors are currently on the page. Surfaced so
 	// the UI can warn about the "enabled but empty" trap.
 	PublishedCount int
@@ -176,6 +218,10 @@ type SettingsRepository interface {
 	Get(ctx context.Context, orgID uuid.UUID) (*Settings, error)
 	Update(ctx context.Context, orgID uuid.UUID, s Settings) error
 	PublishedCount(ctx context.Context, orgID uuid.UUID) (int, error)
+	// SlugAvailable reports whether slug is free for orgID to claim as its custom
+	// status-page slug — i.e. no OTHER org already uses it as its org slug or its
+	// custom slug. The public URL namespace spans both, so both must be checked.
+	SlugAvailable(ctx context.Context, orgID uuid.UUID, slug string) (bool, error)
 }
 
 // SettingsService implements the owner-facing use cases.
@@ -207,6 +253,10 @@ func (s *SettingsService) Get(ctx context.Context, orgID uuid.UUID) (*Settings, 
 type UpdateInput struct {
 	Enabled *bool
 	Title   *string
+	// Slug sets the custom public slug. A non-empty value is normalised and claimed;
+	// an empty string clears the override, reverting the page to the org slug. Nil
+	// leaves the current slug unchanged.
+	Slug *string
 }
 
 // Update changes the org's status-page settings.
@@ -237,6 +287,11 @@ func (s *SettingsService) Update(ctx context.Context, actor auth.Role, orgID, us
 		cur.Title = title
 		changed["status_page_title"] = title
 	}
+	if in.Slug != nil {
+		if err := s.applySlug(ctx, orgID, cur, *in.Slug, changed); err != nil {
+			return nil, err
+		}
+	}
 
 	if err := s.repo.Update(ctx, orgID, *cur); err != nil {
 		return nil, err
@@ -257,4 +312,44 @@ func (s *SettingsService) Update(ctx context.Context, actor auth.Role, orgID, us
 	}
 
 	return s.Get(ctx, orgID)
+}
+
+// applySlug validates and applies a custom-slug change onto cur. An empty value
+// (or the org's own slug) clears the override; any other value is normalised,
+// checked for availability across the public slug namespace, and claimed.
+func (s *SettingsService) applySlug(ctx context.Context, orgID uuid.UUID, cur *Settings, raw string, changed map[string]any) error {
+	if strings.TrimSpace(raw) == "" {
+		if cur.CustomSlug != "" {
+			cur.CustomSlug, cur.Slug = "", cur.OrgSlug
+			changed["status_page_slug"] = nil
+		}
+		return nil
+	}
+	// Normalise so "Acme Cloud" becomes "acme-cloud" rather than being rejected.
+	candidate := slug.Make(raw, "")
+	if candidate == "" {
+		return apperror.Validation("invalid status page URL",
+			apperror.FieldError{Field: "slug", Message: "use letters, numbers and hyphens"})
+	}
+	if candidate == cur.CustomSlug {
+		return nil // unchanged
+	}
+	// Choosing the org's own slug is just "use the default" — clear the override.
+	if candidate == cur.OrgSlug {
+		if cur.CustomSlug != "" {
+			cur.CustomSlug, cur.Slug = "", cur.OrgSlug
+			changed["status_page_slug"] = nil
+		}
+		return nil
+	}
+	available, err := s.repo.SlugAvailable(ctx, orgID, candidate)
+	if err != nil {
+		return err
+	}
+	if !available {
+		return apperror.Conflict("that status page URL is already taken")
+	}
+	cur.CustomSlug, cur.Slug = candidate, candidate
+	changed["status_page_slug"] = candidate
+	return nil
 }

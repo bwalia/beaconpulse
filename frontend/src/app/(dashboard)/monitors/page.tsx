@@ -27,7 +27,8 @@ import {
   StatusBadge,
   Textarea,
 } from "@/components/ui";
-import { ActivityIcon, CheckCircleIcon, PlusIcon, XIcon } from "@/components/icons";
+import { ActivityIcon, CheckCircleIcon, PlusIcon, WrenchIcon, XIcon } from "@/components/icons";
+import { useConfirm } from "@/components/confirm";
 import type { MetricPoint, Monitor } from "@/lib/types";
 
 const schema = z.object({
@@ -150,7 +151,7 @@ function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () =>
           </h3>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             Call this URL from your job on success. If no ping arrives within the interval plus
-            grace period, Beacon alerts you. You can find it again on this monitor later.
+            grace period, Beacon Pulse alerts you. You can find it again on this monitor later.
           </p>
 
           <div className="mt-3 flex items-center gap-2">
@@ -256,7 +257,7 @@ export default function MonitorsPage() {
             </Button>
           }
         >
-          Add your first website, API or port and Beacon starts probing it within seconds.
+          Add your first website, API or port and Beacon Pulse starts probing it within seconds.
         </EmptyState>
       ) : (
         <Card className="overflow-x-auto p-0">
@@ -302,11 +303,23 @@ function MonitorRow({
 }) {
   const setEnabled = useSetMonitorEnabled();
   const deleteMonitor = useDeleteMonitor();
+  const confirm = useConfirm();
 
   return (
     <tr className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40">
       <td className="px-4 py-3">
-        <StatusBadge status={monitor.enabled ? monitor.last_status : "paused"} />
+        <div className="flex flex-col items-start gap-1">
+          <StatusBadge status={monitor.enabled ? monitor.last_status : "paused"} />
+          {monitor.in_maintenance && (
+            <span
+              title="Under an active maintenance window — alerts are suppressed"
+              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+            >
+              <WrenchIcon className="h-3 w-3" />
+              Maintenance
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-4 py-3 font-medium">
         <button
@@ -351,8 +364,17 @@ function MonitorRow({
             size="sm"
             variant="ghost"
             className="text-red-700 hover:bg-red-50 hover:text-red-800 focus-visible:ring-red-500 dark:text-red-400 dark:hover:bg-red-950/50 dark:hover:text-red-300"
-            onClick={() => {
-              if (confirm(`Delete monitor "${monitor.name}"?`)) deleteMonitor.mutate(monitor.id);
+            onClick={async () => {
+              if (
+                await confirm({
+                  title: `Delete “${monitor.name}”?`,
+                  body: "This removes the monitor and its history. This can't be undone.",
+                  confirmLabel: "Delete monitor",
+                  danger: true,
+                })
+              ) {
+                deleteMonitor.mutate(monitor.id);
+              }
             }}
             disabled={deleteMonitor.isPending}
           >
@@ -742,7 +764,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
               </Select>
             </Field>
             <div className="sm:col-span-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
-              A heartbeat has no URL to probe. Instead, Beacon gives you a ping URL to
+              A heartbeat has no URL to probe. Instead, Beacon Pulse gives you a ping URL to
               call from your cron/job on success — if no ping arrives within the interval
               plus grace period, you&apos;re alerted. You&apos;ll get the URL after saving.
             </div>

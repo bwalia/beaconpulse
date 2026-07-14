@@ -4,7 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
+
+	"beacon/internal/domain/auth"
 	"beacon/internal/domain/monitor"
+	"beacon/internal/platform/apperror"
 )
 
 func group(statuses ...monitor.Status) Group {
@@ -14,6 +18,13 @@ func group(statuses ...monitor.Status) Group {
 	}
 	return g
 }
+
+// mon builds one projected monitor with an explicit maintenance flag; mixed wraps
+// a set of them in a single group. Used for the maintenance-override cases.
+func mon(s monitor.Status, maint bool) Monitor {
+	return Monitor{Name: "m", Status: s, InMaintenance: maint}
+}
+func mixed(ms ...Monitor) []Group { return []Group{{Name: "g", Monitors: ms}} }
 
 func TestSummarise(t *testing.T) {
 	tests := []struct {
@@ -38,6 +49,19 @@ func TestSummarise(t *testing.T) {
 			[]Group{group(monitor.StatusUnknown, monitor.StatusUnknown)}, OverallUnknown},
 		{"one unknown among up is not operational",
 			[]Group{group(monitor.StatusUp, monitor.StatusUnknown)}, OverallUnknown},
+
+		// Maintenance overrides down in the HEADLINE: a covered monitor is excluded
+		// from the up/down tally so planned work never reads as an outage.
+		{"a down monitor under maintenance is not an outage",
+			mixed(mon(monitor.StatusDown, true)), OverallMaintenance},
+		{"planned work alongside healthy monitors reads as maintenance",
+			mixed(mon(monitor.StatusUp, false), mon(monitor.StatusDown, true)), OverallMaintenance},
+		{"a genuine outage still shows through a coincident window elsewhere",
+			mixed(mon(monitor.StatusDown, false), mon(monitor.StatusDown, true)), OverallOutage},
+		{"maintenance does not mask a real degrade on a live monitor",
+			mixed(mon(monitor.StatusDegraded, false), mon(monitor.StatusUp, false), mon(monitor.StatusDown, true)), OverallDegraded},
+		{"all monitors up with none in maintenance stays operational",
+			mixed(mon(monitor.StatusUp, false), mon(monitor.StatusUp, false)), OverallOperational},
 	}
 
 	for _, tc := range tests {
@@ -70,6 +94,74 @@ func TestServiceGet_UnpublishedIsIndistinguishableFromMissing(t *testing.T) {
 	if got != nil {
 		t.Fatalf("Get() = %+v, want nil for an unpublished/missing slug", got)
 	}
+}
+
+// fakeSettingsRepo drives SettingsService without a database.
+type fakeSettingsRepo struct {
+	settings  Settings
+	available bool
+}
+
+func (f *fakeSettingsRepo) Get(context.Context, uuid.UUID) (*Settings, error) {
+	s := f.settings
+	return &s, nil
+}
+func (f *fakeSettingsRepo) Update(_ context.Context, _ uuid.UUID, s Settings) error {
+	f.settings = s
+	return nil
+}
+func (f *fakeSettingsRepo) PublishedCount(context.Context, uuid.UUID) (int, error) { return 0, nil }
+func (f *fakeSettingsRepo) SlugAvailable(context.Context, uuid.UUID, string) (bool, error) {
+	return f.available, nil
+}
+
+func TestSettingsUpdate_CustomSlug(t *testing.T) {
+	str := func(s string) *string { return &s }
+	orgID, userID := uuid.New(), uuid.New()
+
+	t.Run("normalises and claims an available slug", func(t *testing.T) {
+		repo := &fakeSettingsRepo{settings: Settings{OrgSlug: "acme", Slug: "acme"}, available: true}
+		ss := NewSettingsService(repo, nil)
+		out, err := ss.Update(context.Background(), auth.RoleAdmin, orgID, userID, UpdateInput{Slug: str("Acme Cloud")})
+		if err != nil {
+			t.Fatalf("Update() error = %v", err)
+		}
+		if out.CustomSlug != "acme-cloud" || out.Slug != "acme-cloud" {
+			t.Fatalf("slug = %q/%q, want acme-cloud", out.CustomSlug, out.Slug)
+		}
+	})
+
+	t.Run("empty clears back to the org slug", func(t *testing.T) {
+		repo := &fakeSettingsRepo{settings: Settings{OrgSlug: "acme", CustomSlug: "acme-cloud", Slug: "acme-cloud"}, available: true}
+		ss := NewSettingsService(repo, nil)
+		out, err := ss.Update(context.Background(), auth.RoleAdmin, orgID, userID, UpdateInput{Slug: str("  ")})
+		if err != nil {
+			t.Fatalf("Update() error = %v", err)
+		}
+		if out.CustomSlug != "" || out.Slug != "acme" {
+			t.Fatalf("slug = %q/%q, want cleared to acme", out.CustomSlug, out.Slug)
+		}
+	})
+
+	t.Run("a taken slug is rejected", func(t *testing.T) {
+		repo := &fakeSettingsRepo{settings: Settings{OrgSlug: "acme", Slug: "acme"}, available: false}
+		ss := NewSettingsService(repo, nil)
+		_, err := ss.Update(context.Background(), auth.RoleAdmin, orgID, userID, UpdateInput{Slug: str("taken")})
+		if err == nil {
+			t.Fatal("expected a conflict for a taken slug")
+		}
+		if ae, ok := err.(*apperror.Error); !ok || ae.Code != apperror.CodeConflict {
+			t.Fatalf("error = %v, want a conflict", err)
+		}
+	})
+
+	t.Run("viewer may not change the slug", func(t *testing.T) {
+		repo := &fakeSettingsRepo{settings: Settings{OrgSlug: "acme", Slug: "acme"}, available: true}
+		ss := NewSettingsService(repo, nil)
+		if _, err := ss.Update(context.Background(), auth.RoleViewer, orgID, userID, UpdateInput{Slug: str("x")}); err == nil {
+			t.Fatal("viewer must be forbidden")
+		}
+	})
 }
 
 func TestServiceGet_TitleFallsBackToOrgName(t *testing.T) {

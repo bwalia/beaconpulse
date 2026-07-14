@@ -46,6 +46,7 @@ func (h *StatusPageHandler) Routes() chi.Router {
 type statusMonitorResponse struct {
 	Name          string     `json:"name"`
 	Status        string     `json:"status"`
+	InMaintenance bool       `json:"in_maintenance"`
 	LastCheckedAt *time.Time `json:"last_checked_at"`
 }
 
@@ -55,12 +56,19 @@ type statusGroupResponse struct {
 	Monitors    []statusMonitorResponse `json:"monitors"`
 }
 
+type statusMaintenanceResponse struct {
+	Title    string    `json:"title"`
+	StartsAt time.Time `json:"starts_at"`
+	EndsAt   time.Time `json:"ends_at"`
+}
+
 type statusPageResponse struct {
-	OrgName   string                `json:"org_name"`
-	Title     string                `json:"title"`
-	Overall   string                `json:"overall"`
-	Groups    []statusGroupResponse `json:"groups"`
-	UpdatedAt time.Time             `json:"updated_at"`
+	OrgName      string                      `json:"org_name"`
+	Title        string                      `json:"title"`
+	Overall      string                      `json:"overall"`
+	Groups       []statusGroupResponse       `json:"groups"`
+	Maintenances []statusMaintenanceResponse `json:"maintenances"`
+	UpdatedAt    time.Time                   `json:"updated_at"`
 }
 
 // get serves GET /api/v1/public/status/{slug}.
@@ -91,6 +99,7 @@ func (h *StatusPageHandler) get(w http.ResponseWriter, r *http.Request) {
 			monitors = append(monitors, statusMonitorResponse{
 				Name:          m.Name,
 				Status:        string(m.Status),
+				InMaintenance: m.InMaintenance,
 				LastCheckedAt: m.LastCheckedAt,
 			})
 		}
@@ -98,6 +107,15 @@ func (h *StatusPageHandler) get(w http.ResponseWriter, r *http.Request) {
 			Name:        g.Name,
 			Environment: g.Environment,
 			Monitors:    monitors,
+		})
+	}
+
+	maintenances := make([]statusMaintenanceResponse, 0, len(page.Maintenances))
+	for _, mw := range page.Maintenances {
+		maintenances = append(maintenances, statusMaintenanceResponse{
+			Title:    mw.Title,
+			StartsAt: mw.StartsAt,
+			EndsAt:   mw.EndsAt,
 		})
 	}
 
@@ -109,10 +127,11 @@ func (h *StatusPageHandler) get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=30")
 
 	httpx.OK(w, statusPageResponse{
-		OrgName:   page.OrgName,
-		Title:     page.Title,
-		Overall:   string(page.Overall),
-		Groups:    groups,
-		UpdatedAt: page.UpdatedAt,
+		OrgName:      page.OrgName,
+		Title:        page.Title,
+		Overall:      string(page.Overall),
+		Groups:       groups,
+		Maintenances: maintenances,
+		UpdatedAt:    page.UpdatedAt,
 	})
 }

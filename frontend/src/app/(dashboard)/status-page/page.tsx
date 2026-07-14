@@ -11,7 +11,8 @@ import {
   GlobeIcon,
   LockIcon,
 } from "@/components/icons";
-import { Button, Card, Field, PageHeader, Skeleton } from "@/components/ui";
+import { Button, Card, Field, Label, PageHeader, Skeleton } from "@/components/ui";
+import { ApiRequestError } from "@/lib/api";
 import {
   useMonitors,
   useSetMonitorPublic,
@@ -35,6 +36,10 @@ export default function StatusPageSettings() {
   const setPublic = useSetMonitorPublic();
 
   const [title, setTitle] = useState("");
+  // null until the user edits, so the field shows the saved custom slug first and an
+  // empty edit clearly means "reset to the default".
+  const [slug, setSlug] = useState<string | null>(null);
+  const [slugError, setSlugError] = useState<string | null>(null);
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants();
 
@@ -132,6 +137,81 @@ export default function StatusPageSettings() {
               </span>
             </p>
           )}
+        </Card>
+      </motion.div>
+
+      {/* ---- Page address (custom slug) ---- */}
+      <motion.div variants={reveal}>
+        <Card className="p-6">
+          <h2 className="font-semibold text-slate-900 dark:text-white">Page address</h2>
+          <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
+            The web address for your status page. Letters, numbers and hyphens — spaces and capitals
+            are tidied automatically.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSlugError(null);
+              update.mutate(
+                { slug: slug ?? settings.custom_slug },
+                {
+                  onError: (err) =>
+                    setSlugError(err instanceof ApiRequestError ? err.message : "Could not save the address"),
+                },
+              );
+            }}
+            className="mt-4 flex flex-wrap items-end gap-3"
+          >
+            <div className="min-w-[18rem] flex-1">
+              <Label>Custom URL</Label>
+              <div
+                className={`flex items-stretch overflow-hidden rounded-lg border bg-white focus-within:ring-2 focus-within:ring-blue-600 dark:bg-slate-900 ${
+                  slugError ? "border-red-500" : "border-slate-300 dark:border-slate-700"
+                }`}
+              >
+                <span className="flex items-center whitespace-nowrap bg-slate-50 px-3 font-mono text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  /status/
+                </span>
+                <input
+                  value={slug ?? settings.custom_slug}
+                  maxLength={63}
+                  onChange={(e) => {
+                    setSlug(e.target.value);
+                    setSlugError(null);
+                  }}
+                  placeholder={settings.org_slug}
+                  aria-invalid={slugError ? true : undefined}
+                  className="w-full bg-transparent px-3 py-2.5 font-mono text-base text-slate-900 focus:outline-none dark:text-white"
+                />
+              </div>
+              {slugError ? (
+                <p role="alert" className="mt-1 text-xs font-medium text-red-700 dark:text-red-400">
+                  {slugError}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Leave blank to use the default: <span className="font-mono">/status/{settings.org_slug}</span>
+                </p>
+              )}
+            </div>
+            <Button type="submit" variant="secondary" disabled={update.isPending}>
+              Save address
+            </Button>
+            {settings.custom_slug && (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={update.isPending}
+                onClick={() => {
+                  setSlug("");
+                  setSlugError(null);
+                  update.mutate({ slug: "" });
+                }}
+              >
+                Reset to default
+              </Button>
+            )}
+          </form>
         </Card>
       </motion.div>
 

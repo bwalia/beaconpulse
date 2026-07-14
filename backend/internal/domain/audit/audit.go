@@ -35,6 +35,14 @@ const (
 	ActionMonitorDeleted Action = "monitor.deleted"
 	ActionMonitorEnabled Action = "monitor.enabled"
 	ActionMonitorPaused  Action = "monitor.paused"
+
+	ActionMaintenanceCreated Action = "maintenance.window.created"
+	ActionMaintenanceUpdated Action = "maintenance.window.updated"
+	ActionMaintenanceDeleted Action = "maintenance.window.deleted"
+	// ActionAlertSuppressed — an alert was withheld because an active maintenance
+	// window covers the monitor. Recorded (never silent) so "we had N alerts during
+	// the window, all suppressed" stays answerable.
+	ActionAlertSuppressed Action = "alert.suppressed_by_maintenance"
 )
 
 // Entry is a single audit record.

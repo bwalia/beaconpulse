@@ -26,7 +26,7 @@ const firaCode = Fira_Code({
 });
 
 export const metadata: Metadata = {
-  title: "Beacon — Infrastructure Monitoring",
+  title: "Beacon Pulse — Infrastructure Monitoring",
   description: "Self-hosted infrastructure monitoring platform",
 };
 

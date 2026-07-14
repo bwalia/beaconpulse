@@ -2,7 +2,7 @@
 
 import { useActiveAlerts } from "@/lib/hooks";
 import { Card, EmptyState, PageHeader, Skeleton } from "@/components/ui";
-import { AlertTriangleIcon, CheckCircleIcon, ClockIcon } from "@/components/icons";
+import { AlertTriangleIcon, CheckCircleIcon, ClockIcon, WrenchIcon } from "@/components/icons";
 
 function sinceLabel(since?: string): string {
   if (!since) return "";
@@ -72,6 +72,15 @@ export default function AlertsPage() {
                         >
                           {a.severity}
                         </span>
+                        {a.in_maintenance && (
+                          <span
+                            title="This monitor is under an active maintenance window — its notification was suppressed"
+                            className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+                          >
+                            <WrenchIcon className="h-3 w-3" />
+                            Suppressed
+                          </span>
+                        )}
                       </div>
                       <p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">
                         {a.monitor_name}{" "}

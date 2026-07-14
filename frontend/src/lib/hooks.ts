@@ -9,6 +9,8 @@ import type {
   ActiveAlert,
   BillingInfo,
   ListResponse,
+  MaintenanceScope,
+  MaintenanceWindow,
   Monitor,
   MonitorMetrics,
   NotificationChannel,
@@ -230,7 +232,7 @@ export function useStatusPageSettings() {
 export function useUpdateStatusPageSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { enabled?: boolean; title?: string }) =>
+    mutationFn: (input: { enabled?: boolean; title?: string; slug?: string }) =>
       api.patch<StatusPageSettings>("/api/v1/status-page", input),
     // Publishing changes the monitor list's meaning too (the "Public" toggles),
     // so refresh both rather than leaving a stale count on screen.
@@ -251,5 +253,53 @@ export function useSetMonitorPublic() {
       qc.invalidateQueries({ queryKey: ["monitors"] });
       qc.invalidateQueries({ queryKey: ["status-page"] });
     },
+  });
+}
+
+// ---- Maintenance windows ----
+
+export function useMaintenanceWindows() {
+  return useQuery({
+    queryKey: ["maintenance-windows"],
+    queryFn: () =>
+      api.get<ListResponse<MaintenanceWindow>>("/api/v1/maintenance-windows?limit=200"),
+    // A window flips active/ended on the server clock; refresh so the badge and
+    // the "now under maintenance" state do not go stale on an open tab.
+    refetchInterval: 30000,
+  });
+}
+
+export interface MaintenanceWindowInput {
+  title: string;
+  description?: string;
+  starts_at: string;
+  ends_at: string;
+  scope: MaintenanceScope;
+  scope_ids?: string[];
+}
+
+export function useCreateMaintenanceWindow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: MaintenanceWindowInput) =>
+      api.post<MaintenanceWindow>("/api/v1/maintenance-windows", input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["maintenance-windows"] }),
+  });
+}
+
+export function useUpdateMaintenanceWindow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Partial<MaintenanceWindowInput> }) =>
+      api.patch<MaintenanceWindow>(`/api/v1/maintenance-windows/${id}`, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["maintenance-windows"] }),
+  });
+}
+
+export function useDeleteMaintenanceWindow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/api/v1/maintenance-windows/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["maintenance-windows"] }),
   });
 }

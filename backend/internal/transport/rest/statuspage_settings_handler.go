@@ -41,6 +41,10 @@ func (h *StatusPageSettingsHandler) Routes() chi.Router {
 type statusPageSettingsRequest struct {
 	Enabled *bool   `json:"enabled"`
 	Title   *string `json:"title" validate:"omitempty,max=120"`
+	// Slug is the custom public URL slug. Empty string clears it (back to the org
+	// slug); omitted (null) leaves it unchanged. Format is enforced server-side
+	// after normalisation, so we only bound the length here.
+	Slug *string `json:"slug" validate:"omitempty,max=63"`
 }
 
 type statusPageSettingsResponse struct {
@@ -49,6 +53,10 @@ type statusPageSettingsResponse struct {
 	Enabled        bool   `json:"enabled"`
 	Title          string `json:"title"`
 	PublishedCount int    `json:"published_count"`
+	// OrgSlug is the default the page falls back to; CustomSlug is the override (empty
+	// when using the default). The UI shows both so "reset to default" is possible.
+	OrgSlug    string `json:"org_slug"`
+	CustomSlug string `json:"custom_slug"`
 	// URL is the public address of the page, so the UI never has to reconstruct
 	// (and get subtly wrong) the route the server actually serves.
 	URL string `json:"url"`
@@ -61,6 +69,8 @@ func toStatusPageSettingsResponse(s *statuspage.Settings) statusPageSettingsResp
 		Enabled:        s.Enabled,
 		Title:          s.Title,
 		PublishedCount: s.PublishedCount,
+		OrgSlug:        s.OrgSlug,
+		CustomSlug:     s.CustomSlug,
 		URL:            "/status/" + s.Slug,
 	}
 }
@@ -90,6 +100,7 @@ func (h *StatusPageSettingsHandler) update(w http.ResponseWriter, r *http.Reques
 	s, err := h.svc.Update(r.Context(), p.Role, p.OrgID, p.UserID, statuspage.UpdateInput{
 		Enabled: req.Enabled,
 		Title:   req.Title,
+		Slug:    req.Slug,
 	})
 	if err != nil {
 		httpx.Error(w, r, err)

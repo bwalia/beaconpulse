@@ -17,11 +17,11 @@ import {
 // behaviour and keeps the page shareable by people who are already customers.
 
 export const metadata: Metadata = {
-  title: "Beacon — Know it's down before your customers do",
+  title: "Beacon Pulse — Know it's down before your customers do",
   description:
     "Self-hosted, multi-tenant infrastructure monitoring. Watch endpoints, certificates and DNS every 30 seconds, alert the right person, and publish a status page your customers trust.",
   openGraph: {
-    title: "Beacon — Infrastructure monitoring you own",
+    title: "Beacon Pulse — Infrastructure monitoring you own",
     description:
       "Uptime, latency, SSL and DNS monitoring with alerting and public status pages. Self-hosted and multi-tenant.",
     type: "website",

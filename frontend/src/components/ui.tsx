@@ -40,19 +40,18 @@ const sizes: Record<Size, string> = {
   lg: "h-12 px-6 text-base",
 };
 
-export function Button({
-  variant = "primary",
-  size = "md",
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
+export const Button = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }
+>(function Button({ variant = "primary", size = "md", className = "", ...props }, ref) {
   return (
     <button
+      ref={ref}
       className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none dark:focus-visible:ring-offset-slate-950 ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     />
   );
-}
+});
 
 /* ---------------- form controls ---------------- */
 
