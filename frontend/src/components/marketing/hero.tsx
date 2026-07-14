@@ -182,7 +182,7 @@ export function Hero() {
             {[
               { v: <CountUp to={99.99} decimals={2} suffix="%" />, l: "Uptime tracked" },
               { v: <CountUp to={30} suffix="s" />, l: "Check interval" },
-              { v: <CountUp to={12} suffix="+" />, l: "Monitor types" },
+              { v: <CountUp to={6} />, l: "Monitor types" },
             ].map((s, i) => (
               <div key={i}>
                 <dt className="sr-only">{s.l}</dt>

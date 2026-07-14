@@ -81,15 +81,35 @@ services:
   prometheus:
     restart: unless-stopped
     image: prom/prometheus:v2.54.1
-    # Served behind the gateway at /prometheus/. route-prefix=/ keeps Prometheus
-    # serving at root internally (so Beacon's reload/query calls are unchanged)
-    # while external-url makes the UI generate /prometheus/-prefixed asset links,
-    # which nginx strips.
+    # OPERATOR access to the real, unfiltered Prometheus.
+    #
+    # Bound to 127.0.0.1 ONLY — never 0.0.0.0. This port has no authentication and
+    # no tenant filtering: it is the whole instance, every tenant's targets and
+    # config included. That is exactly what an operator needs and exactly what a
+    # tenant must never reach, which is why it is deliberately NOT routed through
+    # the gateway. On the tenant path /prometheus/ now redirects to Beacon's own
+    # /explore; the stock Prometheus UI is an operator console and its Targets /
+    # Config / TSDB pages are global by nature, so they can never be shown to one
+    # tenant without leaking the others.
+    #
+    # In Kubernetes there is no equivalent port publish: reach it with
+    #   kubectl -n <env> port-forward svc/beacon-prometheus 9090:9090
+    # then open http://localhost:9090 — every page (Targets, Config, TSDB,
+    # Service Discovery, Alertmanagers) works there, because you are an operator
+    # looking at the whole instance rather than one tenant's slice of it.
+    # Port is configurable because 9090 is a popular squat — this machine already
+    # runs another Prometheus (opsapi) on it. Override with BEACON_PROM_PORT.
+    ports:
+      - "127.0.0.1:${BEACON_PROM_PORT:-9091}:9090"
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=15d
       - --web.enable-lifecycle
-      - --web.external-url=http://localhost:${BEACON_GATEWAY_PORT:-8090}/prometheus/
+      # external-url is the OPERATOR address now, not the gateway path. The gateway
+      # no longer serves this UI (/prometheus/ redirects to Beacon's /explore), so
+      # pointing Prometheus at that path would make its own links bounce the
+      # operator away from the console they just opened.
+      - --web.external-url=http://localhost:${BEACON_PROM_PORT:-9091}/
       - --web.route-prefix=/
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro

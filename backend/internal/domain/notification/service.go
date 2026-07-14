@@ -2,6 +2,8 @@ package notification
 
 import (
 	"context"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -231,16 +233,67 @@ func secretOr(ch *Channel, provided *string) string {
 	return ""
 }
 
+// validateChannel checks a channel's config at CREATE/UPDATE time so a
+// misconfiguration surfaces immediately, in the form, rather than as a silent
+// non-delivery during a 3 a.m. outage. It validates shape only — reachability
+// (a live Slack URL, a working SMTP login) is proven separately by SendTest.
 func validateChannel(t ChannelType, config map[string]string, secret string) error {
+	req := func(field, msg string) error {
+		return apperror.Validation(msg, apperror.FieldError{Field: field, Message: "is required"})
+	}
 	switch t {
 	case TypeTelegram:
 		if strings.TrimSpace(config["chat_id"]) == "" {
-			return apperror.Validation("Telegram requires a chat_id",
-				apperror.FieldError{Field: "config.chat_id", Message: "is required"})
+			return req("config.chat_id", "Telegram requires a chat_id")
 		}
 		if strings.TrimSpace(secret) == "" {
-			return apperror.Validation("Telegram requires a bot token",
-				apperror.FieldError{Field: "secret", Message: "is required"})
+			return req("secret", "Telegram requires a bot token")
+		}
+
+	case TypeSlack:
+		// The Slack webhook URL is the secret. Validate it is an https Slack
+		// hooks URL so a typo (or a webhook URL pasted into config) fails now.
+		u, err := url.Parse(strings.TrimSpace(secret))
+		if err != nil || u.Scheme != "https" {
+			return apperror.Validation("Slack requires an https incoming-webhook URL",
+				apperror.FieldError{Field: "secret", Message: "must be an https Slack webhook URL"})
+		}
+		if !strings.HasSuffix(u.Host, "slack.com") {
+			return apperror.Validation("that does not look like a Slack webhook URL",
+				apperror.FieldError{Field: "secret", Message: "host must be hooks.slack.com"})
+		}
+
+	case TypeWebhook:
+		u, err := url.Parse(strings.TrimSpace(config["url"]))
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+			return apperror.Validation("Webhook requires a valid URL",
+				apperror.FieldError{Field: "config.url", Message: "must be a valid http(s) URL"})
+		}
+		if m := strings.ToUpper(strings.TrimSpace(config["method"])); m != "" && m != "POST" && m != "PUT" {
+			return apperror.Validation("Webhook method must be POST or PUT",
+				apperror.FieldError{Field: "config.method", Message: "must be POST or PUT"})
+		}
+
+	case TypeEmail:
+		if strings.TrimSpace(config["host"]) == "" {
+			return req("config.host", "Email requires an SMTP host")
+		}
+		if strings.TrimSpace(config["from"]) == "" {
+			return req("config.from", "Email requires a from address")
+		}
+		if strings.TrimSpace(config["to"]) == "" {
+			return req("config.to", "Email requires at least one recipient")
+		}
+		if p := strings.TrimSpace(config["port"]); p != "" {
+			if n, err := strconv.Atoi(p); err != nil || n < 1 || n > 65535 {
+				return apperror.Validation("SMTP port must be a number between 1 and 65535",
+					apperror.FieldError{Field: "config.port", Message: "invalid port"})
+			}
+		}
+		if sec := strings.ToLower(strings.TrimSpace(config["security"])); sec != "" &&
+			sec != "starttls" && sec != "tls" && sec != "none" {
+			return apperror.Validation("SMTP security must be starttls, tls or none",
+				apperror.FieldError{Field: "config.security", Message: "invalid value"})
 		}
 	}
 	return nil

@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+
 import {
   useChannels,
   useCreateChannel,
@@ -15,13 +13,12 @@ import { ApiRequestError } from "@/lib/api";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton } from "@/components/ui";
 import type { NotificationChannel } from "@/lib/types";
 import { BellIcon, LockIcon, PlusIcon, XIcon } from "@/components/icons";
-
-const schema = z.object({
-  name: z.string().min(1, "Name is required"),
-  bot_token: z.string().min(1, "Bot token is required"),
-  chat_id: z.string().min(1, "Chat ID is required"),
-});
-type Values = z.infer<typeof schema>;
+import {
+  CHANNEL_TYPES,
+  channelTypeDef,
+  toChannelPayload,
+  type ChannelTypeDef,
+} from "@/lib/channels";
 
 type Notice = { kind: "ok" | "err"; text: string } | null;
 
@@ -34,11 +31,11 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Notifications"
-        subtitle="Get alerted on Telegram the moment something goes down."
+        subtitle="Get alerted the moment something goes down — on Slack, email, a webhook or Telegram."
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
-            {showForm ? "Close" : "Add Telegram"}
+            {showForm ? "Close" : "Add channel"}
           </Button>
         }
       />
@@ -56,7 +53,7 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {showForm && <CreateTelegramForm onDone={() => setShowForm(false)} setNotice={setNotice} />}
+      {showForm && <CreateChannelForm onDone={() => setShowForm(false)} setNotice={setNotice} />}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -71,12 +68,12 @@ export default function NotificationsPage() {
           action={
             <Button onClick={() => setShowForm(true)}>
               <PlusIcon className="h-4 w-4" />
-              Add Telegram
+              Add channel
             </Button>
           }
         >
-          Connect a Telegram channel and Beacon will message you the moment a monitor goes down — enriched with AI
-          triage when enabled.
+          Connect Slack, email, a webhook or Telegram and Beacon will alert you the moment a monitor
+          goes down — enriched with AI triage when enabled.
         </EmptyState>
       ) : (
         <div className="space-y-3">
@@ -100,13 +97,15 @@ function ChannelRow({
   const setEnabled = useSetChannelEnabled();
   const del = useDeleteChannel();
 
+  const def = channelTypeDef(channel.type);
+
   return (
-    <Card className="flex items-center justify-between">
-      <div>
+    <Card className="flex flex-wrap items-center justify-between gap-3">
+      <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium">{channel.name}</span>
           <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs uppercase text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-            {channel.type}
+            {def?.label ?? channel.type}
           </span>
           {!channel.enabled && (
             <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-400">
@@ -114,30 +113,25 @@ function ChannelRow({
             </span>
           )}
         </div>
-        <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-          chat: {channel.config.chat_id} · token{" "}
-          {channel.has_secret ? (
-            <span className="inline-flex items-center gap-1">
-              stored <LockIcon className="h-3 w-3" />
+        <p className="mt-0.5 inline-flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+          <span className="truncate font-mono">{def?.summary(channel) ?? channel.type}</span>
+          {channel.has_secret && (
+            <span className="inline-flex shrink-0 items-center gap-1">
+              · secret <LockIcon className="h-3 w-3" />
             </span>
-          ) : (
-            "missing"
           )}
         </p>
       </div>
-      <div className="flex gap-2">
+      <div className="flex shrink-0 gap-2">
         <Button
           variant="secondary"
           disabled={test.isPending}
           onClick={async () => {
             try {
               await test.mutateAsync(channel.id);
-              setNotice({ kind: "ok", text: `Test message sent to "${channel.name}" — check Telegram.` });
+              setNotice({ kind: "ok", text: `Test sent to "${channel.name}".` });
             } catch (e) {
-              setNotice({
-                kind: "err",
-                text: e instanceof ApiRequestError ? e.message : "Test failed",
-              });
+              setNotice({ kind: "err", text: e instanceof ApiRequestError ? e.message : "Test failed" });
             }
           }}
         >
@@ -164,7 +158,12 @@ function ChannelRow({
   );
 }
 
-function CreateTelegramForm({
+/**
+ * One form for every channel type. Fields are rendered from the selected type's
+ * descriptor, so this component never mentions Slack/SMTP/etc. by name — adding a
+ * channel type is a change to CHANNEL_TYPES, not to this form.
+ */
+function CreateChannelForm({
   onDone,
   setNotice,
 }: {
@@ -172,49 +171,111 @@ function CreateTelegramForm({
   setNotice: (n: Notice) => void;
 }) {
   const createChannel = useCreateChannel();
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<Values>({ resolver: zodResolver(schema) });
+  const [def, setDef] = useState<ChannelTypeDef>(CHANNEL_TYPES[0]);
+  const [name, setName] = useState("");
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = async (values: Values) => {
+  function selectType(v: string) {
+    const next = CHANNEL_TYPES.find((t) => t.value === v);
+    if (next) {
+      setDef(next);
+      setValues({}); // fields differ per type; start clean
+      setErrors({});
+    }
+  }
+
+  function setField(key: string, v: string) {
+    setValues((prev) => ({ ...prev, [key]: v }));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    // Client-side required check — the backend re-validates authoritatively and
+    // returns field errors, which we surface below.
+    const errs: Record<string, string> = {};
+    if (!name.trim()) errs.name = "Name is required";
+    for (const f of def.fields) {
+      if (f.required && !(values[f.key] ?? "").trim()) errs[f.key] = `${f.label} is required`;
+    }
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+
+    setSubmitting(true);
     try {
-      await createChannel.mutateAsync({
-        name: values.name,
-        type: "telegram",
-        config: { chat_id: values.chat_id },
-        secret: values.bot_token,
-      });
-      setNotice({ kind: "ok", text: "Telegram channel added. Use “Send test” to verify it." });
+      await createChannel.mutateAsync(toChannelPayload(def, name, values));
+      setNotice({ kind: "ok", text: `${def.label} channel added. Use “Send test” to verify it.` });
       onDone();
     } catch (e) {
       setNotice({ kind: "err", text: e instanceof ApiRequestError ? e.message : "Failed to add channel" });
+    } finally {
+      setSubmitting(false);
     }
-  };
+  }
 
   return (
     <Card>
-      <div className="mb-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-        <p className="font-medium text-slate-600 dark:text-slate-300">How to set up a Telegram bot:</p>
-        <ol className="mt-1 list-decimal space-y-0.5 pl-4">
-          <li>Message <span className="font-mono">@BotFather</span>, send <span className="font-mono">/newbot</span>, copy the token.</li>
-          <li>Start a chat with your new bot (send it any message).</li>
-          <li>Message <span className="font-mono">@userinfobot</span> to get your chat ID.</li>
-        </ol>
+      {/* Type selector */}
+      <div role="group" aria-label="Channel type" className="mb-4 flex flex-wrap gap-2">
+        {CHANNEL_TYPES.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => selectType(t.value)}
+            aria-pressed={def.value === t.value}
+            className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors motion-reduce:transition-none ${
+              def.value === t.value
+                ? "border-brand-600 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                : "border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <Field label="Channel name" error={errors.name?.message}>
-          <Input placeholder="Ops Telegram" {...register("name")} />
+
+      <p className="mb-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+        {def.blurb}
+      </p>
+
+      <form onSubmit={submit} className="space-y-4" noValidate>
+        <Field label="Channel name" error={errors.name}>
+          <Input
+            placeholder={`${def.label} — on-call`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </Field>
-        <Field label="Bot token" error={errors.bot_token?.message}>
-          <Input type="password" placeholder="123456:ABC-DEF…" {...register("bot_token")} />
-        </Field>
-        <Field label="Chat ID" error={errors.chat_id?.message}>
-          <Input placeholder="123456789" {...register("chat_id")} />
-        </Field>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving…" : "Save channel"}
+
+        {def.fields.map((f) => (
+          <Field key={f.key} label={f.label} hint={f.hint} error={errors[f.key]}>
+            {f.options ? (
+              <select
+                value={values[f.key] ?? f.options[0].value}
+                onChange={(e) => setField(f.key, e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              >
+                {f.options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Input
+                type={f.secret ? "password" : "text"}
+                autoComplete={f.secret ? "new-password" : "off"}
+                placeholder={f.placeholder}
+                value={values[f.key] ?? ""}
+                onChange={(e) => setField(f.key, e.target.value)}
+              />
+            )}
+          </Field>
+        ))}
+
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Saving…" : "Save channel"}
         </Button>
       </form>
     </Card>

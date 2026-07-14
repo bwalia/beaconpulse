@@ -4,12 +4,24 @@ import { useAuth } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
 import { ChartLineIcon, LockIcon, MegaphoneIcon } from "@/components/icons";
 
-// Prometheus and Alertmanager are served through prom-label-proxy at the gateway,
-// which enforces {org_id="<you>"} on every query — so these UIs show ONLY your
-// organization's data. (Blackbox has no query API and cannot be tenant-filtered,
-// so it is not exposed here — it's an operator-only tool on the internal network.)
+// These are served through prom-label-proxy at the gateway, which enforces
+// {org_id="<you>"} on every query — so they show ONLY your organization's data.
+//
+// This page used to link at /prometheus/, the stock Prometheus UI. It no longer
+// does, and that is deliberate. Prometheus's own UI is an OPERATOR tool: its
+// Targets, Config, TSDB-Status, Service-Discovery and Alertmanagers pages read
+// GLOBAL state — there is one Prometheus, one config and one TSDB shared by every
+// tenant, and /targets lists every tenant's monitor URLs. Those pages therefore
+// cannot be tenant-scoped: the proxy correctly 404s them, and the customer sees a
+// screen of red errors. The only way to make them "work" is to leak other
+// customers' data, so they must not work.
+//
+// Beacon's own /explore exposes exactly the part that IS per-tenant — run a query,
+// see your series — with none of the broken half. Operators who genuinely need
+// Targets/Config/TSDB reach Prometheus out-of-band (see deploy/README), never
+// through the tenant gateway.
 const tools = [
-  { href: "/prometheus/", label: "Prometheus", Icon: ChartLineIcon, desc: "PromQL, graphs & alerts — scoped to your org", scoped: true },
+  { href: "/explore", label: "Explore", Icon: ChartLineIcon, desc: "Run PromQL against your own metrics — graphs & tables", scoped: true },
   { href: "/alertmanager/", label: "Alertmanager", Icon: MegaphoneIcon, desc: "Your org's alerts & silences", scoped: true },
 ];
 

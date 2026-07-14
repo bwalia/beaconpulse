@@ -69,6 +69,14 @@ type Notify struct {
 	// DashboardURL is the base URL used to build "open dashboard" links in
 	// notification messages.
 	DashboardURL string
+	// WebhookAllowPrivate lets tenant webhook/Slack channels reach private,
+	// loopback and link-local addresses. This RE-OPENS the SSRF hole and exists
+	// only for single-tenant on-prem operators who deliberately want an internal
+	// webhook. NEVER enable in a multi-tenant deployment. Default false.
+	WebhookAllowPrivate bool
+	// WebhookAllowHTTP permits plain-http webhook targets (default false: https
+	// only). For local development against an http test receiver.
+	WebhookAllowHTTP bool
 }
 
 // HTTP holds the API server configuration.
@@ -201,8 +209,10 @@ func Load() (Config, error) {
 			MaxRetries:  getInt("BEACON_WORKER_MAX_RETRIES", 5, add),
 		},
 		Notify: Notify{
-			WebhookToken: getStr("BEACON_WEBHOOK_TOKEN", ""),
-			DashboardURL: getStr("BEACON_DASHBOARD_URL", "http://localhost:3000"),
+			WebhookToken:        getStr("BEACON_WEBHOOK_TOKEN", ""),
+			DashboardURL:        getStr("BEACON_DASHBOARD_URL", "http://localhost:3000"),
+			WebhookAllowPrivate: getBool("BEACON_WEBHOOK_ALLOW_PRIVATE", false, add),
+			WebhookAllowHTTP:    getBool("BEACON_WEBHOOK_ALLOW_HTTP", false, add),
 		},
 		AI: AI{
 			Enabled: getBool("BEACON_AI_ENABLED", false, add),
