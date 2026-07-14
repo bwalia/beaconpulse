@@ -1,8 +1,9 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 
+import { BeaconMark } from "@/components/icons";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import type {
   PublicStatusGroup,
@@ -11,6 +12,10 @@ import type {
   PublicStatusPage,
   StatusOverall,
 } from "@/lib/types";
+
+// The whole console renders in Departure Mono (loaded on the status route), with a
+// monospace fallback so it degrades gracefully before the font paints.
+const TERMINAL_FONT = "var(--font-departure), ui-monospace, SFMono-Regular, Menlo, monospace";
 
 /**
  * The PUBLIC status page, styled as an old-school terminal / CRT console.
@@ -172,25 +177,50 @@ function MaintenanceBlock({ windows }: { windows: PublicStatusMaintenance[] }) {
 export function StatusView({ page }: { page: PublicStatusPage }) {
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.06);
+  const reduceMotion = useReducedMotion();
   const o = OVERALL[page.overall] ?? OVERALL.unknown;
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-[#080a0f] font-mono text-slate-300 selection:bg-orange-500/30">
+    <div
+      className="relative min-h-dvh overflow-hidden bg-[#080a0f] text-slate-300 selection:bg-orange-500/30"
+      style={{ fontFamily: TERMINAL_FONT }}
+    >
+      {/* Static CRT texture: scanlines + faint RGB grid + vignette. */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0" style={CRT} />
+
+      {/* The CRT refresh sweep — a soft bright band travelling top → bottom, on a
+          loop. This is the "moving white line". Disabled under reduced-motion. */}
+      {!reduceMotion && (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none fixed inset-x-0 z-20 h-40 bg-gradient-to-b from-transparent via-white/[0.07] to-transparent blur-[1px]"
+          initial={{ y: "-30vh" }}
+          animate={{ y: "130vh" }}
+          transition={{ duration: 7, repeat: Infinity, ease: "linear", repeatDelay: 1.5 }}
+        />
+      )}
 
       <div className="relative z-10 mx-auto w-full max-w-3xl px-4 py-8 sm:py-12">
         <motion.div initial="hidden" animate="show" variants={stagger}>
-          {/* Brand line */}
-          <motion.div
+          {/* Beacon header — the brand doubles as the way back to the main site. */}
+          <motion.header
             variants={reveal}
-            className="mb-4 flex items-center justify-between text-xs uppercase tracking-[0.25em] text-slate-500"
+            className="mb-5 flex items-center justify-between border-b border-slate-800 pb-4"
           >
-            <span className="flex items-center gap-2 text-orange-400">
-              <span aria-hidden className="inline-block h-3 w-3 rotate-45 border border-orange-400" />
-              BEACON
-            </span>
-            <span>STATUS CONSOLE</span>
-          </motion.div>
+            <a
+              href="/"
+              className="group flex items-center gap-2.5 text-orange-400 focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
+            >
+              <BeaconMark className="h-5 w-5" />
+              <span className="text-sm uppercase tracking-[0.3em] group-hover:text-orange-300">Beacon</span>
+            </a>
+            <a
+              href="/"
+              className="text-[11px] uppercase tracking-[0.25em] text-slate-500 underline-offset-4 hover:text-orange-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
+            >
+              ← Back to Beacon
+            </a>
+          </motion.header>
 
           {/* Terminal window */}
           <motion.div

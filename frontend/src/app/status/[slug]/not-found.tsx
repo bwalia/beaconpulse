@@ -11,7 +11,10 @@ const CRT: React.CSSProperties = {
 
 export default function StatusNotFound() {
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#080a0f] p-6 font-mono text-slate-300">
+    <div
+      className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#080a0f] p-6 text-slate-300"
+      style={{ fontFamily: "var(--font-departure), ui-monospace, SFMono-Regular, Menlo, monospace" }}
+    >
       <div aria-hidden className="pointer-events-none fixed inset-0" style={CRT} />
       <div className="relative w-full max-w-lg border border-slate-700/70 bg-[#0b0d13] p-6 shadow-[0_0_40px_-12px_rgba(255,90,30,0.25)]">
         <p className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-orange-400">
