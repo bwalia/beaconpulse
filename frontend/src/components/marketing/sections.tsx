@@ -65,14 +65,14 @@ function SectionHead({
 const FEATURES = [
   {
     icon: ActivityIcon,
-    title: "Twelve monitor types",
-    body: "HTTP, TCP, ICMP, DNS, SSL expiry, Kubernetes, Prometheus and more — one system instead of five.",
+    title: "Six monitor types",
+    body: "HTTP, HTTPS, TCP, ICMP, DNS and SSL-expiry checks — one control plane instead of five tools.",
     wide: true,
   },
   {
     icon: BellIcon,
     title: "Alerts that reach a human",
-    body: "Route to Slack, email or webhooks with de-duplication, so one outage isn't fifty pings.",
+    body: "Slack, email, webhooks and Telegram, with de-duplication — so one outage isn't fifty pings.",
   },
   {
     icon: LockIcon,

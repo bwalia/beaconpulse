@@ -28,8 +28,16 @@ const (
 
 // SupportedTypes are the channel types with a working Notifier today. Others are
 // permitted by the schema and reserved for later iterations.
+//
+// This map is the single source of truth the API validates against, so a type is
+// only listed here once its Notifier is registered in the dispatcher (see
+// cmd/api/main.go). Listing a type without a notifier would let a user create a
+// channel that silently never delivers.
 var SupportedTypes = map[ChannelType]bool{
 	TypeTelegram: true,
+	TypeSlack:    true,
+	TypeEmail:    true,
+	TypeWebhook:  true,
 }
 
 // Channel is a configured delivery destination for an organization.

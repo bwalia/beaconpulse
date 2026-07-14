@@ -32,7 +32,7 @@ its own Prometheus.** Heartbeats are built on it.
 
 ---
 
-## F1 — Notification channels (Slack, Email, Webhook)
+## F1 — Notification channels (Slack, Email, Webhook)  ✅ SHIPPED
 
 ### Why first
 The product is currently unusable for most teams, and the marketing overclaims.

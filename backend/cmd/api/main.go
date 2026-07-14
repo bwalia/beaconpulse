@@ -36,6 +36,7 @@ import (
 	"beacon/internal/platform/database"
 	"beacon/internal/platform/logger"
 	"beacon/internal/platform/metrics"
+	"beacon/internal/platform/safehttp"
 	"beacon/internal/platform/validate"
 	"beacon/internal/transport/rest"
 	"beacon/internal/transport/rest/middleware"
@@ -124,8 +125,20 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 
 	// Notification wiring: a registry of per-type notifiers, the CRUD service,
 	// and the dispatcher used by the Alertmanager webhook.
+	//
+	// Slack and Webhook fetch a TENANT-supplied URL, so they share one SSRF-guarded
+	// HTTP client (safehttp) that refuses internal/loopback/metadata addresses.
+	// AllowPrivate/AllowHTTP are off by default and only flipped by a single-tenant
+	// operator who deliberately wants internal webhooks.
+	tenantHTTP := safehttp.New(safehttp.Config{
+		AllowPrivate: cfg.Notify.WebhookAllowPrivate,
+		AllowHTTP:    cfg.Notify.WebhookAllowHTTP,
+	})
 	notifierRegistry := map[notification.ChannelType]notification.Notifier{
 		notification.TypeTelegram: notifier.NewTelegramNotifier(),
+		notification.TypeSlack:    notifier.NewSlackNotifier(tenantHTTP),
+		notification.TypeEmail:    notifier.NewEmailNotifier(),
+		notification.TypeWebhook:  notifier.NewWebhookNotifier(tenantHTTP),
 	}
 	projectLookup := postgres.NewProjectLookupAdapter(projectRepo)
 	notifySvc := notification.NewService(notificationRepo, cipher, notifierRegistry, auditRec, cfg.Notify.DashboardURL)
