@@ -106,8 +106,10 @@ data:
     #
     #   /              -> dashboard (Next.js)
     #   /api/          -> Beacon API
-    #   /prometheus/   -> Prometheus UI, every data query filtered to the caller's
-    #                     org_id via prom-label-proxy
+    #   /prometheus/   -> 302 to Beacon's /explore. The tenant-filtered Prometheus
+    #                     API (/prometheus/api/) is still served, via prom-label-proxy,
+    #                     which pins org_id to the caller. The stock Prometheus UI is
+    #                     NOT served: its admin pages are global and cannot be scoped.
     #   /alertmanager/ -> Alertmanager UI, filtered to the caller
     #
     # Navigations to /prometheus/ and /alertmanager/ are authenticated with an
@@ -133,6 +135,10 @@ data:
         server {
             listen 80;
 
+            # Relative Location headers on redirect. The default rebuilds the URL
+            # from $host and drops the port, which breaks any non-:80 origin.
+            absolute_redirect off;
+
             # ---- gateway auth subrequest (validates the beacon_proxy cookie) ----
             location = /__beacon_authz {
                 internal;
@@ -149,8 +155,7 @@ data:
             location = /readyz  { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
             location = /livez   { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
 
-            # ================= Prometheus (tenant-filtered) =================
-            location = /prometheus { return 301 /prometheus/; }
+            # ============ Prometheus (tenant-filtered API only) ============
             location ^~ /prometheus/federate { return 403; }
             location ~ ^/prometheus/api/ {
                 auth_request     /__beacon_authz;
@@ -159,11 +164,17 @@ data:
                 rewrite ^/prometheus/(.*)$ /$1 break;
                 proxy_pass http://{{ include "beacon.name" "prom-label-proxy-prom" }}:8080;
             }
-            location /prometheus/ {
-                auth_request /__beacon_authz;
-                rewrite ^/prometheus/(.*)$ /$1 break;
-                proxy_pass http://{{ include "beacon.name" "prometheus" }}:9090;
-            }
+            # The stock Prometheus UI is NOT served to tenants — its Targets /
+            # Config / TSDB / Service-Discovery / Alertmanagers pages read state
+            # that is GLOBAL to the instance (one Prometheus, one config, one TSDB,
+            # and /targets lists every tenant's monitor URLs). They cannot be
+            # tenant-scoped, so the proxy 404s them and the customer saw a screen
+            # of red errors. Making them "work" would mean leaking every other
+            # customer's data. Beacon's own /explore exposes the part that IS
+            # per-tenant, over the filtered API above. Operators use:
+            #   kubectl -n <env> port-forward svc/{{ include "beacon.name" "prometheus" }} 9090:9090
+            location = /prometheus  { return 302 /explore; }
+            location /prometheus/   { return 302 /explore; }
 
             # ================= Alertmanager (tenant-filtered) =================
             location = /alertmanager { return 301 /alertmanager/; }

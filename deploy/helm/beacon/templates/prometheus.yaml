@@ -34,7 +34,12 @@ spec:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.retention.time={{ .Values.app.promRetention }}
             - --web.enable-lifecycle
-            - --web.external-url=https://{{ .Values.host }}/prometheus/
+            # The gateway no longer serves the Prometheus UI (/prometheus/ redirects
+            # to Beacon's /explore), so external-url must not point there — its own
+            # links would bounce an operator away from the console they opened.
+            # Operators reach Prometheus out-of-band:
+            #   kubectl -n <env> port-forward svc/{{ include "beacon.name" "prometheus" }} 9090:9090
+            - --web.external-url=http://localhost:9090/
             - --web.route-prefix=/
           ports:
             - containerPort: 9090

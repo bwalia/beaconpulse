@@ -16,6 +16,7 @@ import {
   FolderIcon,
   GlobeIcon,
   SettingsIcon,
+  SearchIcon,
 } from "@/components/icons";
 
 type NavItem = { href: string; label: string; Icon: (p: { className?: string }) => React.ReactElement };
@@ -24,6 +25,7 @@ const baseNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", Icon: DashboardIcon },
   { href: "/monitors", label: "Monitors", Icon: ActivityIcon },
   { href: "/alerts", label: "Alerts", Icon: AlertTriangleIcon },
+  { href: "/explore", label: "Explore", Icon: SearchIcon },
   { href: "/projects", label: "Projects", Icon: FolderIcon },
   { href: "/status-page", label: "Status page", Icon: GlobeIcon },
   { href: "/notifications", label: "Notifications", Icon: BellIcon },
