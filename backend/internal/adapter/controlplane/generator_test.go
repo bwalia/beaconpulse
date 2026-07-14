@@ -237,3 +237,50 @@ func TestEveryRuleCarriesTenantLabels(t *testing.T) {
 		}
 	}
 }
+
+// TestHeartbeat_GeneratesRuleButNoProbe verifies the two invariants that make a
+// heartbeat a push monitor: it produces a HeartbeatMissed rule (carrying the
+// tenant label), and it produces NO Blackbox module and NO scrape job — there is
+// nothing to probe.
+func TestHeartbeat_GeneratesRuleButNoProbe(t *testing.T) {
+	m := monitor.Monitor{
+		ID:              uuid.New(),
+		OrgID:           uuid.New(),
+		ProjectID:       uuid.New(),
+		Name:            "Nightly backup",
+		Type:            monitor.TypeHeartbeat,
+		Target:          monitor.HeartbeatTarget,
+		IntervalSeconds: 3600,
+		GraceSeconds:    300,
+	}
+
+	arts, err := Generate(GeneratorConfig{BlackboxAddr: "blackbox:9115", DNSResolver: "8.8.8.8:53"},
+		[]monitor.Monitor{m})
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	blackbox := string(arts.BlackboxYAML)
+	scrape := string(arts.ScrapeYAML)
+	rules := string(arts.RulesYAML)
+
+	// No probe config for a heartbeat.
+	if strings.Contains(blackbox, m.ID.String()) {
+		t.Error("heartbeat produced a Blackbox module; it must not be probed")
+	}
+	if strings.Contains(scrape, m.ID.String()) {
+		t.Error("heartbeat produced a scrape job; it must not be probed")
+	}
+
+	// It DOES produce a HeartbeatMissed rule with the tenant label and the right
+	// threshold (interval + grace = 3900).
+	if !strings.Contains(rules, "HeartbeatMissed") {
+		t.Error("heartbeat did not produce a HeartbeatMissed rule")
+	}
+	if !strings.Contains(rules, "org_id: "+m.OrgID.String()) {
+		t.Error("HeartbeatMissed rule is missing its org_id tenant label")
+	}
+	if !strings.Contains(rules, "> 3900") {
+		t.Errorf("HeartbeatMissed threshold wrong; want interval+grace=3900 in:\n%s", rules)
+	}
+}

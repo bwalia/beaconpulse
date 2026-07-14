@@ -26,6 +26,7 @@ import (
 	"beacon/internal/domain/audit"
 	"beacon/internal/domain/auth"
 	"beacon/internal/domain/billing"
+	"beacon/internal/domain/heartbeat"
 	"beacon/internal/domain/insight"
 	"beacon/internal/domain/monitor"
 	"beacon/internal/domain/notification"
@@ -116,6 +117,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	orgPlanRepo := postgres.NewOrgPlanRepository(pool)
 	notificationRepo := postgres.NewNotificationRepository(pool)
 	statusPageRepo := postgres.NewStatusPageRepository(pool)
+	heartbeatRepo := postgres.NewHeartbeatRepository(pool)
 	statusPageSettingsRepo := postgres.NewStatusPageSettingsRepository(pool)
 
 	// Cross-cutting.
@@ -165,6 +167,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	// Public status page: the one unauthenticated read. Takes no auditor and no
 	// enqueuer — it is read-only and cannot mutate anything by construction.
 	statusPageSvc := statuspage.NewService(statusPageRepo)
+	heartbeatSvc := heartbeat.NewService(heartbeatRepo)
 	statusPageSettingsSvc := statuspage.NewSettingsService(statusPageSettingsRepo, auditRec)
 
 	// Transport.
@@ -189,6 +192,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Insight:            rest.NewInsightHandler(insightSvc),
 		Billing:            rest.NewBillingHandler(billingSvc, validator, authn),
 		StatusPage:         rest.NewStatusPageHandler(statusPageSvc),
+		Heartbeat:          rest.NewHeartbeatHandler(heartbeatSvc),
 		StatusPageSettings: rest.NewStatusPageSettingsHandler(statusPageSettingsSvc, validator, authn),
 	}), nil
 }

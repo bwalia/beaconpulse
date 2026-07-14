@@ -36,6 +36,14 @@ scrape_configs:
     static_configs:
       - targets: ['api:8080']
 
+  # The worker exports the heartbeat liveness gauge
+  # (beacon_heartbeat_last_ping_timestamp_seconds). It owns that gauge as the
+  # single-writer component, so it is scraped as its own job.
+  - job_name: beacon-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['worker:8081']
+
   - job_name: blackbox-exporter
     metrics_path: /metrics
     static_configs:

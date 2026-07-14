@@ -34,6 +34,12 @@ data:
         metrics_path: /metrics
         static_configs:
           - targets: ['{{ include "beacon.name" "api" }}:8080']
+      # The worker exports the heartbeat liveness gauge; it owns that gauge as the
+      # single-writer component, so it is scraped as its own job.
+      - job_name: beacon-worker
+        metrics_path: /metrics
+        static_configs:
+          - targets: ['{{ include "beacon.name" "worker" }}:8081']
       - job_name: blackbox-exporter
         metrics_path: /metrics
         static_configs:

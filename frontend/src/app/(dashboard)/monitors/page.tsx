@@ -27,15 +27,18 @@ import {
   StatusBadge,
   Textarea,
 } from "@/components/ui";
-import { ActivityIcon, PlusIcon, XIcon } from "@/components/icons";
+import { ActivityIcon, CheckCircleIcon, PlusIcon, XIcon } from "@/components/icons";
 import type { MetricPoint, Monitor } from "@/lib/types";
 
 const schema = z.object({
   project_id: z.string().uuid("Select a project"),
   name: z.string().min(1, "Name is required"),
-  type: z.enum(["http", "https", "ssl", "tcp", "icmp", "dns"]),
-  target: z.string().min(1, "Target is required"),
+  type: z.enum(["http", "https", "ssl", "tcp", "icmp", "dns", "heartbeat"]),
+  // Optional at the schema level; required-unless-heartbeat is enforced by the
+  // refine() at the bottom of the object, because a heartbeat has no target.
+  target: z.string().optional(),
   interval_seconds: z.coerce.number().int().min(10).max(86400),
+  grace_seconds: z.coerce.number().int().min(0).max(86400).optional(),
   // Advanced (all optional)
   valid_status_codes: z.string().optional(),
   body_keyword: z.string().optional(),
@@ -46,6 +49,9 @@ const schema = z.object({
   headers: z.string().optional(),
   dns_query_type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA"]).optional(),
   alert_sensitivity: z.enum(["immediate", "balanced", "relaxed"]).optional(),
+}).refine((v) => v.type === "heartbeat" || (v.target ?? "").trim().length > 0, {
+  message: "Target is required",
+  path: ["target"],
 });
 type Values = z.infer<typeof schema>;
 
@@ -111,6 +117,67 @@ const targetHints: Record<string, string> = {
   icmp: "example.com",
   dns: "example.com",
 };
+
+// HeartbeatCreated shows the ping URL right after a heartbeat is created. The URL
+// carries the token (the credential), so we surface it prominently once and give a
+// ready-to-paste cron example, rather than burying it in the monitor row.
+function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () => void }) {
+  const [copied, setCopied] = useState(false);
+  // ping_url is returned relative; compose the absolute URL from the current origin
+  // so it never hard-codes a gateway host.
+  const url =
+    typeof window !== "undefined" && monitor.ping_url
+      ? new URL(monitor.ping_url, window.location.origin).toString()
+      : (monitor.ping_url ?? "");
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — the URL is selectable in the field regardless */
+    }
+  }
+
+  return (
+    <Card>
+      <div className="flex items-start gap-3">
+        <CheckCircleIcon className="mt-0.5 h-7 w-7 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold text-slate-900 dark:text-white">
+            “{monitor.name}” is ready
+          </h3>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Call this URL from your job on success. If no ping arrives within the interval plus
+            grace period, Beacon alerts you. You can find it again on this monitor later.
+          </p>
+
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              readOnly
+              value={url}
+              onFocus={(e) => e.currentTarget.select()}
+              className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            />
+            <Button variant="secondary" onClick={copy}>
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          </div>
+
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Example crontab:</p>
+          <pre className="mt-1 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
+            {`0 2 * * *  /path/to/backup.sh && curl -fsS ${url}`}
+          </pre>
+
+          <div className="mt-4">
+            <Button onClick={onDone}>Done</Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function MonitorsPage() {
   const { data, isLoading } = useMonitors();
@@ -251,7 +318,13 @@ function MonitorRow({
       </td>
       <td className="px-4 py-3 uppercase text-slate-500 dark:text-slate-400">{monitor.type}</td>
       <td className="max-w-[32rem] truncate px-4 py-3 font-mono text-sm text-slate-500 dark:text-slate-400">
-        {monitor.target}
+        {/* A heartbeat has no probe target; show its ping URL instead, so the
+            owner can retrieve it any time. */}
+        {monitor.type === "heartbeat" && monitor.ping_url ? (
+          <span title="Ping URL — call this from your job">{monitor.ping_url}</span>
+        ) : (
+          monitor.target
+        )}
       </td>
       <td className="px-4 py-3 tabular-nums text-slate-500 dark:text-slate-400">{monitor.interval_seconds}s</td>
       <td className="px-4 py-3">
@@ -572,25 +645,39 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
   });
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [created, setCreated] = useState<Monitor | null>(null);
   const type = watch("type");
   const isHTTP = type === "http" || type === "https" || type === "ssl";
+  const isHeartbeat = type === "heartbeat";
 
   const onSubmit = async (values: Values) => {
     setServerError(null);
     try {
-      await createMonitor.mutateAsync({
+      const monitor = await createMonitor.mutateAsync({
         project_id: values.project_id,
         name: values.name,
         type: values.type,
-        target: values.target,
+        // A heartbeat has no probe target; the server assigns a placeholder.
+        target: isHeartbeat ? undefined : values.target,
         interval_seconds: values.interval_seconds,
+        grace_seconds: isHeartbeat ? values.grace_seconds : undefined,
         settings: buildSettings(values),
       });
-      onDone();
+      // A heartbeat's ping URL is only shown once, right after creation — so we
+      // pause on a success panel instead of closing the form immediately.
+      if (monitor.type === "heartbeat" && monitor.ping_url) {
+        setCreated(monitor);
+      } else {
+        onDone();
+      }
     } catch (err) {
       setServerError(err instanceof ApiRequestError ? err.message : "Failed to create monitor");
     }
   };
+
+  if (created) {
+    return <HeartbeatCreated monitor={created} onDone={onDone} />;
+  }
 
   if (!projects?.data.length) {
     return (
@@ -626,6 +713,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
             <option value="tcp">TCP port</option>
             <option value="icmp">Ping (ICMP)</option>
             <option value="dns">DNS</option>
+            <option value="heartbeat">Heartbeat (cron / job)</option>
           </Select>
         </Field>
         <Field label="Check interval" error={errors.interval_seconds?.message}>
@@ -642,37 +730,62 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
             </p>
           )}
         </Field>
-        <div className="sm:col-span-2">
-          <Field label="Target" error={errors.target?.message}>
-            <Input placeholder={targetHints[type]} {...register("target")} />
-          </Field>
-        </div>
+        {isHeartbeat ? (
+          <>
+            <Field label="Grace period" error={errors.grace_seconds?.message}>
+              <Select {...register("grace_seconds")}>
+                <option value="">One interval (default)</option>
+                <option value="60">1 minute</option>
+                <option value="300">5 minutes</option>
+                <option value="900">15 minutes</option>
+                <option value="3600">1 hour</option>
+              </Select>
+            </Field>
+            <div className="sm:col-span-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
+              A heartbeat has no URL to probe. Instead, Beacon gives you a ping URL to
+              call from your cron/job on success — if no ping arrives within the interval
+              plus grace period, you&apos;re alerted. You&apos;ll get the URL after saving.
+            </div>
+          </>
+        ) : (
+          <div className="sm:col-span-2">
+            <Field label="Target" error={errors.target?.message}>
+              <Input placeholder={targetHints[type]} {...register("target")} />
+            </Field>
+          </div>
+        )}
 
-        <div className="sm:col-span-2">
-          <Field label="Alert sensitivity" error={errors.alert_sensitivity?.message}>
-            <Select {...register("alert_sensitivity")}>
-              {SENSITIVITY_OPTIONS.map((o) => (
-                <option key={o.v} value={o.v}>
-                  {o.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            How long the target must be down before you&apos;re alerted. Immediate catches brief dips; relaxed
-            avoids noise from short blips.
-          </p>
-        </div>
+        {/* Sensitivity is a probe concept (how many failed checks before alerting);
+            a heartbeat uses its grace period instead, so it is hidden here. */}
+        {!isHeartbeat && (
+          <div className="sm:col-span-2">
+            <Field label="Alert sensitivity" error={errors.alert_sensitivity?.message}>
+              <Select {...register("alert_sensitivity")}>
+                {SENSITIVITY_OPTIONS.map((o) => (
+                  <option key={o.v} value={o.v}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              How long the target must be down before you&apos;re alerted. Immediate catches brief dips; relaxed
+              avoids noise from short blips.
+            </p>
+          </div>
+        )}
 
-        <div className="sm:col-span-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-          <button
-            type="button"
-            onClick={() => setShowAdvanced((v) => !v)}
-            className="text-sm font-medium text-brand-600 hover:underline"
-          >
-            {showAdvanced ? "− Hide" : "+ Show"} advanced settings
-          </button>
-        </div>
+        {!isHeartbeat && (
+          <div className="sm:col-span-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="text-sm font-medium text-brand-600 hover:underline"
+            >
+              {showAdvanced ? "− Hide" : "+ Show"} advanced settings
+            </button>
+          </div>
+        )}
 
         {showAdvanced && isHTTP && (
           <>
