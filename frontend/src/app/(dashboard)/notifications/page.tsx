@@ -11,6 +11,7 @@ import {
 } from "@/lib/hooks";
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton } from "@/components/ui";
+import { useConfirm } from "@/components/confirm";
 import type { NotificationChannel } from "@/lib/types";
 import { BellIcon, LockIcon, PlusIcon, XIcon } from "@/components/icons";
 import {
@@ -96,6 +97,7 @@ function ChannelRow({
   const test = useTestChannel();
   const setEnabled = useSetChannelEnabled();
   const del = useDeleteChannel();
+  const confirm = useConfirm();
 
   const def = channelTypeDef(channel.type);
 
@@ -147,8 +149,17 @@ function ChannelRow({
         <Button
           variant="danger"
           disabled={del.isPending}
-          onClick={() => {
-            if (confirm(`Delete channel "${channel.name}"?`)) del.mutate(channel.id);
+          onClick={async () => {
+            if (
+              await confirm({
+                title: `Delete “${channel.name}”?`,
+                body: "Alerts will no longer be delivered to this channel.",
+                confirmLabel: "Delete channel",
+                danger: true,
+              })
+            ) {
+              del.mutate(channel.id);
+            }
           }}
         >
           Delete

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui";
+import { ConfirmProvider } from "@/components/confirm";
 import { ThemeToggle } from "@/lib/theme";
 import {
   ActivityIcon,
@@ -55,6 +56,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
+    <ConfirmProvider>
     <div className="flex min-h-screen">
       <aside className="hidden w-64 flex-shrink-0 border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 md:block">
         <div className="mb-6 flex items-center gap-2.5 px-2">
@@ -108,5 +110,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
     </div>
+    </ConfirmProvider>
   );
 }

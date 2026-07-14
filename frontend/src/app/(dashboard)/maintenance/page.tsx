@@ -12,6 +12,7 @@ import {
 } from "@/lib/hooks";
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton, Textarea } from "@/components/ui";
+import { useConfirm } from "@/components/confirm";
 import { PlusIcon, WrenchIcon, XIcon } from "@/components/icons";
 import type { MaintenanceScope, MaintenanceWindow } from "@/lib/types";
 
@@ -169,6 +170,7 @@ function WindowRow({ window: w, setNotice }: { window: MaintenanceWindow; setNot
   const del = useDeleteMaintenanceWindow();
   const { data: projects } = useProjects();
   const { data: monitors } = useMonitors();
+  const confirm = useConfirm();
 
   const scopeLabel = useMemo(() => {
     if (w.scope === "org") return "All monitors";
@@ -217,8 +219,17 @@ function WindowRow({ window: w, setNotice }: { window: MaintenanceWindow; setNot
         <Button
           variant="danger"
           disabled={del.isPending}
-          onClick={() => {
-            if (confirm(`Delete maintenance window "${w.title}"?`)) {
+          onClick={async () => {
+            if (
+              await confirm({
+                title: `Delete “${w.title}”?`,
+                body: w.active
+                  ? "This window is active now — deleting it resumes alerts for its monitors immediately."
+                  : "This removes the scheduled maintenance window.",
+                confirmLabel: "Delete window",
+                danger: true,
+              })
+            ) {
               del.mutate(w.id, {
                 onError: (e) =>
                   setNotice({ kind: "err", text: e instanceof ApiRequestError ? e.message : "Delete failed" }),

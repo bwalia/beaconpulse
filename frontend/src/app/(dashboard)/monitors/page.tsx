@@ -28,6 +28,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { ActivityIcon, CheckCircleIcon, PlusIcon, WrenchIcon, XIcon } from "@/components/icons";
+import { useConfirm } from "@/components/confirm";
 import type { MetricPoint, Monitor } from "@/lib/types";
 
 const schema = z.object({
@@ -302,6 +303,7 @@ function MonitorRow({
 }) {
   const setEnabled = useSetMonitorEnabled();
   const deleteMonitor = useDeleteMonitor();
+  const confirm = useConfirm();
 
   return (
     <tr className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40">
@@ -362,8 +364,17 @@ function MonitorRow({
             size="sm"
             variant="ghost"
             className="text-red-700 hover:bg-red-50 hover:text-red-800 focus-visible:ring-red-500 dark:text-red-400 dark:hover:bg-red-950/50 dark:hover:text-red-300"
-            onClick={() => {
-              if (confirm(`Delete monitor "${monitor.name}"?`)) deleteMonitor.mutate(monitor.id);
+            onClick={async () => {
+              if (
+                await confirm({
+                  title: `Delete “${monitor.name}”?`,
+                  body: "This removes the monitor and its history. This can't be undone.",
+                  confirmLabel: "Delete monitor",
+                  danger: true,
+                })
+              ) {
+                deleteMonitor.mutate(monitor.id);
+              }
             }}
             disabled={deleteMonitor.isPending}
           >
