@@ -54,9 +54,12 @@ export interface CreateMonitorInput {
   project_id: string;
   name: string;
   type: string;
-  target: string;
+  /** Optional for heartbeat monitors, which have no probe target. */
+  target?: string;
   interval_seconds?: number;
   timeout_seconds?: number;
+  /** Heartbeat only: slack beyond the interval before a missed ping alerts. */
+  grace_seconds?: number;
   settings?: Record<string, unknown>;
 }
 

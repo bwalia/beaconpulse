@@ -2,6 +2,8 @@ package monitor
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -40,6 +42,9 @@ type CreateInput struct {
 	IntervalSeconds int
 	TimeoutSeconds  int
 	Settings        Settings
+	// GraceSeconds applies to heartbeat monitors only: slack beyond the interval
+	// before a missed ping alerts. Zero => default (one interval, floored at 30s).
+	GraceSeconds int
 }
 
 // UpdateInput is a partial update; nil fields are unchanged.
@@ -167,6 +172,20 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Mon
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
+
+	// Heartbeat-specific setup. The token is the ping URL's credential; last_ping
+	// starts at creation so a heartbeat that is created and never wired up alerts
+	// after interval+grace, rather than staying silently "unknown" forever.
+	if in.Type == TypeHeartbeat {
+		token, err := newPingToken()
+		if err != nil {
+			return nil, apperror.Internal(err)
+		}
+		m.PingToken = &token
+		m.LastPingAt = &now
+		m.GraceSeconds = graceOrDefault(in.GraceSeconds, interval)
+	}
+
 	if err := s.repo.Create(ctx, m); err != nil {
 		return nil, err
 	}
@@ -350,6 +369,34 @@ func orDefault(v, def int) int {
 		return def
 	}
 	return v
+}
+
+// minHeartbeatGrace floors the grace period so a heartbeat cannot be configured
+// to alert the instant it is a millisecond late.
+const minHeartbeatGrace = 30
+
+// graceOrDefault picks the grace period for a heartbeat: the requested value, or
+// one interval when unset, floored at minHeartbeatGrace.
+func graceOrDefault(requested, interval int) int {
+	g := requested
+	if g <= 0 {
+		g = interval
+	}
+	if g < minHeartbeatGrace {
+		g = minHeartbeatGrace
+	}
+	return g
+}
+
+// newPingToken returns a high-entropy, URL-safe capability token (32 random bytes
+// => 43 chars). It is the credential in a heartbeat's ping URL, so it must be
+// unguessable — hence crypto/rand, not the monitor's (enumerable) UUID.
+func newPingToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate ping token: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // enforceIntervalFloor rejects intervals faster than the plan allows.

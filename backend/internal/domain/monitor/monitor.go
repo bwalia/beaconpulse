@@ -26,7 +26,16 @@ const (
 	TypeTCP   Type = "tcp"
 	TypeICMP  Type = "icmp"
 	TypeDNS   Type = "dns"
+	// TypeHeartbeat is a PUSH monitor: Beacon does not probe it; the customer's
+	// job pings a capability URL, and silence past interval+grace alerts. It has
+	// no probe target and generates no Blackbox/scrape config.
+	TypeHeartbeat Type = "heartbeat"
 )
+
+// HeartbeatTarget is the placeholder stored in a heartbeat's target column. The
+// schema requires a non-empty target; a heartbeat has none, and nothing reads
+// this value — it exists only to satisfy the NOT NULL / length CHECK.
+const HeartbeatTarget = "(heartbeat)"
 
 // Status is the last observed health of a monitor.
 type Status string
@@ -43,6 +52,7 @@ const (
 var SupportedTypes = map[Type]bool{
 	TypeHTTP: true, TypeHTTPS: true, TypeSSL: true,
 	TypeTCP: true, TypeICMP: true, TypeDNS: true,
+	TypeHeartbeat: true,
 }
 
 // Sensitivity controls how long a monitor must stay down before its MonitorDown
@@ -101,6 +111,15 @@ type Monitor struct {
 	Type      Type
 	Target    string
 	Enabled   bool
+	// PingToken is the heartbeat capability token (nil for probed monitors) — the
+	// opaque credential embedded in the ping URL, not the monitor id.
+	PingToken *string
+	// LastPingAt is when the last heartbeat ping arrived (nil until first ping;
+	// seeded to CreatedAt on a new heartbeat so silence-from-the-start still alerts).
+	LastPingAt *time.Time
+	// GraceSeconds is the slack beyond the interval before a missed ping alerts.
+	// Zero for non-heartbeat monitors.
+	GraceSeconds int
 	// Public publishes this monitor onto the org's public status page.
 	// Defaults to false: enabling a status page must never retroactively
 	// expose an endpoint that was added before the page existed.

@@ -32,7 +32,7 @@ export interface Project {
   updated_at: string;
 }
 
-export type MonitorType = "http" | "https" | "ssl" | "tcp" | "icmp" | "dns";
+export type MonitorType = "http" | "https" | "ssl" | "tcp" | "icmp" | "dns" | "heartbeat";
 export type MonitorStatus = "up" | "down" | "degraded" | "unknown" | "paused";
 
 export interface MonitorSettings {
@@ -65,6 +65,10 @@ export interface Monitor {
   settings: MonitorSettings;
   last_status: MonitorStatus;
   last_checked_at?: string;
+  /** Heartbeat-only: the capability URL the customer's job pings (owner-only). */
+  ping_url?: string;
+  grace_seconds?: number;
+  last_ping_at?: string;
   created_at: string;
   updated_at: string;
 }

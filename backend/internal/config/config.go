@@ -151,6 +151,10 @@ type ControlPlane struct {
 type Worker struct {
 	Concurrency int
 	MaxRetries  int
+	// MetricsAddr is where the worker serves /metrics. The worker (single-instance)
+	// exports the heartbeat gauge here for Prometheus to scrape as job
+	// beacon-worker. Distinct from the API's :8080/metrics.
+	MetricsAddr string
 }
 
 // Load reads configuration from the environment, applies defaults, and
@@ -207,6 +211,7 @@ func Load() (Config, error) {
 		Worker: Worker{
 			Concurrency: getInt("BEACON_WORKER_CONCURRENCY", 8, add),
 			MaxRetries:  getInt("BEACON_WORKER_MAX_RETRIES", 5, add),
+			MetricsAddr: getStr("BEACON_WORKER_METRICS_ADDR", ":8081"),
 		},
 		Notify: Notify{
 			WebhookToken:        getStr("BEACON_WEBHOOK_TOKEN", ""),
