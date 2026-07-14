@@ -22,15 +22,18 @@ function Icon({ className, children }: IconProps & { children: React.ReactNode }
   );
 }
 
-/** Beacon's mark — a broadcasting signal. */
+/**
+ * Beacon Pulse's mark — a broadcast signal (the outer arcs) carrying a heartbeat
+ * pulse (the centre): a beacon, transmitting a pulse. Reads as uptime/monitoring.
+ */
 export function BeaconMark({ className }: IconProps) {
   return (
     <Icon className={className}>
-      <path d="M4.9 19.1a10 10 0 0 1 0-14.2" />
-      <path d="M7.8 16.2a6 6 0 0 1 0-8.4" />
-      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-      <path d="M16.2 7.8a6 6 0 0 1 0 8.4" />
-      <path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
+      {/* broadcast arcs */}
+      <path d="M4.6 18.6a9 9 0 0 1 0-13.2" />
+      <path d="M19.4 5.4a9 9 0 0 1 0 13.2" />
+      {/* heartbeat pulse */}
+      <path d="M7.3 12h1.9l1.3-4 2.4 8 1.3-4h1.9" />
     </Icon>
   );
 }
