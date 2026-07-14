@@ -38,9 +38,30 @@ spec:
           command: ["worker"]
           env:
             {{- include "beacon.backendEnv" . | nindent 12 }}
+          ports:
+            # /metrics — the heartbeat liveness gauge, scraped by Prometheus.
+            - name: metrics
+              containerPort: 8081
           resources:
             {{- toYaml .Values.resources.worker | nindent 12 }}
           volumeMounts:
             {{- include "beacon.backendVolumeMounts" . | nindent 12 }}
       volumes:
         {{- include "beacon.backendVolumes" . | nindent 8 }}
+---
+# Service so Prometheus can scrape the worker's heartbeat gauge at a stable name.
+# The worker is single-instance, so this is one endpoint — exactly one series per
+# heartbeat, which is what makes the miss-detection rule correct.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "beacon.name" "worker" }}
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "beacon.selector" "worker" | nindent 4 }}
+  ports:
+    - name: metrics
+      port: 8081
+      targetPort: 8081

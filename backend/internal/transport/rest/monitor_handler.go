@@ -81,14 +81,17 @@ func (d monitorSettingsDTO) toDomain() monitor.Settings {
 }
 
 type createMonitorRequest struct {
-	ProjectID       string             `json:"project_id" validate:"required,uuid"`
-	Name            string             `json:"name" validate:"required,min=1,max=200"`
-	Type            string             `json:"type" validate:"required,oneof=http https ssl tcp icmp dns"`
-	Target          string             `json:"target" validate:"required,max=2048"`
+	ProjectID string `json:"project_id" validate:"required,uuid"`
+	Name      string `json:"name" validate:"required,min=1,max=200"`
+	Type      string `json:"type" validate:"required,oneof=http https ssl tcp icmp dns heartbeat"`
+	// Optional: a heartbeat has no probe target (the domain enforces
+	// required-for-probed-types). max only.
+	Target          string             `json:"target" validate:"omitempty,max=2048"`
 	Enabled         *bool              `json:"enabled"`
 	Public          *bool              `json:"public"`
 	IntervalSeconds int                `json:"interval_seconds" validate:"omitempty,gte=10,lte=86400"`
 	TimeoutSeconds  int                `json:"timeout_seconds" validate:"omitempty,gte=1,lte=300"`
+	GraceSeconds    int                `json:"grace_seconds" validate:"omitempty,gte=0,lte=86400"`
 	Settings        monitorSettingsDTO `json:"settings"`
 }
 
@@ -116,12 +119,17 @@ type monitorResponse struct {
 	Settings        monitor.Settings `json:"settings"`
 	LastStatus      string           `json:"last_status"`
 	LastCheckedAt   *time.Time       `json:"last_checked_at,omitempty"`
-	CreatedAt       time.Time        `json:"created_at"`
-	UpdatedAt       time.Time        `json:"updated_at"`
+	// Heartbeat-only. PingURL is the capability URL the customer's job pings; it
+	// carries the token, so it is returned only to the authenticated owner.
+	PingURL      string     `json:"ping_url,omitempty"`
+	GraceSeconds int        `json:"grace_seconds,omitempty"`
+	LastPingAt   *time.Time `json:"last_ping_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
 func presentMonitor(m *monitor.Monitor) monitorResponse {
-	return monitorResponse{
+	r := monitorResponse{
 		ID:              m.ID.String(),
 		OrgID:           m.OrgID.String(),
 		ProjectID:       m.ProjectID.String(),
@@ -135,9 +143,17 @@ func presentMonitor(m *monitor.Monitor) monitorResponse {
 		Settings:        m.Settings,
 		LastStatus:      string(m.LastStatus),
 		LastCheckedAt:   m.LastCheckedAt,
+		GraceSeconds:    m.GraceSeconds,
+		LastPingAt:      m.LastPingAt,
 		CreatedAt:       m.CreatedAt,
 		UpdatedAt:       m.UpdatedAt,
 	}
+	if m.PingToken != nil {
+		// Relative on purpose: the frontend prepends its own origin, so this never
+		// hard-codes a gateway host that could drift per environment.
+		r.PingURL = "/api/v1/ping/" + *m.PingToken
+	}
+	return r
 }
 
 // ---- handlers ----
@@ -238,6 +254,7 @@ func (h *MonitorHandler) create(w http.ResponseWriter, r *http.Request) {
 		Public:          req.Public,
 		IntervalSeconds: req.IntervalSeconds,
 		TimeoutSeconds:  req.TimeoutSeconds,
+		GraceSeconds:    req.GraceSeconds,
 		Settings:        req.Settings.toDomain(),
 	})
 	if err != nil {

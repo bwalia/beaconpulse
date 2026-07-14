@@ -31,6 +31,7 @@ type RouterDeps struct {
 	Insight            *InsightHandler
 	Billing            *BillingHandler
 	StatusPage         *StatusPageHandler
+	Heartbeat          *HeartbeatHandler
 	StatusPageSettings *StatusPageSettingsHandler
 }
 
@@ -60,6 +61,9 @@ func NewRouter(d RouterDeps) http.Handler {
 		// the URL in logs, proxies and rate-limit rules — not something a reviewer
 		// has to infer from the absence of a middleware.
 		api.Mount("/public/status", d.StatusPage.Routes())
+		// PUBLIC, unauthenticated: heartbeat ping ingest. The URL token is the
+		// credential; rate-limited per token inside the handler.
+		api.Mount("/ping", d.Heartbeat.Routes())
 
 		api.Mount("/auth", d.Auth.Routes())
 		api.With(d.Authenticator.Require).Get("/me", d.Auth.Me)

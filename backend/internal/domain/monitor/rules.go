@@ -29,11 +29,6 @@ func normalizeAndValidate(t Type, target string, s Settings) (string, Settings, 
 			fmt.Sprintf("monitor type %q is not available yet", t),
 			apperror.FieldError{Field: "type", Message: "unsupported monitor type"})
 	}
-	target = strings.TrimSpace(target)
-	if target == "" {
-		return "", s, apperror.Validation("target is required",
-			apperror.FieldError{Field: "target", Message: "is required"})
-	}
 
 	// Alert sensitivity applies to every monitor type.
 	if s.AlertSensitivity == "" {
@@ -42,6 +37,19 @@ func normalizeAndValidate(t Type, target string, s Settings) (string, Settings, 
 	if !ValidSensitivity(s.AlertSensitivity) {
 		return "", s, apperror.Validation("invalid alert sensitivity",
 			apperror.FieldError{Field: "settings.alert_sensitivity", Message: "must be immediate, balanced or relaxed"})
+	}
+
+	// A heartbeat is push-based: it has no probe target and no per-type probe
+	// settings to validate. We store a fixed, non-secret placeholder target only
+	// because the schema requires a non-empty one; nothing reads it.
+	if t == TypeHeartbeat {
+		return HeartbeatTarget, s, nil
+	}
+
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return "", s, apperror.Validation("target is required",
+			apperror.FieldError{Field: "target", Message: "is required"})
 	}
 
 	switch t {

@@ -119,7 +119,7 @@ time, not at 3 a.m. during an outage.
 
 ---
 
-## F2 — Heartbeat monitors (dead-man's switch)
+## F2 — Heartbeat monitors (dead-man's switch)  ✅ SHIPPED
 
 ### Why
 The one thing black-box probing **structurally cannot do.** A probe says the site

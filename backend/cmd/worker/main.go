@@ -28,6 +28,9 @@ import (
 	"beacon/internal/platform/database"
 	"beacon/internal/platform/logger"
 	"beacon/internal/worker"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"net/http"
 )
 
 func main() {
@@ -91,6 +94,13 @@ func run() error {
 	// Status feedback loop: read probe results from Prometheus back into the DB.
 	statusSync := worker.NewStatusSync(promapi.New(cfg.CtrlPlane.PromQueryURL), monitorRepo)
 
+	// Heartbeat liveness gauge, exported for Prometheus to scrape (job
+	// beacon-worker). Owned by the worker precisely because it must be a single
+	// writer — see worker/heartbeat.go. Served on the worker's own /metrics.
+	metricsReg := prometheus.NewRegistry()
+	heartbeatExporter := worker.NewHeartbeatExporter(monitorRepo, metricsReg)
+	go serveWorkerMetrics(ctx, cfg.Worker.MetricsAddr, metricsReg, log)
+
 	// Periodic maintenance tasks.
 	scheduler := worker.NewScheduler(log,
 		worker.Task{
@@ -103,6 +113,12 @@ func run() error {
 			Name:     "monitor-status-sync",
 			Interval: 30 * time.Second,
 			Run:      statusSync.Run,
+		},
+		worker.Task{
+			Name:       "heartbeat-export",
+			Interval:   15 * time.Second, // faster than status-sync: this drives alerting
+			RunAtStart: true,             // re-seed the gauge from the DB immediately on boot
+			Run:        heartbeatExporter.Run,
 		},
 		worker.Task{
 			Name:     "expired-token-cleanup",
@@ -152,4 +168,24 @@ func connectDBWithRetry(ctx context.Context, cfg config.DB, log *slog.Logger) (*
 		}
 	}
 	return nil, lastErr
+}
+
+// serveWorkerMetrics runs a minimal HTTP server exposing the worker's Prometheus
+// registry at /metrics (plus /healthz). It shuts down when ctx is cancelled.
+func serveWorkerMetrics(ctx context.Context, addr string, reg *prometheus.Registry, log *slog.Logger) {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+	log.Info("worker metrics server listening", slog.String("addr", addr))
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Error("worker metrics server failed", slog.String("error", err.Error()))
+	}
 }

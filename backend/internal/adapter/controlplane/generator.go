@@ -40,6 +40,15 @@ func Generate(cfg GeneratorConfig, monitors []monitor.Monitor) (Artifacts, error
 
 	for i := range monitors {
 		m := &monitors[i]
+
+		// A heartbeat is push-based: Beacon does not probe it, so it produces no
+		// Blackbox module and no scrape job — only its miss-detection rule. Its
+		// liveness comes from a gauge the worker exports (see worker/heartbeat.go).
+		if m.Type == monitor.TypeHeartbeat {
+			rules = append(rules, buildRules(m)...)
+			continue
+		}
+
 		id := sanitizeID(m.ID.String())
 		module := "beacon_" + id
 		job := "mon_" + id
@@ -176,6 +185,28 @@ func ruleLabels(m *monitor.Monitor, severity string) map[string]string {
 // buildRules produces the alerting rules for a monitor: an always-on
 // availability rule plus optional SSL-expiry and slow-response rules.
 func buildRules(m *monitor.Monitor) []alertRule {
+	// A heartbeat has one rule, on a different signal. The gauge
+	// beacon_heartbeat_last_ping_timestamp_seconds is the unix time of the last
+	// ping (exported by the worker from the DB); the alert fires when the time
+	// since that ping exceeds the expected interval plus its grace period. `for:
+	// 0s` because the gauge already encodes the elapsed silence — no additional
+	// dwell is needed.
+	if m.Type == monitor.TypeHeartbeat {
+		threshold := m.IntervalSeconds + m.GraceSeconds
+		return []alertRule{{
+			Alert: "HeartbeatMissed",
+			Expr: fmt.Sprintf(
+				`time() - max by (monitor_id) (beacon_heartbeat_last_ping_timestamp_seconds{monitor_id="%s"}) > %d`,
+				m.ID.String(), threshold),
+			For:    "0s",
+			Labels: ruleLabels(m, "critical"),
+			Annotations: map[string]string{
+				"summary":     fmt.Sprintf("%s has missed its heartbeat", m.Name),
+				"description": fmt.Sprintf("%s expected a ping every %ds (+%ds grace) but none has arrived.", m.Name, m.IntervalSeconds, m.GraceSeconds),
+			},
+		}}
+	}
+
 	sel := fmt.Sprintf(`{monitor_id="%s"}`, m.ID.String())
 	forDur := alertFor(m.Settings.AlertSensitivity, m.IntervalSeconds)
 
