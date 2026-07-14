@@ -145,6 +145,34 @@ func buildScrape(cfg GeneratorConfig, m *monitor.Monitor, module, job, probeTarg
 	}
 }
 
+// ruleLabels builds the label set that EVERY generated rule must carry.
+//
+// org_id is the tenant boundary, and it is the reason this constructor exists.
+// prom-label-proxy filters /api/v1/rules by the tenant label, inspecting the
+// rule's STATIC labels — not the labels of the series its expression happens to
+// match. A rule without org_id is therefore invisible to the very tenant that
+// owns it: Prometheus holds the rule, but the customer's Rules page shows an
+// empty list. That was exactly the bug this replaces (20 rules in Prometheus, 0
+// visible to the tenant).
+//
+// Every rule is built through here specifically so that adding a fourth rule
+// type cannot silently reintroduce it. Do not hand-roll a label map.
+//
+// Note these labels are not *new* on a firing alert: the probe_* series already
+// carry org_id/project_id/monitor_type (see buildScrape), and an alert inherits
+// its expression's labels. Stating them on the rule changes nothing about the
+// alert's identity in Alertmanager — it only makes the rule itself attributable
+// while it is dormant.
+func ruleLabels(m *monitor.Monitor, severity string) map[string]string {
+	return map[string]string{
+		"severity":     severity,
+		"org_id":       m.OrgID.String(),
+		"project_id":   m.ProjectID.String(),
+		"monitor_id":   m.ID.String(),
+		"monitor_type": string(m.Type),
+	}
+}
+
 // buildRules produces the alerting rules for a monitor: an always-on
 // availability rule plus optional SSL-expiry and slow-response rules.
 func buildRules(m *monitor.Monitor) []alertRule {
@@ -152,14 +180,10 @@ func buildRules(m *monitor.Monitor) []alertRule {
 	forDur := alertFor(m.Settings.AlertSensitivity, m.IntervalSeconds)
 
 	rules := []alertRule{{
-		Alert: "MonitorDown",
-		Expr:  "probe_success" + sel + " == 0",
-		For:   forDur,
-		Labels: map[string]string{
-			"severity":     "critical",
-			"monitor_id":   m.ID.String(),
-			"monitor_type": string(m.Type),
-		},
+		Alert:  "MonitorDown",
+		Expr:   "probe_success" + sel + " == 0",
+		For:    forDur,
+		Labels: ruleLabels(m, "critical"),
 		Annotations: map[string]string{
 			"summary":     fmt.Sprintf("%s is down", m.Name),
 			"description": fmt.Sprintf("%s (%s) has failed its health check for more than %s.", m.Name, m.Target, forDur),
@@ -169,13 +193,10 @@ func buildRules(m *monitor.Monitor) []alertRule {
 	if (m.Type == monitor.TypeHTTPS || m.Type == monitor.TypeSSL || strings.HasPrefix(m.Target, "https://")) &&
 		m.Settings.SSLExpiryWarningDays > 0 {
 		rules = append(rules, alertRule{
-			Alert: "SSLCertExpiringSoon",
-			Expr:  fmt.Sprintf("probe_ssl_earliest_cert_expiry%s - time() < %d * 86400", sel, m.Settings.SSLExpiryWarningDays),
-			For:   "10m",
-			Labels: map[string]string{
-				"severity":   "warning",
-				"monitor_id": m.ID.String(),
-			},
+			Alert:  "SSLCertExpiringSoon",
+			Expr:   fmt.Sprintf("probe_ssl_earliest_cert_expiry%s - time() < %d * 86400", sel, m.Settings.SSLExpiryWarningDays),
+			For:    "10m",
+			Labels: ruleLabels(m, "warning"),
 			Annotations: map[string]string{
 				"summary":     fmt.Sprintf("TLS certificate for %s expiring soon", m.Name),
 				"description": fmt.Sprintf("The certificate for %s expires in less than %d days.", m.Target, m.Settings.SSLExpiryWarningDays),
@@ -185,13 +206,10 @@ func buildRules(m *monitor.Monitor) []alertRule {
 
 	if m.Settings.ResponseTimeWarningMS > 0 {
 		rules = append(rules, alertRule{
-			Alert: "SlowResponse",
-			Expr:  fmt.Sprintf("probe_duration_seconds%s > %.3f", sel, float64(m.Settings.ResponseTimeWarningMS)/1000.0),
-			For:   "5m",
-			Labels: map[string]string{
-				"severity":   "warning",
-				"monitor_id": m.ID.String(),
-			},
+			Alert:  "SlowResponse",
+			Expr:   fmt.Sprintf("probe_duration_seconds%s > %.3f", sel, float64(m.Settings.ResponseTimeWarningMS)/1000.0),
+			For:    "5m",
+			Labels: ruleLabels(m, "warning"),
 			Annotations: map[string]string{
 				"summary":     fmt.Sprintf("%s is responding slowly", m.Name),
 				"description": fmt.Sprintf("%s response time has exceeded %dms for 5 minutes.", m.Target, m.Settings.ResponseTimeWarningMS),

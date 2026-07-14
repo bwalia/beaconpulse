@@ -186,3 +186,54 @@ func ruleNames(rf ruleFile) map[string]bool {
 	}
 	return names
 }
+
+// TestEveryRuleCarriesTenantLabels is the regression guard for a bug where the
+// generated alert rules omitted org_id.
+//
+// The failure was invisible in Prometheus (it happily held all 20 rules) and
+// invisible in tests (the rules were structurally valid). It only showed up as
+// an empty Rules page for the customer, because prom-label-proxy filters
+// /api/v1/rules by the rule's STATIC labels — so a rule with no org_id belongs
+// to nobody and is shown to nobody.
+//
+// Asserting across EVERY generated rule (rather than one) is the point: the bug
+// class is "someone adds a fourth rule type and forgets", and only a loop catches
+// that.
+func TestEveryRuleCarriesTenantLabels(t *testing.T) {
+	m := monitor.Monitor{
+		ID:              uuid.New(),
+		OrgID:           uuid.New(),
+		ProjectID:       uuid.New(),
+		Name:            "Checkout",
+		Type:            monitor.TypeHTTPS,
+		Target:          "https://checkout.example.com",
+		IntervalSeconds: 60,
+		TimeoutSeconds:  10,
+		Settings: monitor.Settings{
+			// Turn on the optional rules so all three variants are generated.
+			SSLExpiryWarningDays:  30,
+			ResponseTimeWarningMS: 2000,
+		},
+	}
+
+	rules := buildRules(&m)
+	if len(rules) != 3 {
+		t.Fatalf("expected 3 rules (down + ssl + slow), got %d", len(rules))
+	}
+
+	for _, r := range rules {
+		if got := r.Labels["org_id"]; got != m.OrgID.String() {
+			t.Errorf("rule %q: org_id = %q, want %q — without it the rule is invisible to its own tenant",
+				r.Alert, got, m.OrgID)
+		}
+		if got := r.Labels["monitor_id"]; got != m.ID.String() {
+			t.Errorf("rule %q: monitor_id = %q, want %q", r.Alert, got, m.ID)
+		}
+		if got := r.Labels["project_id"]; got != m.ProjectID.String() {
+			t.Errorf("rule %q: project_id = %q, want %q", r.Alert, got, m.ProjectID)
+		}
+		if r.Labels["severity"] == "" {
+			t.Errorf("rule %q: severity must not be empty", r.Alert)
+		}
+	}
+}
