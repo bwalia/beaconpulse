@@ -23,6 +23,13 @@ function toISO(local: string): string {
   return new Date(local).toISOString();
 }
 
+// toLocalInput renders a Date as the "YYYY-MM-DDTHH:mm" a datetime-local input
+// expects, in the browser's local time (so "Start now" reads as the wall clock).
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function formatRange(startsAt: string, endsAt: string): string {
   const fmt = (iso: string) =>
     new Date(iso).toLocaleString(undefined, {
@@ -32,6 +39,62 @@ function formatRange(startsAt: string, endsAt: string): string {
       minute: "2-digit",
     });
   return `${fmt(startsAt)} → ${fmt(endsAt)}`;
+}
+
+// The viewer's timezone, shown so nobody wonders which clock the times use. Guarded
+// because a rare environment can throw resolving it.
+function localTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "your local time";
+  } catch {
+    return "your local time";
+  }
+}
+
+// HowItWorks is the plain-language explainer at the top of the page. Maintenance is
+// a passive feature — the most common confusion is expecting it to "do" something —
+// so we spell out what it changes and that it runs on its own.
+function HowItWorks() {
+  const steps = [
+    {
+      n: "1",
+      title: "Pick a time and what it covers",
+      body: "Your whole organisation, some projects, or specific monitors.",
+    },
+    {
+      n: "2",
+      title: "While it’s active",
+      body: "Beacon pauses alerts for those monitors and shows “Under maintenance” on your public status page — instead of a red outage.",
+    },
+    {
+      n: "3",
+      title: "It’s automatic",
+      body: "Nothing to switch on or off. It starts and ends on its own; when it ends, alerts resume.",
+    },
+  ];
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+      <div className="flex items-center gap-2">
+        <WrenchIcon className="h-4 w-4 shrink-0 text-blue-700 dark:text-blue-300" />
+        <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">How maintenance windows work</p>
+      </div>
+      <ol className="mt-3 grid gap-3 sm:grid-cols-3">
+        {steps.map((s) => (
+          <li key={s.n} className="flex gap-2.5">
+            <span
+              aria-hidden
+              className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-blue-600 text-xs font-semibold text-white"
+            >
+              {s.n}
+            </span>
+            <p className="text-sm text-blue-900/80 dark:text-blue-100/80">
+              <span className="font-semibold text-blue-900 dark:text-blue-100">{s.title}.</span> {s.body}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 export default function MaintenancePage() {
@@ -45,7 +108,7 @@ export default function MaintenancePage() {
     <div className="space-y-6">
       <PageHeader
         title="Maintenance windows"
-        subtitle="Schedule planned downtime: alerts are suppressed and the status page shows “under maintenance” instead of an outage."
+        subtitle="Planning a deploy or known downtime? Tell Beacon in advance so it doesn’t cry wolf."
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
@@ -53,6 +116,8 @@ export default function MaintenancePage() {
           </Button>
         }
       />
+
+      <HowItWorks />
 
       {notice && (
         <div
@@ -192,6 +257,8 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  const tz = localTimezone();
+
   function toggleId(id: string) {
     setIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
@@ -201,6 +268,22 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
     setIds([]); // ids only meaningful within one scope
     setErrors({});
   }
+
+  // "Start now" one-click fill — the fix for the commonest mistake, scheduling a
+  // window that isn't actually active yet. Defaults the end to one hour out.
+  function fillStartNow() {
+    const now = new Date();
+    setStartsAt(toLocalInput(now));
+    if (!endsAt) setEndsAt(toLocalInput(new Date(now.getTime() + 60 * 60 * 1000)));
+  }
+
+  // Plain-language summary of what this window will cover, shown live in the form.
+  const coverage =
+    scope === "org"
+      ? "every monitor in your organisation"
+      : scope === "project"
+        ? `monitors in ${ids.length || "the selected"} project${ids.length === 1 ? "" : "s"}`
+        : `${ids.length || "the selected"} monitor${ids.length === 1 ? "" : "s"}`;
 
   const longWarning =
     startsAt && endsAt && new Date(endsAt).getTime() - new Date(startsAt).getTime() > LONG_WINDOW_HOURS * 3600_000;
@@ -253,13 +336,27 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
           />
         </Field>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Starts" error={errors.startsAt}>
-            <Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
-          </Field>
-          <Field label="Ends" error={errors.endsAt}>
-            <Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
-          </Field>
+        <div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Starts" error={errors.startsAt}>
+              <Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+            </Field>
+            <Field label="Ends" error={errors.endsAt}>
+              <Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+            </Field>
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Times are in your timezone ({tz}). To take effect right away, start it now.
+            </p>
+            <button
+              type="button"
+              onClick={fillStartNow}
+              className="rounded text-xs font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400"
+            >
+              Start now →
+            </button>
+          </div>
         </div>
 
         {longWarning && (
@@ -313,6 +410,15 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
             empty="No monitors yet."
           />
         )}
+
+        {/* Live plain-language summary, so the person scheduling sees exactly what
+            it will do before they commit. */}
+        <p className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
+          While active, Beacon will <span className="font-medium text-slate-900 dark:text-slate-100">pause alerts</span>{" "}
+          for {coverage} and mark them{" "}
+          <span className="font-medium text-slate-900 dark:text-slate-100">“Under maintenance”</span> on your public
+          status page.
+        </p>
 
         <Button type="submit" disabled={submitting}>
           {submitting ? "Scheduling…" : "Schedule window"}
