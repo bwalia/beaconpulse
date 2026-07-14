@@ -1,13 +1,18 @@
 package rest
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
+
 	"beacon/internal/domain/insight"
+	"beacon/internal/domain/maintenance"
 	"beacon/internal/platform/apperror"
 	"beacon/internal/platform/httpx"
+	"beacon/internal/platform/logger"
 )
 
 // overviewBuckets is the number of samples every window is reduced to. Keeping it
@@ -88,12 +93,14 @@ func (h *InsightHandler) Overview(w http.ResponseWriter, r *http.Request) {
 // and, via the monitor handler, per-monitor metrics). Everything is filtered to
 // the caller's organization so no cross-tenant data is exposed.
 type InsightHandler struct {
-	svc *insight.Service
+	svc   *insight.Service
+	maint *maintenance.Service
 }
 
-// NewInsightHandler builds an InsightHandler.
-func NewInsightHandler(svc *insight.Service) *InsightHandler {
-	return &InsightHandler{svc: svc}
+// NewInsightHandler builds an InsightHandler. maint may be nil, in which case
+// alerts are returned without maintenance annotations.
+func NewInsightHandler(svc *insight.Service, maint *maintenance.Service) *InsightHandler {
+	return &InsightHandler{svc: svc, maint: maint}
 }
 
 type alertResponse struct {
@@ -104,6 +111,9 @@ type alertResponse struct {
 	MonitorType string     `json:"monitor_type"`
 	Target      string     `json:"target"`
 	Since       *time.Time `json:"since,omitempty"`
+	// InMaintenance is true when the alert's monitor is under an active window — its
+	// notification was suppressed, so the UI can label it rather than imply it paged.
+	InMaintenance bool `json:"in_maintenance"`
 }
 
 // ActiveAlerts returns the firing alerts for the caller's organization.
@@ -113,6 +123,17 @@ func (h *InsightHandler) ActiveAlerts(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpx.Error(w, r, err)
 		return
+	}
+	// Batch-resolve which monitors are under maintenance so suppressed alerts can be
+	// labelled. Best-effort: on failure, no labels rather than a failed request.
+	var underMaintenance map[uuid.UUID]bool
+	if h.maint != nil {
+		if m, mErr := h.maint.ActiveMonitorIDs(r.Context(), p.OrgID, time.Now().UTC()); mErr != nil {
+			logger.FromContext(r.Context()).Warn("active alerts: maintenance annotation failed",
+				slog.String("error", mErr.Error()))
+		} else {
+			underMaintenance = m
+		}
 	}
 	out := make([]alertResponse, 0, len(alerts))
 	for _, a := range alerts {
@@ -127,6 +148,11 @@ func (h *InsightHandler) ActiveAlerts(w http.ResponseWriter, r *http.Request) {
 		if !a.Since.IsZero() {
 			since := a.Since
 			ar.Since = &since
+		}
+		if underMaintenance != nil {
+			if id, pErr := uuid.Parse(a.MonitorID); pErr == nil && underMaintenance[id] {
+				ar.InMaintenance = true
+			}
 		}
 		out = append(out, ar)
 	}

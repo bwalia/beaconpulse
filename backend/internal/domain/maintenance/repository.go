@@ -27,4 +27,8 @@ type Repository interface {
 	// given monitor. It resolves the monitor's project internally, so callers need
 	// only the org and monitor ids. This is the suppression hot path.
 	ActiveForMonitor(ctx context.Context, orgID, monitorID uuid.UUID, at time.Time) (bool, error)
+
+	// ActiveMonitorIDs returns the set of monitor ids in the org covered by an active
+	// window at `at` — the batch form used to badge lists without an N+1.
+	ActiveMonitorIDs(ctx context.Context, orgID uuid.UUID, at time.Time) (map[uuid.UUID]bool, error)
 }

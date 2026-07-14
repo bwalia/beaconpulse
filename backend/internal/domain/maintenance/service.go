@@ -158,6 +158,12 @@ func (s *Service) IsSuppressed(ctx context.Context, orgID, monitorID uuid.UUID, 
 	return s.repo.ActiveForMonitor(ctx, orgID, monitorID, at)
 }
 
+// ActiveMonitorIDs returns the set of monitor ids in the org currently under an
+// active window — used to badge the monitor and alert lists in one query.
+func (s *Service) ActiveMonitorIDs(ctx context.Context, orgID uuid.UUID, at time.Time) (map[uuid.UUID]bool, error) {
+	return s.repo.ActiveMonitorIDs(ctx, orgID, at)
+}
+
 func (s *Service) audit(ctx context.Context, actor Actor, action audit.Action, resourceID uuid.UUID, md map[string]any) {
 	org := actor.OrgID
 	uid := actor.UserID

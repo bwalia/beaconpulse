@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -8,9 +9,11 @@ import (
 	"github.com/google/uuid"
 
 	"beacon/internal/domain/insight"
+	"beacon/internal/domain/maintenance"
 	"beacon/internal/domain/monitor"
 	"beacon/internal/platform/apperror"
 	"beacon/internal/platform/httpx"
+	"beacon/internal/platform/logger"
 	"beacon/internal/platform/validate"
 	"beacon/internal/transport/rest/middleware"
 )
@@ -19,13 +22,15 @@ import (
 type MonitorHandler struct {
 	svc       *monitor.Service
 	insight   *insight.Service
+	maint     *maintenance.Service
 	validator *validate.Validator
 	auth      *middleware.Authenticator
 }
 
-// NewMonitorHandler builds a MonitorHandler.
-func NewMonitorHandler(svc *monitor.Service, insightSvc *insight.Service, v *validate.Validator, a *middleware.Authenticator) *MonitorHandler {
-	return &MonitorHandler{svc: svc, insight: insightSvc, validator: v, auth: a}
+// NewMonitorHandler builds a MonitorHandler. maint may be nil, in which case the
+// list is served without maintenance annotations.
+func NewMonitorHandler(svc *monitor.Service, insightSvc *insight.Service, maint *maintenance.Service, v *validate.Validator, a *middleware.Authenticator) *MonitorHandler {
+	return &MonitorHandler{svc: svc, insight: insightSvc, maint: maint, validator: v, auth: a}
 }
 
 // Routes returns the authenticated monitor routes.
@@ -119,6 +124,10 @@ type monitorResponse struct {
 	Settings        monitor.Settings `json:"settings"`
 	LastStatus      string           `json:"last_status"`
 	LastCheckedAt   *time.Time       `json:"last_checked_at,omitempty"`
+	// InMaintenance is true when an active maintenance window covers this monitor.
+	// Set only on the list response (which batch-resolves coverage); other reads
+	// leave it false.
+	InMaintenance bool `json:"in_maintenance"`
 	// Heartbeat-only. PingURL is the capability URL the customer's job pings; it
 	// carries the token, so it is returned only to the authenticated owner.
 	PingURL      string     `json:"ping_url,omitempty"`
@@ -181,7 +190,8 @@ func (h *MonitorHandler) list(w http.ResponseWriter, r *http.Request) {
 		f.Enabled = &v
 	}
 
-	items, total, err := h.svc.List(r.Context(), monitorActor(r), f)
+	actor := monitorActor(r)
+	items, total, err := h.svc.List(r.Context(), actor, f)
 	if err != nil {
 		httpx.Error(w, r, err)
 		return
@@ -190,7 +200,28 @@ func (h *MonitorHandler) list(w http.ResponseWriter, r *http.Request) {
 	for i := range items {
 		out = append(out, presentMonitor(&items[i]))
 	}
+	h.annotateMaintenance(r, actor.OrgID, items, out)
 	httpx.OK(w, newListResponse(out, total, limit, offset))
+}
+
+// annotateMaintenance marks each response row whose monitor is under an active
+// window. Best-effort: one batch query, and a failure degrades to no badges rather
+// than failing the whole list — the chip is informational, not load-bearing.
+func (h *MonitorHandler) annotateMaintenance(r *http.Request, orgID uuid.UUID, items []monitor.Monitor, out []monitorResponse) {
+	if h.maint == nil {
+		return
+	}
+	active, err := h.maint.ActiveMonitorIDs(r.Context(), orgID, time.Now().UTC())
+	if err != nil {
+		logger.FromContext(r.Context()).Warn("monitor list: maintenance annotation failed",
+			slog.String("error", err.Error()))
+		return
+	}
+	for i := range items {
+		if active[items[i].ID] {
+			out[i].InMaintenance = true
+		}
+	}
 }
 
 type usageResponse struct {

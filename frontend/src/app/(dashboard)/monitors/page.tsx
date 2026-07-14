@@ -27,7 +27,7 @@ import {
   StatusBadge,
   Textarea,
 } from "@/components/ui";
-import { ActivityIcon, CheckCircleIcon, PlusIcon, XIcon } from "@/components/icons";
+import { ActivityIcon, CheckCircleIcon, PlusIcon, WrenchIcon, XIcon } from "@/components/icons";
 import type { MetricPoint, Monitor } from "@/lib/types";
 
 const schema = z.object({
@@ -306,7 +306,18 @@ function MonitorRow({
   return (
     <tr className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40">
       <td className="px-4 py-3">
-        <StatusBadge status={monitor.enabled ? monitor.last_status : "paused"} />
+        <div className="flex flex-col items-start gap-1">
+          <StatusBadge status={monitor.enabled ? monitor.last_status : "paused"} />
+          {monitor.in_maintenance && (
+            <span
+              title="Under an active maintenance window — alerts are suppressed"
+              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+            >
+              <WrenchIcon className="h-3 w-3" />
+              Maintenance
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-4 py-3 font-medium">
         <button

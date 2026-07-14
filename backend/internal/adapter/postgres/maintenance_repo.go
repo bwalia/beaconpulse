@@ -162,6 +162,37 @@ func (r *MaintenanceRepository) ActiveForMonitor(ctx context.Context, orgID, mon
 	return exists, nil
 }
 
+// ActiveMonitorIDs returns the set of monitor ids in the org that an active window
+// at `at` covers — the batch form of ActiveForMonitor, so a list can be badged with
+// one query instead of an N+1. The scope predicate matches ActiveForMonitor and the
+// status-page projection exactly.
+func (r *MaintenanceRepository) ActiveMonitorIDs(ctx context.Context, orgID uuid.UUID, at time.Time) (map[uuid.UUID]bool, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT DISTINCT m.id
+		   FROM monitors m
+		   JOIN maintenance_windows w ON w.org_id = m.org_id
+		                             AND w.deleted_at IS NULL
+		                             AND w.starts_at <= $2 AND w.ends_at > $2
+		                             AND ( w.scope = 'org'
+		                                OR (w.scope = 'project' AND m.project_id = ANY(w.scope_ids))
+		                                OR (w.scope = 'monitor' AND m.id = ANY(w.scope_ids)) )
+		  WHERE m.org_id = $1 AND m.deleted_at IS NULL`, orgID, at.UTC())
+	if err != nil {
+		return nil, apperror.Internal(fmt.Errorf("active maintenance monitor ids: %w", err))
+	}
+	defer rows.Close()
+
+	out := make(map[uuid.UUID]bool)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, apperror.Internal(fmt.Errorf("scan active monitor id: %w", err))
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
 func uuidsToStrings(ids []uuid.UUID) []string {
 	out := make([]string, len(ids))
 	for i, id := range ids {

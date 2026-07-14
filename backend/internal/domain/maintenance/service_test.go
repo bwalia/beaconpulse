@@ -20,6 +20,7 @@ type fakeRepo struct {
 	suppErr   error
 	lastAt    time.Time
 	lastMonID uuid.UUID
+	activeSet map[uuid.UUID]bool
 }
 
 func (f *fakeRepo) Create(_ context.Context, w *Window) error { f.created = w; return nil }
@@ -34,6 +35,9 @@ func (f *fakeRepo) SoftDelete(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) 
 func (f *fakeRepo) ActiveForMonitor(_ context.Context, _ uuid.UUID, monitorID uuid.UUID, at time.Time) (bool, error) {
 	f.lastMonID, f.lastAt = monitorID, at
 	return f.suppress, f.suppErr
+}
+func (f *fakeRepo) ActiveMonitorIDs(context.Context, uuid.UUID, time.Time) (map[uuid.UUID]bool, error) {
+	return f.activeSet, nil
 }
 
 type noopRecorder struct{}
@@ -123,5 +127,19 @@ func TestIsSuppressed_PassesThroughToRepo(t *testing.T) {
 	}
 	if repo.lastMonID != mon || !repo.lastAt.Equal(at) {
 		t.Fatalf("repo called with (%v,%v), want (%v,%v)", repo.lastMonID, repo.lastAt, mon, at)
+	}
+}
+
+func TestActiveMonitorIDs_PassesThroughToRepo(t *testing.T) {
+	id := uuid.New()
+	repo := &fakeRepo{activeSet: map[uuid.UUID]bool{id: true}}
+	svc := NewService(repo, noopRecorder{})
+
+	got, err := svc.ActiveMonitorIDs(context.Background(), uuid.New(), time.Now())
+	if err != nil {
+		t.Fatalf("ActiveMonitorIDs() error = %v", err)
+	}
+	if !got[id] {
+		t.Fatal("expected the repo's active set to pass through")
 	}
 }

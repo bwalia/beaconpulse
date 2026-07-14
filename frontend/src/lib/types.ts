@@ -65,6 +65,8 @@ export interface Monitor {
   settings: MonitorSettings;
   last_status: MonitorStatus;
   last_checked_at?: string;
+  /** True when an active maintenance window covers this monitor (list responses). */
+  in_maintenance?: boolean;
   /** Heartbeat-only: the capability URL the customer's job pings (owner-only). */
   ping_url?: string;
   grace_seconds?: number;
@@ -95,6 +97,8 @@ export interface ActiveAlert {
   monitor_type: string;
   target: string;
   since?: string;
+  /** The alert's monitor is under an active window, so its notification was suppressed. */
+  in_maintenance?: boolean;
 }
 
 export interface MetricPoint {

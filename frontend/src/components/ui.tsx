@@ -213,7 +213,6 @@ const statusStyles: Record<string, string> = {
   down: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
   degraded: "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200",
   paused: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  under_maintenance: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
   unknown: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
