@@ -40,6 +40,8 @@ import {
 const SLO_PERCENT = 99;
 /** Matches `overviewBuckets` in the Go handler: the API reduces every window to this many samples. */
 const SLOT_COUNT = 48;
+// The dashboard shows only the worst few monitors; the rest live on /monitors.
+const DASHBOARD_MONITOR_CAP = 8;
 
 export default function DashboardPage() {
   const [hours, setHours] = useState<RangeHours>(24);
@@ -53,6 +55,8 @@ export default function DashboardPage() {
   const up = enabled.filter((m) => m.last_status === "up").length;
   const downMonitors = enabled.filter((m) => m.last_status === "down");
   const activeAlerts = alerts?.data ?? [];
+  // The endpoint paginates now; the true firing count lives in pagination.total.
+  const activeAlertCount = alerts?.pagination.total ?? activeAlerts.length;
 
   const histById = new Map<string, MonitorUptime>();
   (overview?.monitors ?? []).forEach((m) => histById.set(m.monitor_id, m));
@@ -84,7 +88,7 @@ export default function DashboardPage() {
         total={enabled.length}
         up={up}
         downNames={downMonitors.map((m) => m.name)}
-        alertCount={activeAlerts.length}
+        alertCount={activeAlertCount}
       />
 
       {/* Stat tiles. The number wears a text token; the rail, dot and delta chip
@@ -125,9 +129,9 @@ export default function DashboardPage() {
         />
         <StatTile
           label="Active alerts"
-          value={activeAlerts.length}
-          sub={activeAlerts.length ? "needs attention" : "none firing"}
-          tone={activeAlerts.length ? "critical" : "good"}
+          value={activeAlertCount}
+          sub={activeAlertCount ? "needs attention" : "none firing"}
+          tone={activeAlertCount ? "critical" : "good"}
         />
       </div>
 
@@ -175,11 +179,26 @@ export default function DashboardPage() {
             .
           </EmptyCard>
         ) : (
-          <div className="grid gap-2.5">
-            {triaged.map((m) => (
-              <MonitorRow key={m.id} monitor={m} hist={histById.get(m.id)} winShort={winShort} />
-            ))}
-          </div>
+          <>
+            {/* The dashboard is a summary, not the full list — show the worst few and
+                link out. Otherwise 100+ monitors would bury everything below them. */}
+            <div className="grid gap-2.5">
+              {triaged.slice(0, DASHBOARD_MONITOR_CAP).map((m) => (
+                <MonitorRow key={m.id} monitor={m} hist={histById.get(m.id)} winShort={winShort} />
+              ))}
+            </div>
+            {list.length > DASHBOARD_MONITOR_CAP && (
+              <div className="mt-3 flex justify-center">
+                <Link
+                  href="/monitors"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:bg-brand-900/20"
+                >
+                  View all {list.length} monitors
+                  <ArrowRightIcon className="h-4 w-4" />
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -189,7 +208,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold">Active alerts</h2>
           <NavLink href="/alerts">View all</NavLink>
         </div>
-        {activeAlerts.length === 0 ? (
+        {activeAlertCount === 0 ? (
           <EmptyCard>
             <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
               <CheckCircleIcon className="h-4 w-4" />

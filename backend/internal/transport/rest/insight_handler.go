@@ -3,6 +3,7 @@ package rest
 import (
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -116,9 +117,15 @@ type alertResponse struct {
 	InMaintenance bool `json:"in_maintenance"`
 }
 
-// ActiveAlerts returns the firing alerts for the caller's organization.
+// ActiveAlerts returns the firing alerts for the caller's organization. Filtering
+// (by severity) and pagination happen server-side: the alerts come from Prometheus
+// in one read, then the handler sorts (critical first), filters, and slices — so a
+// large incident doesn't ship hundreds of rows to the browser at once.
 func (h *InsightHandler) ActiveAlerts(w http.ResponseWriter, r *http.Request) {
 	p := mustPrincipal(r)
+	limit, offset := paginationParams(r, 20, 200)
+	severity := r.URL.Query().Get("severity")
+
 	alerts, err := h.svc.ActiveAlerts(r.Context(), p.OrgID)
 	if err != nil {
 		httpx.Error(w, r, err)
@@ -135,8 +142,12 @@ func (h *InsightHandler) ActiveAlerts(w http.ResponseWriter, r *http.Request) {
 			underMaintenance = m
 		}
 	}
-	out := make([]alertResponse, 0, len(alerts))
+
+	all := make([]alertResponse, 0, len(alerts))
 	for _, a := range alerts {
+		if severity != "" && a.Severity != severity {
+			continue
+		}
 		ar := alertResponse{
 			Name:        a.Name,
 			Severity:    a.Severity,
@@ -154,7 +165,26 @@ func (h *InsightHandler) ActiveAlerts(w http.ResponseWriter, r *http.Request) {
 				ar.InMaintenance = true
 			}
 		}
-		out = append(out, ar)
+		all = append(all, ar)
 	}
-	httpx.OK(w, map[string]any{"data": out})
+
+	// Stable, meaningful order so pages don't reshuffle: critical first, then name.
+	sort.SliceStable(all, func(i, j int) bool {
+		ci, cj := all[i].Severity == "critical", all[j].Severity == "critical"
+		if ci != cj {
+			return ci
+		}
+		return all[i].Name < all[j].Name
+	})
+
+	total := len(all)
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	httpx.OK(w, newListResponse(all[start:end], total, limit, offset))
 }

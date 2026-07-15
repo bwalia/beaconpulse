@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -86,11 +87,29 @@ func (r *NotificationRepository) GetByID(ctx context.Context, orgID, id uuid.UUI
 	return c, nil
 }
 
-// List returns the org's channels, newest first.
-func (r *NotificationRepository) List(ctx context.Context, orgID uuid.UUID) ([]notification.Channel, error) {
-	return r.query(ctx,
-		`SELECT `+channelColumns+` FROM notification_channels
-		 WHERE org_id=$1 AND deleted_at IS NULL ORDER BY created_at DESC`, orgID)
+// List returns a filtered, paginated page of the org's channels (newest first)
+// plus the total count.
+func (r *NotificationRepository) List(ctx context.Context, orgID uuid.UUID, f notification.ListFilter) ([]notification.Channel, int, error) {
+	where := []string{"org_id = $1", "deleted_at IS NULL"}
+	args := []any{orgID}
+	n := 1
+	if f.Search != "" {
+		n++
+		where = append(where, fmt.Sprintf("name ILIKE $%d", n))
+		args = append(args, "%"+f.Search+"%")
+	}
+	clause := strings.Join(where, " AND ")
+
+	var total int
+	if err := r.pool.QueryRow(ctx, `SELECT count(*) FROM notification_channels WHERE `+clause, args...).Scan(&total); err != nil {
+		return nil, 0, apperror.Internal(fmt.Errorf("count channels: %w", err))
+	}
+
+	args = append(args, f.Limit, f.Offset)
+	q := fmt.Sprintf(`SELECT %s FROM notification_channels WHERE %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d`,
+		channelColumns, clause, n+1, n+2)
+	items, err := r.query(ctx, q, args...)
+	return items, total, err
 }
 
 // ListEnabledByOrg returns the enabled channels for one org.

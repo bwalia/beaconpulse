@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 import {
   useChannels,
@@ -9,11 +10,15 @@ import {
   useSetChannelEnabled,
   useTestChannel,
 } from "@/lib/hooks";
+import { Pagination, SearchInput } from "@/components/table-controls";
+import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
+
+const NOTIFICATIONS_PAGE_SIZE = 20;
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton } from "@/components/ui";
 import { useConfirm } from "@/components/confirm";
 import type { NotificationChannel } from "@/lib/types";
-import { BellIcon, LockIcon, PlusIcon, XIcon } from "@/components/icons";
+import { BellIcon, LockIcon, PlusIcon, SearchIcon, XIcon } from "@/components/icons";
 import {
   CHANNEL_TYPES,
   channelTypeDef,
@@ -24,9 +29,30 @@ import {
 type Notice = { kind: "ok" | "err"; text: string } | null;
 
 export default function NotificationsPage() {
-  const { data, isLoading } = useChannels();
+  const [page, setPage] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const reveal = useRevealVariants();
+  const stagger = useStaggerVariants(0.05);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+  useEffect(() => {
+    setPage(0);
+  }, [search]);
+
+  const { data, isLoading, isPlaceholderData } = useChannels({
+    page,
+    pageSize: NOTIFICATIONS_PAGE_SIZE,
+    search: search || undefined,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.pagination.total ?? 0;
+  const filtering = search !== "";
 
   return (
     <div className="space-y-6">
@@ -56,32 +82,66 @@ export default function NotificationsPage() {
 
       {showForm && <CreateChannelForm onDone={() => setShowForm(false)} setNotice={setNotice} />}
 
+      {(total > 0 || filtering) && !isLoading && (
+        <SearchInput
+          value={searchInput}
+          onChange={setSearchInput}
+          placeholder="Search channels by name…"
+          label="Search notification channels"
+        />
+      )}
+
       {isLoading ? (
         <div className="space-y-3">
           {[0, 1].map((i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
-      ) : !data?.data.length ? (
+      ) : total === 0 ? (
         <EmptyState
-          icon={<BellIcon className="h-5 w-5" />}
-          title="No channels yet"
+          icon={filtering ? <SearchIcon className="h-5 w-5" /> : <BellIcon className="h-5 w-5" />}
+          title={filtering ? "No matching channels" : "No channels yet"}
           action={
-            <Button onClick={() => setShowForm(true)}>
-              <PlusIcon className="h-4 w-4" />
-              Add channel
-            </Button>
+            filtering ? (
+              <Button variant="secondary" onClick={() => setSearchInput("")}>
+                Clear search
+              </Button>
+            ) : (
+              <Button onClick={() => setShowForm(true)}>
+                <PlusIcon className="h-4 w-4" />
+                Add channel
+              </Button>
+            )
           }
         >
-          Connect Slack, email, a webhook or Telegram and Beacon Pulse will alert you the moment a monitor
-          goes down — enriched with AI triage when enabled.
+          {filtering
+            ? "No notification channels match your search."
+            : "Connect Slack, email, a webhook or Telegram and Beacon Pulse will alert you the moment a monitor goes down — enriched with AI triage when enabled."}
         </EmptyState>
       ) : (
-        <div className="space-y-3">
-          {data.data.map((c) => (
-            <ChannelRow key={c.id} channel={c} setNotice={setNotice} />
-          ))}
-        </div>
+        <>
+          <motion.div
+            key={page}
+            initial="hidden"
+            animate="show"
+            variants={stagger}
+            className={`space-y-3 ${isPlaceholderData ? "opacity-60 transition-opacity" : "transition-opacity"}`}
+          >
+            {rows.map((c) => (
+              <motion.div key={c.id} variants={reveal}>
+                <ChannelRow channel={c} setNotice={setNotice} />
+              </motion.div>
+            ))}
+          </motion.div>
+          <Pagination
+            page={page}
+            pageSize={NOTIFICATIONS_PAGE_SIZE}
+            total={total}
+            unit="channels"
+            busy={isPlaceholderData}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </div>
   );
@@ -102,29 +162,34 @@ function ChannelRow({
   const def = channelTypeDef(channel.type);
 
   return (
-    <Card className="flex flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{channel.name}</span>
-          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs uppercase text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-            {def?.label ?? channel.type}
-          </span>
-          {!channel.enabled && (
-            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-              paused
+    <Card
+      className={`border-l-4 transition-shadow hover:shadow-md motion-reduce:transition-none ${
+        channel.enabled ? "border-l-brand-500" : "border-l-slate-300 dark:border-l-slate-700"
+      }`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-900 dark:text-white">{channel.name}</span>
+            <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
+              {def?.label ?? channel.type}
             </span>
-          )}
+            {!channel.enabled && (
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                paused
+              </span>
+            )}
+          </div>
+          <p className="mt-1 inline-flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+            <span className="truncate font-mono">{def?.summary(channel) ?? channel.type}</span>
+            {channel.has_secret && (
+              <span className="inline-flex shrink-0 items-center gap-1">
+                · secret <LockIcon className="h-3 w-3" />
+              </span>
+            )}
+          </p>
         </div>
-        <p className="mt-0.5 inline-flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
-          <span className="truncate font-mono">{def?.summary(channel) ?? channel.type}</span>
-          {channel.has_secret && (
-            <span className="inline-flex shrink-0 items-center gap-1">
-              · secret <LockIcon className="h-3 w-3" />
-            </span>
-          )}
-        </p>
-      </div>
-      <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
         <Button
           variant="secondary"
           disabled={test.isPending}
@@ -164,6 +229,7 @@ function ChannelRow({
         >
           Delete
         </Button>
+        </div>
       </div>
     </Card>
   );

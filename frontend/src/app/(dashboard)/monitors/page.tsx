@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,7 +9,7 @@ import {
   useCreateMonitor,
   useDeleteMonitor,
   useMonitorMetrics,
-  useMonitors,
+  useMonitorsPage,
   useProjects,
   useSetMonitorEnabled,
   useUpdateMonitor,
@@ -27,9 +28,13 @@ import {
   StatusBadge,
   Textarea,
 } from "@/components/ui";
-import { ActivityIcon, CheckCircleIcon, PlusIcon, WrenchIcon, XIcon } from "@/components/icons";
+import { ActivityIcon, CheckCircleIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
 import { useConfirm } from "@/components/confirm";
+import { Pagination, SearchInput } from "@/components/table-controls";
+import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import type { MetricPoint, Monitor } from "@/lib/types";
+
+const PAGE_SIZE = 20;
 
 const schema = z.object({
   project_id: z.string().uuid("Select a project"),
@@ -181,11 +186,37 @@ function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () =>
 }
 
 export default function MonitorsPage() {
-  const { data, isLoading } = useMonitors();
+  const [page, setPage] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+
+  // Debounce the search box so we don't refetch on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+  // Any filter change returns to the first page — otherwise you could sit on an
+  // out-of-range page showing nothing.
+  useEffect(() => {
+    setPage(0);
+  }, [search, status]);
+
+  const { data, isLoading, isPlaceholderData } = useMonitorsPage({
+    page,
+    pageSize: PAGE_SIZE,
+    search: search || undefined,
+    status: status || undefined,
+  });
   const { data: usage } = useUsage();
   const [showForm, setShowForm] = useState(false);
   const [metricsFor, setMetricsFor] = useState<Monitor | null>(null);
   const [editing, setEditing] = useState<Monitor | null>(null);
+
+  const rows = data?.data ?? [];
+  const total = data?.pagination.total ?? 0;
+  const filtering = search !== "" || status !== "";
+  const stagger = useStaggerVariants(0.03);
 
   const atLimit = usage ? usage.monitors_used >= usage.monitors_limit : false;
   const pct = usage ? Math.min(100, Math.round((usage.monitors_used / usage.monitors_limit) * 100)) : 0;
@@ -239,6 +270,31 @@ export default function MonitorsPage() {
 
       {showForm && <CreateMonitorForm onDone={() => setShowForm(false)} />}
 
+      {/* Toolbar: server-side search + status filter. */}
+      {(total > 0 || filtering) && !isLoading && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <SearchInput
+            value={searchInput}
+            onChange={setSearchInput}
+            placeholder="Search by name or target…"
+            label="Search monitors"
+          />
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            aria-label="Filter by status"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-44"
+          >
+            <option value="">All statuses</option>
+            <option value="up">Up</option>
+            <option value="down">Down</option>
+            <option value="degraded">Degraded</option>
+            <option value="paused">Paused</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-2">
           <Skeleton className="h-11 w-full rounded-t-xl" />
@@ -246,44 +302,75 @@ export default function MonitorsPage() {
             <Skeleton key={i} className="h-14 w-full" />
           ))}
         </div>
-      ) : !data?.data.length ? (
+      ) : total === 0 ? (
         <EmptyState
-          icon={<ActivityIcon className="h-5 w-5" />}
-          title="No monitors yet"
+          icon={filtering ? <SearchIcon className="h-5 w-5" /> : <ActivityIcon className="h-5 w-5" />}
+          title={filtering ? "No matching monitors" : "No monitors yet"}
           action={
-            <Button onClick={() => setShowForm(true)}>
-              <PlusIcon className="h-4 w-4" />
-              Add monitor
-            </Button>
+            filtering ? (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSearchInput("");
+                  setStatus("");
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : (
+              <Button onClick={() => setShowForm(true)}>
+                <PlusIcon className="h-4 w-4" />
+                Add monitor
+              </Button>
+            )
           }
         >
-          Add your first website, API or port and Beacon Pulse starts probing it within seconds.
+          {filtering
+            ? "No monitors match your search or filter. Try a different term."
+            : "Add your first website, API or port and Beacon Pulse starts probing it within seconds."}
         </EmptyState>
       ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50/80 text-left text-xs uppercase tracking-wide text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-semibold">Status</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Name</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Type</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Target</th>
-                <th scope="col" className="px-4 py-3 font-semibold">Interval</th>
-                <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.data.map((m) => (
-                <MonitorRow
-                  key={m.id}
-                  monitor={m}
-                  onMetrics={() => setMetricsFor(m)}
-                  onEdit={() => setEditing(m)}
-                />
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <>
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full text-[15px]">
+              <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+                <tr>
+                  <th scope="col" className="px-4 py-3 font-semibold">Status</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Name</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Type</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Target</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Interval</th>
+                  <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <motion.tbody
+                key={page}
+                initial="hidden"
+                animate="show"
+                variants={stagger}
+                className={isPlaceholderData ? "opacity-60 transition-opacity duration-200" : "transition-opacity duration-200"}
+              >
+                {rows.map((m) => (
+                  <MonitorRow
+                    key={m.id}
+                    monitor={m}
+                    onMetrics={() => setMetricsFor(m)}
+                    onEdit={() => setEditing(m)}
+                  />
+                ))}
+              </motion.tbody>
+            </table>
+          </Card>
+
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={total}
+            unit="monitors"
+            busy={isPlaceholderData}
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       {metricsFor && <MonitorMetricsModal monitor={metricsFor} onClose={() => setMetricsFor(null)} />}
@@ -304,10 +391,17 @@ function MonitorRow({
   const setEnabled = useSetMonitorEnabled();
   const deleteMonitor = useDeleteMonitor();
   const confirm = useConfirm();
+  const reveal = useRevealVariants();
+
+  const target =
+    monitor.type === "heartbeat" && monitor.ping_url ? monitor.ping_url : monitor.target;
 
   return (
-    <tr className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40">
-      <td className="px-4 py-3">
+    <motion.tr
+      variants={reveal}
+      className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40"
+    >
+      <td className="px-4 py-3.5 align-top">
         <div className="flex flex-col items-start gap-1">
           <StatusBadge status={monitor.enabled ? monitor.last_status : "paused"} />
           {monitor.in_maintenance && (
@@ -321,25 +415,31 @@ function MonitorRow({
           )}
         </div>
       </td>
-      <td className="px-4 py-3 font-medium">
+      <td className="px-4 py-3.5">
         <button
           onClick={onMetrics}
-          className="rounded text-left hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:text-brand-400"
+          className="rounded text-left font-medium text-slate-900 hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-white dark:hover:text-brand-400"
         >
           {monitor.name}
         </button>
       </td>
-      <td className="px-4 py-3 uppercase text-slate-500 dark:text-slate-400">{monitor.type}</td>
-      <td className="max-w-[32rem] truncate px-4 py-3 font-mono text-sm text-slate-500 dark:text-slate-400">
-        {/* A heartbeat has no probe target; show its ping URL instead, so the
-            owner can retrieve it any time. */}
-        {monitor.type === "heartbeat" && monitor.ping_url ? (
-          <span title="Ping URL — call this from your job">{monitor.ping_url}</span>
-        ) : (
-          monitor.target
-        )}
+      <td className="px-4 py-3.5">
+        <span className="inline-block rounded border border-slate-200 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          {monitor.type}
+        </span>
       </td>
-      <td className="px-4 py-3 tabular-nums text-slate-500 dark:text-slate-400">{monitor.interval_seconds}s</td>
+      <td className="px-4 py-3.5">
+        {/* A heartbeat has no probe target; show its ping URL instead, so the
+            owner can retrieve it any time. Truncate long values with the full
+            string on hover. */}
+        <span
+          title={target}
+          className="block max-w-[22rem] truncate font-mono text-sm text-slate-700 dark:text-slate-300 lg:max-w-[32rem]"
+        >
+          {target}
+        </span>
+      </td>
+      <td className="px-4 py-3.5 tabular-nums text-slate-700 dark:text-slate-300">{monitor.interval_seconds}s</td>
       <td className="px-4 py-3">
         {/* Safe actions recede; the destructive one keeps its danger colour but is
             separated and de-emphasised, so `Delete` isn't the loudest thing on the
@@ -382,7 +482,7 @@ function MonitorRow({
           </Button>
         </div>
       </td>
-    </tr>
+    </motion.tr>
   );
 }
 

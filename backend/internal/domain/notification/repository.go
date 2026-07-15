@@ -6,11 +6,18 @@ import (
 	"github.com/google/uuid"
 )
 
+// ListFilter narrows and paginates a channel listing.
+type ListFilter struct {
+	Search string
+	Limit  int
+	Offset int
+}
+
 // Repository persists notification channels, org-scoped.
 type Repository interface {
 	Create(ctx context.Context, c *Channel) error
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (*Channel, error)
-	List(ctx context.Context, orgID uuid.UUID) ([]Channel, error)
+	List(ctx context.Context, orgID uuid.UUID, f ListFilter) (items []Channel, total int, err error)
 	Update(ctx context.Context, c *Channel) error
 	SoftDelete(ctx context.Context, orgID, id, deletedBy uuid.UUID) error
 	// ListEnabledByOrg returns the enabled channels for one org, used when

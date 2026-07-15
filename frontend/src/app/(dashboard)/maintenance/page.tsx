@@ -13,10 +13,13 @@ import {
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton, Textarea } from "@/components/ui";
 import { useConfirm } from "@/components/confirm";
+import { Pagination } from "@/components/table-controls";
 import { PlusIcon, WrenchIcon, XIcon } from "@/components/icons";
 import type { MaintenanceScope, MaintenanceWindow } from "@/lib/types";
 
 type Notice = { kind: "ok" | "err"; text: string } | null;
+
+const MAINTENANCE_PAGE_SIZE = 20;
 
 // The status page and alerting both key off the server clock, so windows are
 // entered in the operator's local time and converted to an absolute instant here.
@@ -99,11 +102,16 @@ function HowItWorks() {
 }
 
 export default function MaintenancePage() {
-  const { data, isLoading } = useMaintenanceWindows();
+  const [page, setPage] = useState(0);
+  const { data, isLoading, isPlaceholderData } = useMaintenanceWindows({
+    page,
+    pageSize: MAINTENANCE_PAGE_SIZE,
+  });
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
   const windows = data?.data ?? [];
+  const total = data?.pagination.total ?? 0;
 
   return (
     <div className="space-y-6">
@@ -156,11 +164,21 @@ export default function MaintenancePage() {
           public status page shows planned work rather than a red “major outage”.
         </EmptyState>
       ) : (
-        <div className="space-y-3">
-          {windows.map((w) => (
-            <WindowRow key={w.id} window={w} setNotice={setNotice} />
-          ))}
-        </div>
+        <>
+          <div className={`space-y-3 ${isPlaceholderData ? "opacity-60 transition-opacity" : "transition-opacity"}`}>
+            {windows.map((w) => (
+              <WindowRow key={w.id} window={w} setNotice={setNotice} />
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            pageSize={MAINTENANCE_PAGE_SIZE}
+            total={total}
+            unit="windows"
+            busy={isPlaceholderData}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </div>
   );

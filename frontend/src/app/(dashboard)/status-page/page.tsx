@@ -11,15 +11,18 @@ import {
   GlobeIcon,
   LockIcon,
 } from "@/components/icons";
-import { Button, Card, Field, Label, PageHeader, Skeleton } from "@/components/ui";
+import { Button, Card, Label, PageHeader, Skeleton } from "@/components/ui";
+import { Pagination, SearchInput } from "@/components/table-controls";
 import { ApiRequestError } from "@/lib/api";
 import {
-  useMonitors,
+  useMonitorsPage,
   useSetMonitorPublic,
   useStatusPageSettings,
   useUpdateStatusPageSettings,
 } from "@/lib/hooks";
 import { DUR, useRevealVariants, useStaggerVariants } from "@/lib/motion";
+
+const DOMAINS_PAGE_SIZE = 10;
 
 /**
  * Owner controls for the public status page.
@@ -31,9 +34,24 @@ import { DUR, useRevealVariants, useStaggerVariants } from "@/lib/motion";
  */
 export default function StatusPageSettings() {
   const { data: settings, isLoading } = useStatusPageSettings();
-  const { data: monitors } = useMonitors();
   const update = useUpdateStatusPageSettings();
   const setPublic = useSetMonitorPublic();
+
+  const [domainPage, setDomainPage] = useState(0);
+  const [domainSearchInput, setDomainSearchInput] = useState("");
+  const [domainSearch, setDomainSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDomainSearch(domainSearchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [domainSearchInput]);
+  useEffect(() => {
+    setDomainPage(0);
+  }, [domainSearch]);
+  const { data: monitors, isPlaceholderData: monitorsBusy } = useMonitorsPage({
+    page: domainPage,
+    pageSize: DOMAINS_PAGE_SIZE,
+    search: domainSearch || undefined,
+  });
 
   const [title, setTitle] = useState("");
   // null until the user edits, so the field shows the saved custom slug first and an
@@ -59,8 +77,13 @@ export default function StatusPageSettings() {
     );
   }
 
-  const published = monitors?.data?.filter((m) => m.public) ?? [];
-  const enabledButEmpty = settings.enabled && published.length === 0;
+  // The authoritative published count comes from the settings API (org-wide), not
+  // the current monitor page — so the "enabled but empty" warning is correct even
+  // when the list below is paginated or filtered.
+  const monitorRows = monitors?.data ?? [];
+  const monitorTotal = monitors?.pagination.total ?? 0;
+  const domainSearching = domainSearch !== "";
+  const enabledButEmpty = settings.enabled && settings.published_count === 0;
 
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
@@ -72,8 +95,8 @@ export default function StatusPageSettings() {
       {/* ---- Publish switch ---- */}
       <motion.div variants={reveal}>
         <Card className="p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 gap-4">
               <span
                 className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
                   settings.enabled ? "bg-emerald-600/10" : "bg-slate-500/10"
@@ -99,10 +122,10 @@ export default function StatusPageSettings() {
                   <Link
                     href={settings.url}
                     target="_blank"
-                    className="group mt-3 inline-flex items-center gap-2 rounded-lg font-mono text-sm text-blue-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-blue-400"
+                    className="group mt-3 inline-flex max-w-full items-center gap-2 rounded-lg font-mono text-sm text-blue-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-blue-400"
                   >
-                    {settings.url}
-                    <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
+                    <span className="break-all">{settings.url}</span>
+                    <ArrowRightIcon className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
                   </Link>
                 )}
               </div>
@@ -113,6 +136,7 @@ export default function StatusPageSettings() {
               disabled={update.isPending}
               onClick={() => update.mutate({ enabled: !settings.enabled })}
               style={{ transitionDuration: `${DUR.micro}s` }}
+              className="w-full shrink-0 sm:w-auto"
             >
               {update.isPending
                 ? "Saving…"
@@ -160,12 +184,14 @@ export default function StatusPageSettings() {
                 },
               );
             }}
-            className="mt-4 flex flex-wrap items-end gap-3"
+            className="mt-4"
           >
-            <div className="min-w-[18rem] flex-1">
-              <Label>Custom URL</Label>
+            <Label htmlFor="status-slug">Custom URL</Label>
+            {/* Label on top, [input + buttons] in one stretch row (so they share a
+                height and align), hint below. Stacks full-width on mobile. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
               <div
-                className={`flex items-stretch overflow-hidden rounded-lg border bg-white focus-within:ring-2 focus-within:ring-blue-600 dark:bg-slate-900 ${
+                className={`flex min-w-0 flex-1 items-stretch overflow-hidden rounded-lg border bg-white focus-within:ring-2 focus-within:ring-blue-600 dark:bg-slate-900 ${
                   slugError ? "border-red-500" : "border-slate-300 dark:border-slate-700"
                 }`}
               >
@@ -173,6 +199,7 @@ export default function StatusPageSettings() {
                   /status/
                 </span>
                 <input
+                  id="status-slug"
                   value={slug ?? settings.custom_slug}
                   maxLength={63}
                   onChange={(e) => {
@@ -181,35 +208,43 @@ export default function StatusPageSettings() {
                   }}
                   placeholder={settings.org_slug}
                   aria-invalid={slugError ? true : undefined}
-                  className="w-full bg-transparent px-3 py-2.5 font-mono text-base text-slate-900 focus:outline-none dark:text-white"
+                  className="w-full min-w-0 bg-transparent px-3 py-2.5 font-mono text-base text-slate-900 focus:outline-none dark:text-white"
                 />
               </div>
-              {slugError ? (
-                <p role="alert" className="mt-1 text-xs font-medium text-red-700 dark:text-red-400">
-                  {slugError}
-                </p>
-              ) : (
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Leave blank to use the default: <span className="font-mono">/status/{settings.org_slug}</span>
-                </p>
-              )}
+              <div className="flex gap-3">
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  disabled={update.isPending}
+                  className="flex-1 sm:flex-none"
+                >
+                  Save address
+                </Button>
+                {settings.custom_slug && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={update.isPending}
+                    className="flex-1 sm:flex-none"
+                    onClick={() => {
+                      setSlug("");
+                      setSlugError(null);
+                      update.mutate({ slug: "" });
+                    }}
+                  >
+                    Reset to default
+                  </Button>
+                )}
+              </div>
             </div>
-            <Button type="submit" variant="secondary" disabled={update.isPending}>
-              Save address
-            </Button>
-            {settings.custom_slug && (
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={update.isPending}
-                onClick={() => {
-                  setSlug("");
-                  setSlugError(null);
-                  update.mutate({ slug: "" });
-                }}
-              >
-                Reset to default
-              </Button>
+            {slugError ? (
+              <p role="alert" className="mt-1.5 text-xs font-medium text-red-700 dark:text-red-400">
+                {slugError}
+              </p>
+            ) : (
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                Leave blank to use the default: <span className="font-mono">/status/{settings.org_slug}</span>
+              </p>
             )}
           </form>
         </Card>
@@ -223,25 +258,24 @@ export default function StatusPageSettings() {
               e.preventDefault();
               update.mutate({ title });
             }}
-            className="flex flex-wrap items-end gap-4"
           >
-            <div className="min-w-[16rem] flex-1">
-              <Field
-                label="Public heading"
-                hint={`Shown at the top of the page. Leave blank to use “${settings.org_name}”.`}
-              >
-                <input
-                  value={title}
-                  maxLength={120}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder={settings.org_name}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                />
-              </Field>
+            <Label htmlFor="status-heading">Public heading</Label>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+              <input
+                id="status-heading"
+                value={title}
+                maxLength={120}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={settings.org_name}
+                className="w-full min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              />
+              <Button type="submit" variant="secondary" disabled={update.isPending} className="sm:flex-none">
+                Save heading
+              </Button>
             </div>
-            <Button type="submit" variant="secondary" disabled={update.isPending}>
-              Save heading
-            </Button>
+            <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+              Shown at the top of the page. Leave blank to use “{settings.org_name}”.
+            </p>
           </form>
         </Card>
       </motion.div>
@@ -249,7 +283,7 @@ export default function StatusPageSettings() {
       {/* ---- Which domains are public ---- */}
       <motion.div variants={reveal}>
         <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-6 py-4 dark:border-slate-800">
             <div>
               <h2 className="font-semibold text-slate-900 dark:text-white">Published domains</h2>
               <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
@@ -257,13 +291,26 @@ export default function StatusPageSettings() {
                 configuration.
               </p>
             </div>
-            <span className="shrink-0 font-mono text-sm tabular-nums text-slate-500 dark:text-slate-400">
-              {published.length}/{monitors?.data?.length ?? 0}
+            <span className="shrink-0 font-mono text-sm tabular-nums text-slate-600 dark:text-slate-300">
+              {settings.published_count} of {monitorTotal} public
             </span>
           </div>
 
-          <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-            {(monitors?.data ?? []).map((m) => (
+          {(monitorTotal > 0 || domainSearching) && (
+            <div className="border-b border-slate-200 px-6 py-3 dark:border-slate-800">
+              <SearchInput
+                value={domainSearchInput}
+                onChange={setDomainSearchInput}
+                placeholder="Search monitors…"
+                label="Search monitors to publish"
+              />
+            </div>
+          )}
+
+          <ul
+            className={`divide-y divide-slate-200 dark:divide-slate-800 ${monitorsBusy ? "opacity-60 transition-opacity" : "transition-opacity"}`}
+          >
+            {monitorRows.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-4 px-6 py-4">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900 dark:text-white">{m.name}</p>
@@ -291,10 +338,25 @@ export default function StatusPageSettings() {
             ))}
           </ul>
 
-          {(monitors?.data?.length ?? 0) === 0 && (
+          {monitorTotal === 0 && (
             <p className="px-6 py-10 text-center text-slate-500 dark:text-slate-400">
-              No monitors yet. Add one and it will appear here, private by default.
+              {domainSearching
+                ? "No monitors match your search."
+                : "No monitors yet. Add one and it will appear here, private by default."}
             </p>
+          )}
+
+          {monitorTotal > 0 && (
+            <div className="border-t border-slate-200 px-6 py-3 dark:border-slate-800">
+              <Pagination
+                page={domainPage}
+                pageSize={DOMAINS_PAGE_SIZE}
+                total={monitorTotal}
+                unit="monitors"
+                busy={monitorsBusy}
+                onPageChange={setDomainPage}
+              />
+            </div>
           )}
         </Card>
       </motion.div>

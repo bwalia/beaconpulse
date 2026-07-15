@@ -31,8 +31,9 @@ func (f *fakeChannelRepo) GetByID(_ context.Context, orgID, id uuid.UUID) (*Chan
 	}
 	return c, nil
 }
-func (f *fakeChannelRepo) List(_ context.Context, orgID uuid.UUID) ([]Channel, error) {
-	return f.byOrg(orgID), nil
+func (f *fakeChannelRepo) List(_ context.Context, orgID uuid.UUID, _ ListFilter) ([]Channel, int, error) {
+	items := f.byOrg(orgID)
+	return items, len(items), nil
 }
 func (f *fakeChannelRepo) ListEnabledByOrg(_ context.Context, orgID uuid.UUID) ([]Channel, error) {
 	var out []Channel
