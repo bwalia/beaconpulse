@@ -11,7 +11,7 @@ import {
   GlobeIcon,
   LockIcon,
 } from "@/components/icons";
-import { Button, Card, Field, Label, PageHeader, Skeleton } from "@/components/ui";
+import { Button, Card, Label, PageHeader, Skeleton } from "@/components/ui";
 import { ApiRequestError } from "@/lib/api";
 import {
   useMonitors,
@@ -72,8 +72,8 @@ export default function StatusPageSettings() {
       {/* ---- Publish switch ---- */}
       <motion.div variants={reveal}>
         <Card className="p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 gap-4">
               <span
                 className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
                   settings.enabled ? "bg-emerald-600/10" : "bg-slate-500/10"
@@ -99,10 +99,10 @@ export default function StatusPageSettings() {
                   <Link
                     href={settings.url}
                     target="_blank"
-                    className="group mt-3 inline-flex items-center gap-2 rounded-lg font-mono text-sm text-blue-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-blue-400"
+                    className="group mt-3 inline-flex max-w-full items-center gap-2 rounded-lg font-mono text-sm text-blue-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-blue-400"
                   >
-                    {settings.url}
-                    <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
+                    <span className="break-all">{settings.url}</span>
+                    <ArrowRightIcon className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
                   </Link>
                 )}
               </div>
@@ -113,6 +113,7 @@ export default function StatusPageSettings() {
               disabled={update.isPending}
               onClick={() => update.mutate({ enabled: !settings.enabled })}
               style={{ transitionDuration: `${DUR.micro}s` }}
+              className="w-full shrink-0 sm:w-auto"
             >
               {update.isPending
                 ? "Saving…"
@@ -160,12 +161,14 @@ export default function StatusPageSettings() {
                 },
               );
             }}
-            className="mt-4 flex flex-wrap items-end gap-3"
+            className="mt-4"
           >
-            <div className="min-w-[18rem] flex-1">
-              <Label>Custom URL</Label>
+            <Label htmlFor="status-slug">Custom URL</Label>
+            {/* Label on top, [input + buttons] in one stretch row (so they share a
+                height and align), hint below. Stacks full-width on mobile. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
               <div
-                className={`flex items-stretch overflow-hidden rounded-lg border bg-white focus-within:ring-2 focus-within:ring-blue-600 dark:bg-slate-900 ${
+                className={`flex min-w-0 flex-1 items-stretch overflow-hidden rounded-lg border bg-white focus-within:ring-2 focus-within:ring-blue-600 dark:bg-slate-900 ${
                   slugError ? "border-red-500" : "border-slate-300 dark:border-slate-700"
                 }`}
               >
@@ -173,6 +176,7 @@ export default function StatusPageSettings() {
                   /status/
                 </span>
                 <input
+                  id="status-slug"
                   value={slug ?? settings.custom_slug}
                   maxLength={63}
                   onChange={(e) => {
@@ -181,35 +185,43 @@ export default function StatusPageSettings() {
                   }}
                   placeholder={settings.org_slug}
                   aria-invalid={slugError ? true : undefined}
-                  className="w-full bg-transparent px-3 py-2.5 font-mono text-base text-slate-900 focus:outline-none dark:text-white"
+                  className="w-full min-w-0 bg-transparent px-3 py-2.5 font-mono text-base text-slate-900 focus:outline-none dark:text-white"
                 />
               </div>
-              {slugError ? (
-                <p role="alert" className="mt-1 text-xs font-medium text-red-700 dark:text-red-400">
-                  {slugError}
-                </p>
-              ) : (
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Leave blank to use the default: <span className="font-mono">/status/{settings.org_slug}</span>
-                </p>
-              )}
+              <div className="flex gap-3">
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  disabled={update.isPending}
+                  className="flex-1 sm:flex-none"
+                >
+                  Save address
+                </Button>
+                {settings.custom_slug && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={update.isPending}
+                    className="flex-1 sm:flex-none"
+                    onClick={() => {
+                      setSlug("");
+                      setSlugError(null);
+                      update.mutate({ slug: "" });
+                    }}
+                  >
+                    Reset to default
+                  </Button>
+                )}
+              </div>
             </div>
-            <Button type="submit" variant="secondary" disabled={update.isPending}>
-              Save address
-            </Button>
-            {settings.custom_slug && (
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={update.isPending}
-                onClick={() => {
-                  setSlug("");
-                  setSlugError(null);
-                  update.mutate({ slug: "" });
-                }}
-              >
-                Reset to default
-              </Button>
+            {slugError ? (
+              <p role="alert" className="mt-1.5 text-xs font-medium text-red-700 dark:text-red-400">
+                {slugError}
+              </p>
+            ) : (
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                Leave blank to use the default: <span className="font-mono">/status/{settings.org_slug}</span>
+              </p>
             )}
           </form>
         </Card>
@@ -223,25 +235,24 @@ export default function StatusPageSettings() {
               e.preventDefault();
               update.mutate({ title });
             }}
-            className="flex flex-wrap items-end gap-4"
           >
-            <div className="min-w-[16rem] flex-1">
-              <Field
-                label="Public heading"
-                hint={`Shown at the top of the page. Leave blank to use “${settings.org_name}”.`}
-              >
-                <input
-                  value={title}
-                  maxLength={120}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder={settings.org_name}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                />
-              </Field>
+            <Label htmlFor="status-heading">Public heading</Label>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+              <input
+                id="status-heading"
+                value={title}
+                maxLength={120}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={settings.org_name}
+                className="w-full min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              />
+              <Button type="submit" variant="secondary" disabled={update.isPending} className="sm:flex-none">
+                Save heading
+              </Button>
             </div>
-            <Button type="submit" variant="secondary" disabled={update.isPending}>
-              Save heading
-            </Button>
+            <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+              Shown at the top of the page. Leave blank to use “{settings.org_name}”.
+            </p>
           </form>
         </Card>
       </motion.div>
