@@ -71,6 +71,9 @@ type Repository interface {
 // Payments is the payment provider (Stripe). Kept an interface so the domain and
 // its tests never import the SDK.
 type Payments interface {
+	// Configured reports whether tier p can be subscribed to right now — i.e. its
+	// price id is set. False for tiers the operator has not wired a price for.
+	Configured(p plan.Plan) bool
 	// EnsureCustomer returns the org's Stripe customer id, creating it if needed.
 	EnsureCustomer(ctx context.Context, orgID uuid.UUID, email string) (string, error)
 	// SubscriptionCheckoutURL returns a Stripe Checkout URL for a recurring tier.
@@ -116,6 +119,13 @@ func (s *Service) MonitorHoursPerDollar() int { return s.monitorHoursPerDollar }
 
 // Enabled reports whether Stripe is wired up.
 func (s *Service) Enabled() bool { return s.pay != nil }
+
+// Subscribable reports whether tier p can be purchased as a subscription right now
+// (Stripe configured and a price set). The UI uses it to avoid offering a dead
+// button for a tier whose price the operator has not wired.
+func (s *Service) Subscribable(p plan.Plan) bool {
+	return s.pay != nil && (p == plan.Starter || p == plan.Pro) && s.pay.Configured(p)
+}
 
 // Overview is the customer-facing billing summary.
 type Overview struct {
@@ -169,6 +179,10 @@ func (s *Service) StartSubscription(ctx context.Context, actor Actor, p plan.Pla
 	if p != plan.Starter && p != plan.Pro {
 		return "", apperror.Validation("not a subscribable plan",
 			apperror.FieldError{Field: "plan", Message: "must be starter or pro"})
+	}
+	if !s.pay.Configured(p) {
+		return "", apperror.Validation("subscriptions are not set up for this plan yet",
+			apperror.FieldError{Field: "plan", Message: "no Stripe price is configured — use pay-as-you-go, or ask an admin to set STRIPE_PRICE_*"})
 	}
 	cust, err := s.ensureCustomer(ctx, actor)
 	if err != nil {

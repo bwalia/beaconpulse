@@ -52,6 +52,18 @@ func New(cfg Config) *Client {
 
 var _ billing.Payments = (*Client)(nil)
 
+// Configured reports whether tier p has a Stripe price wired.
+func (c *Client) Configured(p plan.Plan) bool {
+	switch p {
+	case plan.Starter:
+		return c.priceStarter != ""
+	case plan.Pro:
+		return c.pricePro != ""
+	default:
+		return false
+	}
+}
+
 // EnsureCustomer creates a Stripe customer tagged with the org id. The domain only
 // calls this when the org has no stored customer, so this always creates one.
 func (c *Client) EnsureCustomer(ctx context.Context, orgID uuid.UUID, email string) (string, error) {

@@ -247,14 +247,25 @@ function PlansGrid({
                     Your plan
                   </Button>
                 ) : isPaid ? (
-                  <Button
-                    variant="primary"
-                    className="w-full"
-                    disabled={!canManage || !info.billing_enabled || subscribe.isPending}
-                    onClick={() => onSubscribe(p)}
-                  >
-                    {subscribe.isPending ? "Starting…" : `Subscribe to ${p.name}`}
-                  </Button>
+                  <div>
+                    <Button
+                      variant="primary"
+                      className="w-full"
+                      disabled={!canManage || !p.subscribable || subscribe.isPending}
+                      onClick={() => onSubscribe(p)}
+                    >
+                      {subscribe.isPending
+                        ? "Starting…"
+                        : p.subscribable
+                          ? `Subscribe to ${p.name}`
+                          : "Not available"}
+                    </Button>
+                    {info.billing_enabled && !p.subscribable && (
+                      <p className="mt-1.5 text-center text-xs text-slate-500 dark:text-slate-400">
+                        No Stripe price configured — use pay-as-you-go above.
+                      </p>
+                    )}
+                  </div>
                 ) : (
                   <Button variant="secondary" className="w-full" disabled>
                     Default tier

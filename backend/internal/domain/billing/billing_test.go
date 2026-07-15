@@ -50,6 +50,7 @@ func (f *fakeRepo) DeductCredit(context.Context, int64) error { return nil }
 // fakePay returns fixed URLs and records the last inputs.
 type fakePay struct{ lastTopUp TopUpInput }
 
+func (fakePay) Configured(plan.Plan) bool { return true }
 func (fakePay) EnsureCustomer(context.Context, uuid.UUID, string) (string, error) {
 	return "cus_x", nil
 }

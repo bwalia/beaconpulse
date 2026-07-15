@@ -130,6 +130,8 @@ export interface PlanInfo {
   max_monitors: number;
   min_interval_seconds: number;
   features: string[];
+  /** Whether this tier can be subscribed to right now (Stripe price configured). */
+  subscribable: boolean;
 }
 
 export interface BillingInfo {

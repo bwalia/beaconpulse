@@ -53,6 +53,9 @@ type planInfoResponse struct {
 	MaxMonitors        int      `json:"max_monitors"`
 	MinIntervalSeconds int      `json:"min_interval_seconds"`
 	Features           []string `json:"features"`
+	// Subscribable is true only when this tier can be purchased right now (Stripe
+	// configured and a price set). The UI disables the button otherwise.
+	Subscribable bool `json:"subscribable"`
 }
 
 type billingResponse struct {
@@ -70,7 +73,7 @@ type billingResponse struct {
 	Plans                 []planInfoResponse `json:"plans"`
 }
 
-func presentCatalog(items []plan.Info) []planInfoResponse {
+func presentCatalog(items []plan.Info, subscribable func(plan.Plan) bool) []planInfoResponse {
 	out := make([]planInfoResponse, 0, len(items))
 	for _, p := range items {
 		out = append(out, planInfoResponse{
@@ -80,6 +83,7 @@ func presentCatalog(items []plan.Info) []planInfoResponse {
 			MaxMonitors:        p.Limits.MaxMonitors,
 			MinIntervalSeconds: p.Limits.MinIntervalSeconds,
 			Features:           p.Features,
+			Subscribable:       subscribable(p.Plan),
 		})
 	}
 	return out
@@ -104,7 +108,7 @@ func (h *BillingHandler) get(w http.ResponseWriter, r *http.Request) {
 		MaxMonitors:           ov.Limits.MaxMonitors,
 		MonitorHoursPerDollar: h.svc.MonitorHoursPerDollar(),
 		BillingEnabled:        h.svc.Enabled(),
-		Plans:                 presentCatalog(h.svc.Catalog()),
+		Plans:                 presentCatalog(h.svc.Catalog(), h.svc.Subscribable),
 	}
 	if !ov.PeriodEnd.IsZero() {
 		resp.PeriodEnd = &ov.PeriodEnd
