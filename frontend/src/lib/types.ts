@@ -130,10 +130,24 @@ export interface PlanInfo {
   max_monitors: number;
   min_interval_seconds: number;
   features: string[];
+  /** Whether this tier can be subscribed to right now (Stripe price configured). */
+  subscribable: boolean;
 }
 
 export interface BillingInfo {
-  current_plan: string;
+  /** The tier the org subscribed to (free by default). */
+  subscribed_plan: string;
+  /** The tier whose limits actually apply right now (may be payg/free). */
+  effective_plan: string;
+  subscription_status: string;
+  period_end?: string;
+  /** Remaining pay-as-you-go balance, in monitor-seconds. */
+  credit_seconds: number;
+  max_monitors: number;
+  /** Pay-as-you-go rate: $1 buys this many monitor-hours. */
+  monitor_hours_per_dollar: number;
+  /** Whether Stripe is configured on this deployment. */
+  billing_enabled: boolean;
   plans: PlanInfo[];
 }
 

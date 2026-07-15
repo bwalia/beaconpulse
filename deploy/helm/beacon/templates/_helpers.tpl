@@ -126,6 +126,47 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
       # populated yet — enrichment just degrades to "no analysis" (non-fatal).
       optional: true
 {{- end }}
+# Stripe billing. Sourced from a SEPARATE `beacon-billing-secrets` Secret that the
+# deploy workflow creates from GitHub Secrets — so rotating Stripe keys never
+# touches the stable sealed beacon-secrets (JWT/encryption/postgres). All optional:
+# an absent key leaves billing disabled (checkout refused, overview still served)
+# rather than blocking pod start.
+- name: STRIPE_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: beacon-billing-secrets
+      key: STRIPE_SECRET_KEY
+      optional: true
+- name: STRIPE_PUBLISHABLE_KEY
+  valueFrom:
+    secretKeyRef:
+      name: beacon-billing-secrets
+      key: STRIPE_PUBLISHABLE_KEY
+      optional: true
+- name: STRIPE_WEBHOOK_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: beacon-billing-secrets
+      key: STRIPE_WEBHOOK_SECRET
+      optional: true
+- name: STRIPE_PRICE_STARTER
+  valueFrom:
+    secretKeyRef:
+      name: beacon-billing-secrets
+      key: STRIPE_PRICE_STARTER
+      optional: true
+- name: STRIPE_PRICE_PRO
+  valueFrom:
+    secretKeyRef:
+      name: beacon-billing-secrets
+      key: STRIPE_PRICE_PRO
+      optional: true
+- name: BEACON_BILLING_MONITOR_HOURS_PER_DOLLAR
+  value: {{ (.Values.billing).monitorHoursPerDollar | default 5 | quote }}
+- name: BEACON_BILLING_SUCCESS_URL
+  value: "{{ include "beacon.baseURL" . }}/billing?checkout=success"
+- name: BEACON_BILLING_CANCEL_URL
+  value: "{{ include "beacon.baseURL" . }}/billing?checkout=cancel"
 {{- end -}}
 
 {{/*

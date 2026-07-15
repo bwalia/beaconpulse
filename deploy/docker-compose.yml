@@ -45,6 +45,16 @@ x-backend-env: &backend-env
   BEACON_AI_MODEL: ${BEACON_AI_MODEL:-}
   BEACON_AI_API_KEY: ${BEACON_AI_API_KEY:-}
   BEACON_AI_TIMEOUT: ${BEACON_AI_TIMEOUT:-20s}
+  # Stripe billing — values come from deploy/.env (gitignored). Empty secret key
+  # disables billing (checkout refused, overview still served).
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
+  STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+  BEACON_BILLING_MONITOR_HOURS_PER_DOLLAR: ${BEACON_BILLING_MONITOR_HOURS_PER_DOLLAR:-5}
+  BEACON_BILLING_SUCCESS_URL: http://localhost:${BEACON_GATEWAY_PORT:-8090}/billing?checkout=success
+  BEACON_BILLING_CANCEL_URL: http://localhost:${BEACON_GATEWAY_PORT:-8090}/billing?checkout=cancel
 
 services:
   postgres:
