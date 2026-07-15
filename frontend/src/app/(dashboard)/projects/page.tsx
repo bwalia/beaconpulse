@@ -28,6 +28,14 @@ const ENV_STYLES: Record<string, string> = {
   development: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
+// Left-border accent per environment, matching the Alerts list card style so the
+// two pages read as one system.
+const ENV_ACCENT: Record<string, string> = {
+  production: "border-l-brand-600",
+  staging: "border-l-amber-500",
+  development: "border-l-slate-400 dark:border-l-slate-600",
+};
+
 export default function ProjectsPage() {
   const [page, setPage] = useState(0);
   const [searchInput, setSearchInput] = useState("");
@@ -132,26 +140,36 @@ export default function ProjectsPage() {
             initial="hidden"
             animate="show"
             variants={stagger}
-            className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${isPlaceholderData ? "opacity-60 transition-opacity" : "transition-opacity"}`}
+            className={`space-y-3 ${isPlaceholderData ? "opacity-60 transition-opacity" : "transition-opacity"}`}
           >
             {rows.map((p) => (
               <motion.li key={p.id} variants={reveal}>
-              <Card className="h-full transition-shadow hover:shadow-md motion-reduce:transition-none">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="truncate font-semibold text-slate-900 dark:text-white">{p.name}</h3>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
-                      ENV_STYLES[p.environment] ?? ENV_STYLES.development
-                    }`}
-                  >
-                    {p.environment}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{p.description || "No description"}</p>
-                <p className="mt-3 truncate font-mono text-xs text-slate-500 dark:text-slate-400">{p.slug}</p>
-              </Card>
-            </motion.li>
-          ))}
+                <Card
+                  className={`border-l-4 transition-shadow hover:shadow-md motion-reduce:transition-none ${
+                    ENV_ACCENT[p.environment] ?? ENV_ACCENT.development
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-slate-900 dark:text-white">{p.name}</span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
+                            ENV_STYLES[p.environment] ?? ENV_STYLES.development
+                          }`}
+                        >
+                          {p.environment}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">
+                        {p.description || "No description"}
+                      </p>
+                      <p className="truncate font-mono text-xs text-slate-500 dark:text-slate-400">{p.slug}</p>
+                    </div>
+                  </div>
+                </Card>
+              </motion.li>
+            ))}
           </motion.ul>
           <Pagination
             page={page}

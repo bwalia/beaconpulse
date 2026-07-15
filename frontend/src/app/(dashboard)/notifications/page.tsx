@@ -162,29 +162,34 @@ function ChannelRow({
   const def = channelTypeDef(channel.type);
 
   return (
-    <Card className="flex flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{channel.name}</span>
-          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs uppercase text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-            {def?.label ?? channel.type}
-          </span>
-          {!channel.enabled && (
-            <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-              paused
+    <Card
+      className={`border-l-4 transition-shadow hover:shadow-md motion-reduce:transition-none ${
+        channel.enabled ? "border-l-brand-500" : "border-l-slate-300 dark:border-l-slate-700"
+      }`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-900 dark:text-white">{channel.name}</span>
+            <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
+              {def?.label ?? channel.type}
             </span>
-          )}
+            {!channel.enabled && (
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                paused
+              </span>
+            )}
+          </div>
+          <p className="mt-1 inline-flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+            <span className="truncate font-mono">{def?.summary(channel) ?? channel.type}</span>
+            {channel.has_secret && (
+              <span className="inline-flex shrink-0 items-center gap-1">
+                · secret <LockIcon className="h-3 w-3" />
+              </span>
+            )}
+          </p>
         </div>
-        <p className="mt-0.5 inline-flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
-          <span className="truncate font-mono">{def?.summary(channel) ?? channel.type}</span>
-          {channel.has_secret && (
-            <span className="inline-flex shrink-0 items-center gap-1">
-              · secret <LockIcon className="h-3 w-3" />
-            </span>
-          )}
-        </p>
-      </div>
-      <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
         <Button
           variant="secondary"
           disabled={test.isPending}
@@ -224,6 +229,7 @@ function ChannelRow({
         >
           Delete
         </Button>
+        </div>
       </div>
     </Card>
   );
