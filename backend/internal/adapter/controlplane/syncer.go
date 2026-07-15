@@ -6,15 +6,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
+	"github.com/google/uuid"
+
 	"beacon/internal/domain/monitor"
+	"beacon/internal/domain/plan"
 )
 
 // MonitorReader is the narrow read dependency the syncer needs: the full set of
-// enabled monitors to project into config.
+// enabled monitors to project into config, plus each org's effective plan so we
+// can cap probing to the tier's monitor limit.
 type MonitorReader interface {
 	ListAllEnabled(ctx context.Context) ([]monitor.Monitor, error)
+	EffectivePlans(ctx context.Context) (map[uuid.UUID]plan.Plan, error)
 }
 
 // Paths locates the files the syncer owns and rewrites.
@@ -52,6 +58,15 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("controlplane: list monitors: %w", err)
 	}
+	plans, err := s.reader.EffectivePlans(ctx)
+	if err != nil {
+		return fmt.Errorf("controlplane: list org plans: %w", err)
+	}
+	// Enforce the "fall back to Free" rule: probe at most the effective tier's
+	// monitor limit per org, oldest first. A depleted pay-as-you-go org keeps its
+	// 10 free monitors probing; the rest go dark until it pays again.
+	monitors = capToPlan(monitors, plans)
+
 	arts, err := Generate(s.genCfg, monitors)
 	if err != nil {
 		return fmt.Errorf("controlplane: generate: %w", err)
@@ -77,6 +92,35 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		reloadErr = errors.Join(reloadErr, err)
 	}
 	return reloadErr
+}
+
+// capToPlan keeps, per org, only the oldest N enabled monitors where N is the
+// effective tier's MaxMonitors — the control-plane half of "fall back to Free".
+// Input order is preserved (deterministic output, no config churn).
+func capToPlan(monitors []monitor.Monitor, plans map[uuid.UUID]plan.Plan) []monitor.Monitor {
+	byOrg := map[uuid.UUID][]int{}
+	for i := range monitors {
+		byOrg[monitors[i].OrgID] = append(byOrg[monitors[i].OrgID], i)
+	}
+	allowed := make(map[uuid.UUID]bool, len(monitors))
+	for org, idxs := range byOrg {
+		max := plan.LimitsFor(plans[org]).MaxMonitors // missing org → Free limits
+		sort.SliceStable(idxs, func(a, b int) bool {
+			return monitors[idxs[a]].CreatedAt.Before(monitors[idxs[b]].CreatedAt)
+		})
+		for k, i := range idxs {
+			if k < max {
+				allowed[monitors[i].ID] = true
+			}
+		}
+	}
+	kept := make([]monitor.Monitor, 0, len(monitors))
+	for _, m := range monitors {
+		if allowed[m.ID] {
+			kept = append(kept, m)
+		}
+	}
+	return kept
 }
 
 // writeAtomic writes data to path via a temp file + rename so readers never see

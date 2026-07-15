@@ -1,12 +1,20 @@
-// Package billing manages an organization's subscription plan. In this build a
-// plan change is applied directly (a self-serve switch); a production deployment
-// would insert a payment provider (e.g. Stripe Checkout) before ChangePlan and
-// drive it from a webhook. The domain is intentionally provider-agnostic: it only
-// reads and writes the org's plan and records an audit entry.
+// Package billing manages how an organization pays for monitoring. There are two
+// ways to pay, both through Stripe, and they compose:
+//
+//   - Pay-as-you-go: buy any amount; it becomes a balance of MONITOR-SECONDS. A
+//     worker deducts one second of credit per enabled monitor per second, so more
+//     domains burn the balance faster. When it hits zero the org falls back to Free.
+//   - Subscription: a recurring Stripe subscription for the Starter/Pro tiers.
+//
+// The EFFECTIVE plan — the limits that actually apply — is computed, never stored:
+// the subscribed tier while its subscription is active, else pay-as-you-go while
+// credit remains, else Free. The domain is provider-agnostic: Stripe lives behind
+// the Payments interface, this package only knows money, credit and plans.
 package billing
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -16,10 +24,25 @@ import (
 	"beacon/internal/platform/apperror"
 )
 
-// OrgPlanStore reads and writes an organization's plan.
-type OrgPlanStore interface {
-	Plan(ctx context.Context, orgID uuid.UUID) (plan.Plan, error)
-	SetPlan(ctx context.Context, orgID uuid.UUID, p plan.Plan) error
+// State is an org's billing snapshot.
+type State struct {
+	// Plan is the SUBSCRIBED tier (free by default); it is not the effective tier.
+	Plan               plan.Plan
+	SubscriptionStatus string // Stripe status, "" when never subscribed
+	PeriodEnd          time.Time
+	StripeCustomerID   string
+	// CreditSeconds is the remaining pay-as-you-go balance, in monitor-seconds.
+	CreditSeconds int64
+}
+
+// SubscriptionActive reports whether a paid subscription currently grants its tier.
+func (s State) SubscriptionActive() bool {
+	return s.SubscriptionStatus == "active" || s.SubscriptionStatus == "trialing"
+}
+
+// Effective is the plan whose limits actually apply right now.
+func (s State) Effective() plan.Plan {
+	return plan.Effective(s.Plan, s.SubscriptionActive(), s.CreditSeconds)
 }
 
 // Actor is the authenticated caller.
@@ -27,46 +50,236 @@ type Actor struct {
 	UserID uuid.UUID
 	OrgID  uuid.UUID
 	Role   auth.Role
+	// Email is used to create the Stripe customer on first checkout (best-effort).
+	Email string
 }
 
-// Service implements plan viewing and changing.
+// Repository persists billing state and the Stripe idempotency ledger.
+type Repository interface {
+	State(ctx context.Context, orgID uuid.UUID) (State, error)
+	SetCustomerID(ctx context.Context, orgID uuid.UUID, customerID string) error
+	// ApplyTopUp idempotently adds credit if eventID has not been seen; returns
+	// whether it applied (false = duplicate webhook, already credited).
+	ApplyTopUp(ctx context.Context, orgID uuid.UUID, addSeconds, amountCents int64, eventID string) (applied bool, err error)
+	// ApplySubscription idempotently sets the org's subscribed tier + Stripe status.
+	ApplySubscription(ctx context.Context, orgID uuid.UUID, p plan.Plan, status string, periodEnd time.Time, eventID string) (applied bool, err error)
+	// DeductCredit burns `elapsedSeconds` × (enabled monitor count) from every org
+	// that has credit, flooring at zero. This is the pay-as-you-go meter.
+	DeductCredit(ctx context.Context, elapsedSeconds int64) error
+}
+
+// Payments is the payment provider (Stripe). Kept an interface so the domain and
+// its tests never import the SDK.
+type Payments interface {
+	// EnsureCustomer returns the org's Stripe customer id, creating it if needed.
+	EnsureCustomer(ctx context.Context, orgID uuid.UUID, email string) (string, error)
+	// SubscriptionCheckoutURL returns a Stripe Checkout URL for a recurring tier.
+	SubscriptionCheckoutURL(ctx context.Context, in CheckoutInput) (string, error)
+	// TopUpCheckoutURL returns a Stripe Checkout URL for a one-time custom amount.
+	TopUpCheckoutURL(ctx context.Context, in TopUpInput) (string, error)
+}
+
+// CheckoutInput / TopUpInput are what the service hands the payment provider.
+type CheckoutInput struct {
+	OrgID      uuid.UUID
+	CustomerID string
+	Plan       plan.Plan
+}
+type TopUpInput struct {
+	OrgID       uuid.UUID
+	CustomerID  string
+	AmountCents int64
+}
+
+// Service implements billing use cases.
 type Service struct {
-	store    OrgPlanStore
-	auditlog audit.Recorder
+	repo                  Repository
+	pay                   Payments // nil when Stripe is not configured
+	auditlog              audit.Recorder
+	monitorHoursPerDollar int
 }
 
-// NewService wires the billing service.
-func NewService(store OrgPlanStore, auditlog audit.Recorder) *Service {
-	return &Service{store: store, auditlog: auditlog}
+// NewService wires the billing service. pay may be nil (Stripe disabled), in which
+// case the checkout methods return a clear "not configured" error.
+func NewService(repo Repository, pay Payments, auditlog audit.Recorder, monitorHoursPerDollar int) *Service {
+	if monitorHoursPerDollar <= 0 {
+		monitorHoursPerDollar = 5
+	}
+	return &Service{repo: repo, pay: pay, auditlog: auditlog, monitorHoursPerDollar: monitorHoursPerDollar}
 }
 
-// Catalog returns the purchasable plans.
+// Catalog returns the subscribable plans for the pricing UI.
 func (s *Service) Catalog() []plan.Info { return plan.Catalog() }
 
-// Current returns the caller org's current plan.
-func (s *Service) Current(ctx context.Context, actor Actor) (plan.Plan, error) {
-	return s.store.Plan(ctx, actor.OrgID)
+// MonitorHoursPerDollar exposes the pay-as-you-go rate for the UI.
+func (s *Service) MonitorHoursPerDollar() int { return s.monitorHoursPerDollar }
+
+// Enabled reports whether Stripe is wired up.
+func (s *Service) Enabled() bool { return s.pay != nil }
+
+// Overview is the customer-facing billing summary.
+type Overview struct {
+	SubscribedPlan     plan.Plan
+	EffectivePlan      plan.Plan
+	SubscriptionStatus string
+	PeriodEnd          time.Time
+	CreditSeconds      int64
+	Limits             plan.Limits
 }
 
-// ChangePlan switches the org to a new plan. Restricted to owners/admins (the
-// people who would hold billing responsibility).
-func (s *Service) ChangePlan(ctx context.Context, actor Actor, newPlan plan.Plan) (plan.Plan, error) {
-	if !actor.Role.CanAdminister() {
-		return "", apperror.Forbidden("only owners and admins can change the plan")
+// Overview returns the caller org's billing state.
+func (s *Service) Overview(ctx context.Context, actor Actor) (Overview, error) {
+	st, err := s.repo.State(ctx, actor.OrgID)
+	if err != nil {
+		return Overview{}, err
 	}
-	if !newPlan.Valid() {
-		return "", apperror.Validation("unknown plan",
-			apperror.FieldError{Field: "plan", Message: "must be free, starter or pro"})
-	}
-	if err := s.store.SetPlan(ctx, actor.OrgID, newPlan); err != nil {
+	eff := st.Effective()
+	return Overview{
+		SubscribedPlan:     st.Plan,
+		EffectivePlan:      eff,
+		SubscriptionStatus: st.SubscriptionStatus,
+		PeriodEnd:          st.PeriodEnd,
+		CreditSeconds:      st.CreditSeconds,
+		Limits:             plan.LimitsFor(eff),
+	}, nil
+}
+
+// StartTopUp creates a Stripe Checkout session for a one-time pay-as-you-go top-up
+// of amountCents and returns its URL. Admins/owners only (they hold the card).
+func (s *Service) StartTopUp(ctx context.Context, actor Actor, amountCents int64) (string, error) {
+	if err := s.guard(actor); err != nil {
 		return "", err
 	}
-	org := actor.OrgID
-	uid := actor.UserID
-	_ = s.auditlog.Record(ctx, audit.Entry{
-		OrgID: &org, UserID: &uid, Action: "billing.plan_changed",
-		ResourceType: "organization", ResourceID: org.String(),
-		Metadata: map[string]any{"plan": string(newPlan)},
-	})
-	return newPlan, nil
+	if amountCents < 100 {
+		return "", apperror.Validation("amount too small",
+			apperror.FieldError{Field: "amount", Message: "minimum top-up is $1"})
+	}
+	cust, err := s.ensureCustomer(ctx, actor)
+	if err != nil {
+		return "", err
+	}
+	return s.pay.TopUpCheckoutURL(ctx, TopUpInput{OrgID: actor.OrgID, CustomerID: cust, AmountCents: amountCents})
+}
+
+// StartSubscription creates a Stripe Checkout session for a recurring tier.
+func (s *Service) StartSubscription(ctx context.Context, actor Actor, p plan.Plan) (string, error) {
+	if err := s.guard(actor); err != nil {
+		return "", err
+	}
+	if p != plan.Starter && p != plan.Pro {
+		return "", apperror.Validation("not a subscribable plan",
+			apperror.FieldError{Field: "plan", Message: "must be starter or pro"})
+	}
+	cust, err := s.ensureCustomer(ctx, actor)
+	if err != nil {
+		return "", err
+	}
+	return s.pay.SubscriptionCheckoutURL(ctx, CheckoutInput{OrgID: actor.OrgID, CustomerID: cust, Plan: p})
+}
+
+// Kind is a normalized webhook event category the service knows how to apply.
+type Kind int
+
+const (
+	// KindIgnore is an event we intentionally do not act on.
+	KindIgnore Kind = iota
+	// KindTopUp is a completed one-time pay-as-you-go payment.
+	KindTopUp
+	// KindSubscription is a subscription lifecycle change.
+	KindSubscription
+)
+
+// WebhookEvent is a Stripe event normalized by the adapter for the service to
+// apply. The adapter verifies the signature; the service only trusts this struct.
+type WebhookEvent struct {
+	ID   string // Stripe event id — the idempotency key
+	Kind Kind
+
+	// Top-up fields.
+	OrgID       uuid.UUID
+	AmountCents int64
+
+	// Subscription fields.
+	Plan      plan.Plan
+	Status    string
+	PeriodEnd time.Time
+}
+
+// ApplyWebhook applies a verified, normalized Stripe event idempotently.
+func (s *Service) ApplyWebhook(ctx context.Context, ev WebhookEvent) error {
+	switch ev.Kind {
+	case KindTopUp:
+		if ev.OrgID == uuid.Nil {
+			return nil // no org to credit; ignore rather than error a webhook
+		}
+		addSeconds := ev.AmountCents * int64(s.monitorHoursPerDollar) * 3600 / 100
+		applied, err := s.repo.ApplyTopUp(ctx, ev.OrgID, addSeconds, ev.AmountCents, ev.ID)
+		if err != nil {
+			return err
+		}
+		if applied {
+			org := ev.OrgID
+			_ = s.auditlog.Record(ctx, audit.Entry{
+				OrgID: &org, Action: "billing.credit_added",
+				ResourceType: "organization", ResourceID: org.String(),
+				Metadata: map[string]any{"amount_cents": ev.AmountCents, "credit_seconds": addSeconds},
+			})
+		}
+		return nil
+	case KindSubscription:
+		if ev.OrgID == uuid.Nil {
+			return nil
+		}
+		applied, err := s.repo.ApplySubscription(ctx, ev.OrgID, ev.Plan, ev.Status, ev.PeriodEnd, ev.ID)
+		if err != nil {
+			return err
+		}
+		if applied {
+			org := ev.OrgID
+			_ = s.auditlog.Record(ctx, audit.Entry{
+				OrgID: &org, Action: "billing.subscription_updated",
+				ResourceType: "organization", ResourceID: org.String(),
+				Metadata: map[string]any{"plan": string(ev.Plan), "status": ev.Status},
+			})
+		}
+		return nil
+	default:
+		return nil
+	}
+}
+
+// ConsumeCredit burns pay-as-you-go credit for the elapsed window. Called by the
+// worker meter; safe to call with a zero balance (deducts nothing).
+func (s *Service) ConsumeCredit(ctx context.Context, elapsedSeconds int64) error {
+	return s.repo.DeductCredit(ctx, elapsedSeconds)
+}
+
+func (s *Service) guard(actor Actor) error {
+	if s.pay == nil {
+		return apperror.Validation("billing is not configured on this deployment")
+	}
+	if !actor.Role.CanAdminister() {
+		return apperror.Forbidden("only owners and admins can manage billing")
+	}
+	return nil
+}
+
+// ensureCustomer returns the org's Stripe customer id, creating and persisting it
+// on first use.
+func (s *Service) ensureCustomer(ctx context.Context, actor Actor) (string, error) {
+	st, err := s.repo.State(ctx, actor.OrgID)
+	if err != nil {
+		return "", err
+	}
+	if st.StripeCustomerID != "" {
+		return st.StripeCustomerID, nil
+	}
+	cust, err := s.pay.EnsureCustomer(ctx, actor.OrgID, actor.Email)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.SetCustomerID(ctx, actor.OrgID, cust); err != nil {
+		return "", err
+	}
+	return cust, nil
 }

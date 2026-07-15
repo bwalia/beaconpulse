@@ -66,6 +66,7 @@ func run() error {
 	// Control-plane syncer: reads monitors, regenerates config, reloads services.
 	monitorRepo := postgres.NewMonitorRepository(pool)
 	refreshRepo := postgres.NewRefreshTokenRepository(pool)
+	billingRepo := postgres.NewBillingRepository(pool)
 	reloader := controlplane.NewReloader(cfg.CtrlPlane.PromReloadURL, cfg.CtrlPlane.BlackboxReloadURL)
 	syncer := controlplane.NewSyncer(
 		monitorRepo,
@@ -119,6 +120,14 @@ func run() error {
 			Interval:   15 * time.Second, // faster than status-sync: this drives alerting
 			RunAtStart: true,             // re-seed the gauge from the DB immediately on boot
 			Run:        heartbeatExporter.Run,
+		},
+		worker.Task{
+			// The pay-as-you-go meter: every minute, burn 60 monitor-seconds of
+			// credit per enabled monitor. When an org's balance hits zero its
+			// effective plan drops to Free and the control-plane resync caps it.
+			Name:     "credit-meter",
+			Interval: time.Minute,
+			Run:      func(ctx context.Context) error { return billingRepo.DeductCredit(ctx, 60) },
 		},
 		worker.Task{
 			Name:     "expired-token-cleanup",

@@ -281,15 +281,20 @@ export function useBilling() {
   return useQuery({ queryKey: ["billing"], queryFn: () => api.get<BillingInfo>("/api/v1/billing") });
 }
 
-export function useChangePlan() {
-  const qc = useQueryClient();
+// useStartSubscription / useStartTopUp create a Stripe Checkout session and return
+// its URL; the page redirects the browser there. Nothing changes locally until the
+// signed webhook confirms payment, so there is no cache to invalidate here.
+export function useStartSubscription() {
   return useMutation({
     mutationFn: (plan: string) =>
-      api.post<{ current_plan: string }>("/api/v1/billing/plan", { plan }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["billing"] });
-      qc.invalidateQueries({ queryKey: ["usage"] });
-    },
+      api.post<{ checkout_url: string }>("/api/v1/billing/checkout/subscription", { plan }),
+  });
+}
+
+export function useStartTopUp() {
+  return useMutation({
+    mutationFn: (amountCents: number) =>
+      api.post<{ checkout_url: string }>("/api/v1/billing/checkout/topup", { amount_cents: amountCents }),
   });
 }
 

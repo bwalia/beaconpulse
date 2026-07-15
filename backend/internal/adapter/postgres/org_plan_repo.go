@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"beacon/internal/domain/billing"
 	"beacon/internal/domain/monitor"
 	"beacon/internal/domain/plan"
 	"beacon/internal/platform/apperror"
@@ -24,36 +23,29 @@ func NewOrgPlanRepository(pool *pgxpool.Pool) *OrgPlanRepository {
 	return &OrgPlanRepository{pool: pool}
 }
 
-var (
-	_ monitor.OrgPlanReader = (*OrgPlanRepository)(nil)
-	_ billing.OrgPlanStore  = (*OrgPlanRepository)(nil)
-)
+var _ monitor.OrgPlanReader = (*OrgPlanRepository)(nil)
 
-// Plan returns the org's plan. A missing org surfaces as not-found; an
-// unexpected/empty value falls back to Free via plan.LimitsFor downstream.
+// Plan returns the org's EFFECTIVE plan — the tier whose limits actually apply
+// right now: the subscribed tier while its Stripe subscription is active, else
+// pay-as-you-go while credit remains, else Free. Enforcement (monitor create,
+// control-plane cap) reads this, so a depleted org automatically falls back to
+// Free's limits. A missing org surfaces as not-found.
 func (r *OrgPlanRepository) Plan(ctx context.Context, orgID uuid.UUID) (plan.Plan, error) {
-	var p string
+	var (
+		p      string
+		status *string
+		credit int64
+	)
 	err := r.pool.QueryRow(ctx,
-		`SELECT plan FROM organizations WHERE id = $1 AND deleted_at IS NULL`, orgID,
-	).Scan(&p)
+		`SELECT plan, subscription_status, credit_seconds
+		   FROM organizations WHERE id = $1 AND deleted_at IS NULL`, orgID,
+	).Scan(&p, &status, &credit)
 	if err != nil {
 		if isNoRows(err) {
 			return "", apperror.NotFound("organization not found")
 		}
 		return "", apperror.Internal(fmt.Errorf("read org plan: %w", err))
 	}
-	return plan.Plan(p), nil
-}
-
-// SetPlan updates the org's plan.
-func (r *OrgPlanRepository) SetPlan(ctx context.Context, orgID uuid.UUID, p plan.Plan) error {
-	tag, err := r.pool.Exec(ctx,
-		`UPDATE organizations SET plan = $2 WHERE id = $1 AND deleted_at IS NULL`, orgID, string(p))
-	if err != nil {
-		return apperror.Internal(fmt.Errorf("set org plan: %w", err))
-	}
-	if tag.RowsAffected() == 0 {
-		return apperror.NotFound("organization not found")
-	}
-	return nil
+	subActive := status != nil && (*status == "active" || *status == "trialing")
+	return plan.Effective(plan.Plan(p), subActive, credit), nil
 }
