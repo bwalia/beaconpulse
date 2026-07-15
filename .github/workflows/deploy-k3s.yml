@@ -224,11 +224,6 @@ jobs:
 
   deploy:
     runs-on: self-hosted
-    # Bind to a GitHub Environment named after the target (int/test/prod) so its
-    # environment-scoped secrets (e.g. Stripe TEST keys for int/test, LIVE keys for
-    # prod) resolve automatically. Repo-level secrets still apply as the fallback,
-    # so existing secrets (KUBE_CONFIG_DATA_K3S, …) keep working unchanged.
-    environment: ${{ github.event.inputs.TARGET_ENV || 'int' }}
     # `dns` must land before helm, so the record is resolvable by the time
     # cert-manager tries to solve the HTTP-01 challenge for the new host.
     # `wslproxy` must land too: the edge has to hold the vhost + rule before the
@@ -264,34 +259,6 @@ jobs:
           if ! command -v helm >/dev/null 2>&1; then
             curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           fi
-
-      - name: Provision billing (Stripe) secrets
-        # Creates/updates beacon-billing-secrets in the target namespace directly
-        # from GitHub Secrets — no local sealing, no touching the stable sealed
-        # beacon-secrets. Idempotent (dry-run | apply). Absent key => billing stays
-        # disabled (the chart marks these env optional), which is a safe default.
-        if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
-        env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          STRIPE_PRICE_STARTER: ${{ secrets.STRIPE_PRICE_STARTER }}
-          STRIPE_PRICE_PRO: ${{ secrets.STRIPE_PRICE_PRO }}
-        run: |
-          set -euo pipefail
-          kubectl create namespace "$TARGET_ENV" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-          if [ -z "${STRIPE_SECRET_KEY:-}" ]; then
-            echo "::notice::No STRIPE_SECRET_KEY set for '$TARGET_ENV' — billing stays disabled."
-            exit 0
-          fi
-          kubectl -n "$TARGET_ENV" create secret generic beacon-billing-secrets \
-            --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
-            --from-literal=STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY:-}" \
-            --from-literal=STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-}" \
-            --from-literal=STRIPE_PRICE_STARTER="${STRIPE_PRICE_STARTER:-}" \
-            --from-literal=STRIPE_PRICE_PRO="${STRIPE_PRICE_PRO:-}" \
-            --dry-run=client -o yaml | kubectl apply -f -
-          echo "::notice::beacon-billing-secrets applied to '$TARGET_ENV'."
 
       - name: Deploy Beacon Helm chart
         if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
