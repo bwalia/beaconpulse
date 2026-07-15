@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"beacon/internal/domain/monitor"
+	"beacon/internal/domain/plan"
 	"beacon/internal/platform/apperror"
 )
 
@@ -246,6 +247,33 @@ func (r *MonitorRepository) ListAllEnabled(ctx context.Context) ([]monitor.Monit
 			return nil, apperror.Internal(fmt.Errorf("scan monitor: %w", err))
 		}
 		out = append(out, *m)
+	}
+	return out, rows.Err()
+}
+
+// EffectivePlans returns each non-deleted org's effective plan, so the control
+// plane can cap probing to that tier's monitor limit — a depleted pay-as-you-go
+// org falls back to Free's 10. Limit values stay in the plan package.
+func (r *MonitorRepository) EffectivePlans(ctx context.Context) (map[uuid.UUID]plan.Plan, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, plan, subscription_status, credit_seconds FROM organizations WHERE deleted_at IS NULL`)
+	if err != nil {
+		return nil, apperror.Internal(fmt.Errorf("list org plans: %w", err))
+	}
+	defer rows.Close()
+	out := map[uuid.UUID]plan.Plan{}
+	for rows.Next() {
+		var (
+			id     uuid.UUID
+			p      string
+			status *string
+			credit int64
+		)
+		if err := rows.Scan(&id, &p, &status, &credit); err != nil {
+			return nil, apperror.Internal(fmt.Errorf("scan org plan: %w", err))
+		}
+		active := status != nil && (*status == "active" || *status == "trialing")
+		out[id] = plan.Effective(plan.Plan(p), active, credit)
 	}
 	return out, rows.Err()
 }

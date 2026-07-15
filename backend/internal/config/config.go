@@ -36,6 +36,7 @@ type Config struct {
 	Worker    Worker
 	Notify    Notify
 	AI        AI
+	Billing   Billing
 }
 
 // AI holds optional LLM-based alert enrichment configuration. When Enabled, a
@@ -61,6 +62,29 @@ type AI struct {
 }
 
 // Notify holds notification/alerting configuration.
+// Billing configures Stripe payments: recurring subscriptions (Starter/Pro) and
+// one-time pay-as-you-go top-ups. Empty StripeSecretKey disables billing entirely
+// (the API returns a clear error instead of half-working).
+type Billing struct {
+	StripeSecretKey      string
+	StripePublishableKey string
+	// StripeWebhookSecret verifies the signature on Stripe's webhook POSTs.
+	StripeWebhookSecret string
+	// PriceStarter / PricePro are the Stripe Price IDs for the two subscription
+	// tiers. Empty means that tier is not purchasable (Checkout is refused).
+	PriceStarter string
+	PricePro     string
+	// MonitorHoursPerDollar is the pay-as-you-go rate: $1 buys this many
+	// monitor-hours of credit. Default 5.
+	MonitorHoursPerDollar int
+	// SuccessURL / CancelURL are where Stripe Checkout returns the customer.
+	SuccessURL string
+	CancelURL  string
+}
+
+// Enabled reports whether Stripe is configured.
+func (b Billing) Enabled() bool { return b.StripeSecretKey != "" }
+
 type Notify struct {
 	// WebhookToken is the shared secret Alertmanager presents (as a Bearer
 	// token) when POSTing alerts to Beacon's webhook. Empty disables the check
@@ -218,6 +242,16 @@ func Load() (Config, error) {
 			DashboardURL:        getStr("BEACON_DASHBOARD_URL", "http://localhost:3000"),
 			WebhookAllowPrivate: getBool("BEACON_WEBHOOK_ALLOW_PRIVATE", false, add),
 			WebhookAllowHTTP:    getBool("BEACON_WEBHOOK_ALLOW_HTTP", false, add),
+		},
+		Billing: Billing{
+			StripeSecretKey:       getStr("STRIPE_SECRET_KEY", ""),
+			StripePublishableKey:  getStr("STRIPE_PUBLISHABLE_KEY", ""),
+			StripeWebhookSecret:   getStr("STRIPE_WEBHOOK_SECRET", ""),
+			PriceStarter:          getStr("STRIPE_PRICE_STARTER", ""),
+			PricePro:              getStr("STRIPE_PRICE_PRO", ""),
+			MonitorHoursPerDollar: getInt("BEACON_BILLING_MONITOR_HOURS_PER_DOLLAR", 5, add),
+			SuccessURL:            getStr("BEACON_BILLING_SUCCESS_URL", "http://localhost:3000/billing?checkout=success"),
+			CancelURL:             getStr("BEACON_BILLING_CANCEL_URL", "http://localhost:3000/billing?checkout=cancel"),
 		},
 		AI: AI{
 			Enabled: getBool("BEACON_AI_ENABLED", false, add),

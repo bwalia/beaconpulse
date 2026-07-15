@@ -22,6 +22,7 @@ import (
 	"beacon/internal/adapter/postgres"
 	"beacon/internal/adapter/promapi"
 	"beacon/internal/adapter/queue"
+	stripeadapter "beacon/internal/adapter/stripe"
 	"beacon/internal/config"
 	"beacon/internal/domain/audit"
 	"beacon/internal/domain/auth"
@@ -163,7 +164,26 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	// Tenant-scoped insight reads over Prometheus.
 	insightQuerier := promapi.NewInsightQuerier(promapi.New(cfg.CtrlPlane.PromQueryURL))
 	insightSvc := insight.NewService(insightQuerier, monitorRepo)
-	billingSvc := billing.NewService(orgPlanRepo, auditRec)
+	// Billing: Stripe-backed subscriptions + pay-as-you-go credit. When Stripe is
+	// unconfigured the service still serves the read-only overview; checkout is
+	// refused with a clear error.
+	billingRepo := postgres.NewBillingRepository(pool)
+	var payments billing.Payments
+	var stripeWebhook rest.StripeWebhook
+	if cfg.Billing.Enabled() {
+		stripeClient := stripeadapter.New(stripeadapter.Config{
+			SecretKey:     cfg.Billing.StripeSecretKey,
+			PriceStarter:  cfg.Billing.PriceStarter,
+			PricePro:      cfg.Billing.PricePro,
+			SuccessURL:    cfg.Billing.SuccessURL,
+			CancelURL:     cfg.Billing.CancelURL,
+			WebhookSecret: cfg.Billing.StripeWebhookSecret,
+		})
+		payments = stripeClient
+		stripeWebhook = stripeClient
+		log.Info("Stripe billing enabled")
+	}
+	billingSvc := billing.NewService(billingRepo, payments, auditRec, cfg.Billing.MonitorHoursPerDollar)
 
 	// Services.
 	authSvc := auth.NewService(userRepo, refreshRepo, tokens, hasher, auditRec)
@@ -196,7 +216,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Maintenance:        rest.NewMaintenanceHandler(maintenanceSvc, validator, authn),
 		Alert:              rest.NewAlertHandler(dispatcher, cfg.Notify.WebhookToken),
 		Insight:            rest.NewInsightHandler(insightSvc, maintenanceSvc),
-		Billing:            rest.NewBillingHandler(billingSvc, validator, authn),
+		Billing:            rest.NewBillingHandler(billingSvc, stripeWebhook, validator, authn),
 		StatusPage:         rest.NewStatusPageHandler(statusPageSvc),
 		Heartbeat:          rest.NewHeartbeatHandler(heartbeatSvc),
 		StatusPageSettings: rest.NewStatusPageSettingsHandler(statusPageSettingsSvc, validator, authn),

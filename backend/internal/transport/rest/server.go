@@ -85,6 +85,9 @@ func NewRouter(d RouterDeps) http.Handler {
 		// Alertmanager webhook: no JWT (Alertmanager can't present one); guarded
 		// by a shared secret inside the handler.
 		api.Post("/alerts/webhook", d.Alert.Webhook)
+		// Stripe webhook: no JWT (Stripe can't present one); authenticity comes
+		// from the signature the handler verifies against the webhook secret.
+		api.Post("/billing/webhook", d.Billing.Webhook)
 	})
 
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
