@@ -90,6 +90,12 @@ read_env() { # read_env KEY FILE -> value on stdout (empty if absent)
 }
 
 BEACON_AI_API_KEY="$(read_env BEACON_AI_API_KEY "$ENV_FILE")"
+# Stripe billing (all optional — empty just leaves billing disabled).
+STRIPE_SECRET_KEY="$(read_env STRIPE_SECRET_KEY "$ENV_FILE")"
+STRIPE_PUBLISHABLE_KEY="$(read_env STRIPE_PUBLISHABLE_KEY "$ENV_FILE")"
+STRIPE_WEBHOOK_SECRET="$(read_env STRIPE_WEBHOOK_SECRET "$ENV_FILE")"
+STRIPE_PRICE_STARTER="$(read_env STRIPE_PRICE_STARTER "$ENV_FILE")"
+STRIPE_PRICE_PRO="$(read_env STRIPE_PRICE_PRO "$ENV_FILE")"
 REGISTRY_USERNAME="$(read_env REGISTRY_USERNAME "$ENV_FILE")"
 REGISTRY_PASSWORD="$(read_env REGISTRY_PASSWORD "$ENV_FILE")"
 
@@ -213,6 +219,13 @@ ARGS=(generic beacon-secrets
   --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD")
 # The AI key is optional — the chart marks it optional so an empty value never
 # blocks pod start. Only include it when we actually have one.
+for _sk in STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_STARTER STRIPE_PRICE_PRO; do
+  _v="${!_sk}"
+  if [[ -n "$_v" ]]; then
+    ARGS+=(--from-literal="$_sk=$_v")
+    note "including $_sk from deploy/.env"
+  fi
+done
 if [[ -n "$BEACON_AI_API_KEY" ]]; then
   ARGS+=(--from-literal=BEACON_AI_API_KEY="$BEACON_AI_API_KEY")
   note "including BEACON_AI_API_KEY from deploy/.env"
