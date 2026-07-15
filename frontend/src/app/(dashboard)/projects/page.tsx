@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,6 +9,7 @@ import { useCreateProject, useProjects } from "@/lib/hooks";
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Select, Skeleton } from "@/components/ui";
 import { FolderIcon, PlusIcon, XIcon } from "@/components/icons";
+import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -26,6 +28,8 @@ const ENV_STYLES: Record<string, string> = {
 export default function ProjectsPage() {
   const { data, isLoading } = useProjects();
   const [showForm, setShowForm] = useState(false);
+  const reveal = useRevealVariants();
+  const stagger = useStaggerVariants(0.04);
 
   return (
     <div className="space-y-6">
@@ -62,12 +66,17 @@ export default function ProjectsPage() {
           Projects group related monitors so alerts and dashboards stay organized by application or team.
         </EmptyState>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <motion.ul
+          initial="hidden"
+          animate="show"
+          variants={stagger}
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
           {data.data.map((p) => (
-            <li key={p.id}>
+            <motion.li key={p.id} variants={reveal}>
               <Card className="h-full transition-shadow hover:shadow-md motion-reduce:transition-none">
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="truncate font-semibold">{p.name}</h3>
+                  <h3 className="truncate font-semibold text-slate-900 dark:text-white">{p.name}</h3>
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${
                       ENV_STYLES[p.environment] ?? ENV_STYLES.development
@@ -76,12 +85,12 @@ export default function ProjectsPage() {
                     {p.environment}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{p.description || "No description"}</p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{p.description || "No description"}</p>
                 <p className="mt-3 truncate font-mono text-xs text-slate-500 dark:text-slate-400">{p.slug}</p>
               </Card>
-            </li>
+            </motion.li>
           ))}
-        </ul>
+        </motion.ul>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 import {
   useChannels,
@@ -9,6 +10,7 @@ import {
   useSetChannelEnabled,
   useTestChannel,
 } from "@/lib/hooks";
+import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton } from "@/components/ui";
 import { useConfirm } from "@/components/confirm";
@@ -27,6 +29,8 @@ export default function NotificationsPage() {
   const { data, isLoading } = useChannels();
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const reveal = useRevealVariants();
+  const stagger = useStaggerVariants(0.05);
 
   return (
     <div className="space-y-6">
@@ -77,11 +81,13 @@ export default function NotificationsPage() {
           goes down — enriched with AI triage when enabled.
         </EmptyState>
       ) : (
-        <div className="space-y-3">
+        <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-3">
           {data.data.map((c) => (
-            <ChannelRow key={c.id} channel={c} setNotice={setNotice} />
+            <motion.div key={c.id} variants={reveal}>
+              <ChannelRow channel={c} setNotice={setNotice} />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );

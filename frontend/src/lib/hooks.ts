@@ -43,12 +43,48 @@ export function useCreateProject() {
 
 // ---- Monitors ----
 
+// useMonitors fetches up to 200 monitors in one shot. It backs the consumers that
+// need the whole set at once — the dashboard rollup, the status-page publish list,
+// and the maintenance scope pickers. The paginated Monitors PAGE uses
+// useMonitorsPage instead. (Keys share the "monitors" prefix so a create/delete
+// invalidation covers both.)
 export function useMonitors(projectId?: string) {
   const query = projectId ? `&project_id=${projectId}` : "";
   return useQuery({
     queryKey: ["monitors", projectId ?? "all"],
     queryFn: () => api.get<ListResponse<Monitor>>(`/api/v1/monitors?limit=200${query}`),
     refetchInterval: 15000, // near-real-time status without websockets in this slice
+  });
+}
+
+export interface MonitorPageParams {
+  /** Zero-based page index. */
+  page: number;
+  pageSize: number;
+  search?: string;
+  status?: string;
+  type?: string;
+  projectId?: string;
+}
+
+// useMonitorsPage is the server-side-paginated fetch for the Monitors page: one
+// page of results plus the total count, so the table scales to thousands of
+// monitors without shipping them all to the browser. placeholderData keeps the
+// current page on screen while the next loads, so paging doesn't flash a skeleton.
+export function useMonitorsPage(p: MonitorPageParams) {
+  const qs = new URLSearchParams({
+    limit: String(p.pageSize),
+    offset: String(p.page * p.pageSize),
+  });
+  if (p.search) qs.set("search", p.search);
+  if (p.status) qs.set("status", p.status);
+  if (p.type) qs.set("type", p.type);
+  if (p.projectId) qs.set("project_id", p.projectId);
+  return useQuery({
+    queryKey: ["monitors", "page", p],
+    queryFn: () => api.get<ListResponse<Monitor>>(`/api/v1/monitors?${qs.toString()}`),
+    refetchInterval: 15000,
+    placeholderData: (previous) => previous,
   });
 }
 

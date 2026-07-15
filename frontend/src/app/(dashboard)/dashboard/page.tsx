@@ -40,6 +40,8 @@ import {
 const SLO_PERCENT = 99;
 /** Matches `overviewBuckets` in the Go handler: the API reduces every window to this many samples. */
 const SLOT_COUNT = 48;
+// The dashboard shows only the worst few monitors; the rest live on /monitors.
+const DASHBOARD_MONITOR_CAP = 8;
 
 export default function DashboardPage() {
   const [hours, setHours] = useState<RangeHours>(24);
@@ -175,11 +177,26 @@ export default function DashboardPage() {
             .
           </EmptyCard>
         ) : (
-          <div className="grid gap-2.5">
-            {triaged.map((m) => (
-              <MonitorRow key={m.id} monitor={m} hist={histById.get(m.id)} winShort={winShort} />
-            ))}
-          </div>
+          <>
+            {/* The dashboard is a summary, not the full list — show the worst few and
+                link out. Otherwise 100+ monitors would bury everything below them. */}
+            <div className="grid gap-2.5">
+              {triaged.slice(0, DASHBOARD_MONITOR_CAP).map((m) => (
+                <MonitorRow key={m.id} monitor={m} hist={histById.get(m.id)} winShort={winShort} />
+              ))}
+            </div>
+            {list.length > DASHBOARD_MONITOR_CAP && (
+              <div className="mt-3 flex justify-center">
+                <Link
+                  href="/monitors"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:bg-brand-900/20"
+                >
+                  View all {list.length} monitors
+                  <ArrowRightIcon className="h-4 w-4" />
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </section>
 

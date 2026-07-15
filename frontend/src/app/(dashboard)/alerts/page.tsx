@@ -1,8 +1,11 @@
 "use client";
 
+import { motion } from "framer-motion";
+
 import { useActiveAlerts } from "@/lib/hooks";
 import { Card, EmptyState, PageHeader, Skeleton } from "@/components/ui";
 import { AlertTriangleIcon, CheckCircleIcon, ClockIcon, WrenchIcon } from "@/components/icons";
+import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
 
 function sinceLabel(since?: string): string {
   if (!since) return "";
@@ -19,6 +22,8 @@ export default function AlertsPage() {
   const { data, isLoading } = useActiveAlerts();
   const alerts = data?.data ?? [];
   const critical = alerts.filter((a) => a.severity === "critical").length;
+  const reveal = useRevealVariants();
+  const stagger = useStaggerVariants(0.05);
 
   return (
     <div className="space-y-6">
@@ -49,11 +54,11 @@ export default function AlertsPage() {
           Nothing is firing right now. Alerts appear here the moment a monitor breaches its rule.
         </EmptyState>
       ) : (
-        <ul className="space-y-3">
+        <motion.ul initial="hidden" animate="show" variants={stagger} className="space-y-3">
           {alerts.map((a, i) => {
             const isCritical = a.severity === "critical";
             return (
-              <li key={i}>
+              <motion.li key={i} variants={reveal}>
                 <Card
                   className={`border-l-4 transition-shadow hover:shadow-md motion-reduce:transition-none ${
                     isCritical ? "border-l-red-600" : "border-l-amber-500"
@@ -96,10 +101,10 @@ export default function AlertsPage() {
                     )}
                   </div>
                 </Card>
-              </li>
+              </motion.li>
             );
           })}
-        </ul>
+        </motion.ul>
       )}
     </div>
   );
