@@ -28,8 +28,9 @@ import {
   StatusBadge,
   Textarea,
 } from "@/components/ui";
-import { ActivityIcon, ArrowRightIcon, CheckCircleIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
+import { ActivityIcon, CheckCircleIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
 import { useConfirm } from "@/components/confirm";
+import { Pagination, SearchInput } from "@/components/table-controls";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import type { MetricPoint, Monitor } from "@/lib/types";
 
@@ -214,10 +215,7 @@ export default function MonitorsPage() {
 
   const rows = data?.data ?? [];
   const total = data?.pagination.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filtering = search !== "" || status !== "";
-  const from = total === 0 ? 0 : page * PAGE_SIZE + 1;
-  const to = Math.min(total, (page + 1) * PAGE_SIZE);
   const stagger = useStaggerVariants(0.03);
 
   const atLimit = usage ? usage.monitors_used >= usage.monitors_limit : false;
@@ -275,16 +273,12 @@ export default function MonitorsPage() {
       {/* Toolbar: server-side search + status filter. */}
       {(total > 0 || filtering) && !isLoading && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search by name or target…"
-              aria-label="Search monitors"
-              className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
-            />
-          </div>
+          <SearchInput
+            value={searchInput}
+            onChange={setSearchInput}
+            placeholder="Search by name or target…"
+            label="Search monitors"
+          />
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
@@ -338,7 +332,7 @@ export default function MonitorsPage() {
       ) : (
         <>
           <Card className="overflow-x-auto p-0">
-            <table className="w-full text-sm">
+            <table className="w-full text-[15px]">
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-semibold">Status</th>
@@ -368,41 +362,14 @@ export default function MonitorsPage() {
             </table>
           </Card>
 
-          {/* Pagination footer */}
-          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Showing{" "}
-              <span className="font-medium tabular-nums text-slate-900 dark:text-slate-200">
-                {from}–{to}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium tabular-nums text-slate-900 dark:text-slate-200">{total}</span>{" "}
-              monitor{total === 1 ? "" : "s"}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                <ArrowRightIcon className="h-4 w-4 rotate-180" />
-                Previous
-              </Button>
-              <span className="px-1 text-sm tabular-nums text-slate-500 dark:text-slate-400">
-                {page + 1} / {pageCount}
-              </span>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page + 1 >= pageCount}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-                <ArrowRightIcon className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={total}
+            unit="monitors"
+            busy={isPlaceholderData}
+            onPageChange={setPage}
+          />
         </>
       )}
 
@@ -434,7 +401,7 @@ function MonitorRow({
       variants={reveal}
       className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40"
     >
-      <td className="px-4 py-3 align-top">
+      <td className="px-4 py-3.5 align-top">
         <div className="flex flex-col items-start gap-1">
           <StatusBadge status={monitor.enabled ? monitor.last_status : "paused"} />
           {monitor.in_maintenance && (
@@ -448,7 +415,7 @@ function MonitorRow({
           )}
         </div>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5">
         <button
           onClick={onMetrics}
           className="rounded text-left font-medium text-slate-900 hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-white dark:hover:text-brand-400"
@@ -456,23 +423,23 @@ function MonitorRow({
           {monitor.name}
         </button>
       </td>
-      <td className="px-4 py-3">
-        <span className="inline-block rounded border border-slate-200 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:text-slate-300">
+      <td className="px-4 py-3.5">
+        <span className="inline-block rounded border border-slate-200 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:text-slate-300">
           {monitor.type}
         </span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5">
         {/* A heartbeat has no probe target; show its ping URL instead, so the
             owner can retrieve it any time. Truncate long values with the full
             string on hover. */}
         <span
           title={target}
-          className="block max-w-[22rem] truncate font-mono text-[13px] text-slate-600 dark:text-slate-300 lg:max-w-[32rem]"
+          className="block max-w-[22rem] truncate font-mono text-sm text-slate-700 dark:text-slate-300 lg:max-w-[32rem]"
         >
           {target}
         </span>
       </td>
-      <td className="px-4 py-3 tabular-nums text-slate-600 dark:text-slate-300">{monitor.interval_seconds}s</td>
+      <td className="px-4 py-3.5 tabular-nums text-slate-700 dark:text-slate-300">{monitor.interval_seconds}s</td>
       <td className="px-4 py-3">
         {/* Safe actions recede; the destructive one keeps its danger colour but is
             separated and de-emphasised, so `Delete` isn't the loudest thing on the

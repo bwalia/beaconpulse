@@ -94,7 +94,12 @@ func notificationActor(r *http.Request) notification.Actor {
 // ---- handlers ----
 
 func (h *NotificationHandler) list(w http.ResponseWriter, r *http.Request) {
-	items, err := h.svc.List(r.Context(), notificationActor(r))
+	limit, offset := paginationParams(r, 20, 200)
+	items, total, err := h.svc.List(r.Context(), notificationActor(r), notification.ListFilter{
+		Search: r.URL.Query().Get("search"),
+		Limit:  limit,
+		Offset: offset,
+	})
 	if err != nil {
 		httpx.Error(w, r, err)
 		return
@@ -103,7 +108,7 @@ func (h *NotificationHandler) list(w http.ResponseWriter, r *http.Request) {
 	for i := range items {
 		out = append(out, presentChannel(&items[i]))
 	}
-	httpx.OK(w, map[string]any{"data": out})
+	httpx.OK(w, newListResponse(out, total, limit, offset))
 }
 
 func (h *NotificationHandler) get(w http.ResponseWriter, r *http.Request) {

@@ -96,9 +96,9 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Cha
 	return ch, nil
 }
 
-// List returns the org's channels.
-func (s *Service) List(ctx context.Context, actor Actor) ([]Channel, error) {
-	return s.repo.List(ctx, actor.OrgID)
+// List returns a paginated page of the org's channels plus the total count.
+func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Channel, int, error) {
+	return s.repo.List(ctx, actor.OrgID, f)
 }
 
 // Get returns one channel.

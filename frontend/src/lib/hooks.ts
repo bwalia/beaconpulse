@@ -22,10 +22,30 @@ import type {
 
 // ---- Projects ----
 
+// useProjects fetches up to 200 projects at once — for the project SELECTORS
+// (monitor form, maintenance scope). The Projects PAGE uses useProjectsPage.
 export function useProjects() {
   return useQuery({
     queryKey: ["projects"],
     queryFn: () => api.get<ListResponse<Project>>("/api/v1/projects?limit=200"),
+  });
+}
+
+export interface ProjectPageParams {
+  page: number;
+  pageSize: number;
+  search?: string;
+  environment?: string;
+}
+
+export function useProjectsPage(p: ProjectPageParams) {
+  const qs = new URLSearchParams({ limit: String(p.pageSize), offset: String(p.page * p.pageSize) });
+  if (p.search) qs.set("search", p.search);
+  if (p.environment) qs.set("environment", p.environment);
+  return useQuery({
+    queryKey: ["projects", "page", p],
+    queryFn: () => api.get<ListResponse<Project>>(`/api/v1/projects?${qs.toString()}`),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -159,10 +179,19 @@ export function useDeleteMonitor() {
 
 // ---- Notification channels ----
 
-export function useChannels() {
+export interface ChannelPageParams {
+  page: number;
+  pageSize: number;
+  search?: string;
+}
+
+export function useChannels(p: ChannelPageParams) {
+  const qs = new URLSearchParams({ limit: String(p.pageSize), offset: String(p.page * p.pageSize) });
+  if (p.search) qs.set("search", p.search);
   return useQuery({
-    queryKey: ["channels"],
-    queryFn: () => api.get<{ data: NotificationChannel[] }>("/api/v1/notification-channels"),
+    queryKey: ["channels", p],
+    queryFn: () => api.get<ListResponse<NotificationChannel>>(`/api/v1/notification-channels?${qs.toString()}`),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -207,11 +236,28 @@ export function useTestChannel() {
 
 // ---- Insight (tenant-scoped, from Prometheus) ----
 
-export function useActiveAlerts() {
+export interface AlertPageParams {
+  page: number;
+  pageSize: number;
+  severity?: string;
+}
+
+// useActiveAlerts returns firing alerts. Params paginate/filter server-side; called
+// with none (the dashboard), it fetches the default page and still carries the true
+// total in pagination.total for the count tile.
+export function useActiveAlerts(p?: AlertPageParams) {
+  const qs = new URLSearchParams();
+  if (p) {
+    qs.set("limit", String(p.pageSize));
+    qs.set("offset", String(p.page * p.pageSize));
+    if (p.severity) qs.set("severity", p.severity);
+  }
+  const query = qs.toString();
   return useQuery({
-    queryKey: ["alerts"],
-    queryFn: () => api.get<{ data: ActiveAlert[] }>("/api/v1/alerts"),
+    queryKey: ["alerts", p ?? "default"],
+    queryFn: () => api.get<ListResponse<ActiveAlert>>(`/api/v1/alerts${query ? `?${query}` : ""}`),
     refetchInterval: 15000,
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -294,14 +340,24 @@ export function useSetMonitorPublic() {
 
 // ---- Maintenance windows ----
 
-export function useMaintenanceWindows() {
+export interface MaintenancePageParams {
+  page: number;
+  pageSize: number;
+}
+
+export function useMaintenanceWindows(p?: MaintenancePageParams) {
+  const qs = new URLSearchParams(
+    p
+      ? { limit: String(p.pageSize), offset: String(p.page * p.pageSize) }
+      : { limit: "200" },
+  );
   return useQuery({
-    queryKey: ["maintenance-windows"],
-    queryFn: () =>
-      api.get<ListResponse<MaintenanceWindow>>("/api/v1/maintenance-windows?limit=200"),
+    queryKey: ["maintenance-windows", p ?? "all"],
+    queryFn: () => api.get<ListResponse<MaintenanceWindow>>(`/api/v1/maintenance-windows?${qs.toString()}`),
     // A window flips active/ended on the server clock; refresh so the badge and
     // the "now under maintenance" state do not go stale on an open tab.
     refetchInterval: 30000,
+    placeholderData: (previous) => previous,
   });
 }
 

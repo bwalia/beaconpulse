@@ -1,11 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 import { useActiveAlerts } from "@/lib/hooks";
 import { Card, EmptyState, PageHeader, Skeleton } from "@/components/ui";
-import { AlertTriangleIcon, CheckCircleIcon, ClockIcon, WrenchIcon } from "@/components/icons";
+import { AlertTriangleIcon, CheckCircleIcon, ClockIcon, SearchIcon, WrenchIcon } from "@/components/icons";
+import { Pagination } from "@/components/table-controls";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
+
+const ALERTS_PAGE_SIZE = 20;
 
 function sinceLabel(since?: string): string {
   if (!since) return "";
@@ -19,9 +23,19 @@ function sinceLabel(since?: string): string {
 }
 
 export default function AlertsPage() {
-  const { data, isLoading } = useActiveAlerts();
+  const [page, setPage] = useState(0);
+  const [severity, setSeverity] = useState("");
+  useEffect(() => {
+    setPage(0);
+  }, [severity]);
+
+  const { data, isLoading, isPlaceholderData } = useActiveAlerts({
+    page,
+    pageSize: ALERTS_PAGE_SIZE,
+    severity: severity || undefined,
+  });
   const alerts = data?.data ?? [];
-  const critical = alerts.filter((a) => a.severity === "critical").length;
+  const total = data?.pagination.total ?? 0;
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.05);
 
@@ -31,14 +45,29 @@ export default function AlertsPage() {
         title="Alerts"
         subtitle="Currently-firing alerts for your organization only."
         actions={
-          alerts.length > 0 ? (
+          total > 0 ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-800 dark:bg-red-950/60 dark:text-red-300">
               <AlertTriangleIcon className="h-3.5 w-3.5" />
-              {alerts.length} firing{critical ? ` · ${critical} critical` : ""}
+              {total} firing
             </span>
           ) : null
         }
       />
+
+      {(total > 0 || severity) && !isLoading && (
+        <div className="flex justify-end">
+          <select
+            value={severity}
+            onChange={(e) => setSeverity(e.target.value)}
+            aria-label="Filter by severity"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-48"
+          >
+            <option value="">All severities</option>
+            <option value="critical">Critical</option>
+            <option value="warning">Warning</option>
+          </select>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-3">
@@ -46,16 +75,41 @@ export default function AlertsPage() {
             <Skeleton key={i} className="h-24 w-full rounded-xl" />
           ))}
         </div>
-      ) : alerts.length === 0 ? (
+      ) : total === 0 ? (
         <EmptyState
-          icon={<CheckCircleIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
-          title="All clear"
+          icon={
+            severity ? (
+              <SearchIcon className="h-5 w-5" />
+            ) : (
+              <CheckCircleIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            )
+          }
+          title={severity ? "No matching alerts" : "All clear"}
+          action={
+            severity ? (
+              <button
+                onClick={() => setSeverity("")}
+                className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-400"
+              >
+                Clear filter
+              </button>
+            ) : undefined
+          }
         >
-          Nothing is firing right now. Alerts appear here the moment a monitor breaches its rule.
+          {severity
+            ? `No ${severity} alerts are firing right now.`
+            : "Nothing is firing right now. Alerts appear here the moment a monitor breaches its rule."}
         </EmptyState>
       ) : (
-        <motion.ul initial="hidden" animate="show" variants={stagger} className="space-y-3">
-          {alerts.map((a, i) => {
+        <>
+          <motion.ul
+            key={page}
+            initial="hidden"
+            animate="show"
+            variants={stagger}
+            className={`space-y-3 ${isPlaceholderData ? "opacity-60 transition-opacity" : "transition-opacity"}`}
+          >
+            {alerts.map((a, i) => {
             const isCritical = a.severity === "critical";
             return (
               <motion.li key={i} variants={reveal}>
@@ -104,7 +158,16 @@ export default function AlertsPage() {
               </motion.li>
             );
           })}
-        </motion.ul>
+          </motion.ul>
+          <Pagination
+            page={page}
+            pageSize={ALERTS_PAGE_SIZE}
+            total={total}
+            unit="alerts"
+            busy={isPlaceholderData}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </div>
   );

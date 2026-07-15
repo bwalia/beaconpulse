@@ -55,6 +55,8 @@ export default function DashboardPage() {
   const up = enabled.filter((m) => m.last_status === "up").length;
   const downMonitors = enabled.filter((m) => m.last_status === "down");
   const activeAlerts = alerts?.data ?? [];
+  // The endpoint paginates now; the true firing count lives in pagination.total.
+  const activeAlertCount = alerts?.pagination.total ?? activeAlerts.length;
 
   const histById = new Map<string, MonitorUptime>();
   (overview?.monitors ?? []).forEach((m) => histById.set(m.monitor_id, m));
@@ -86,7 +88,7 @@ export default function DashboardPage() {
         total={enabled.length}
         up={up}
         downNames={downMonitors.map((m) => m.name)}
-        alertCount={activeAlerts.length}
+        alertCount={activeAlertCount}
       />
 
       {/* Stat tiles. The number wears a text token; the rail, dot and delta chip
@@ -127,9 +129,9 @@ export default function DashboardPage() {
         />
         <StatTile
           label="Active alerts"
-          value={activeAlerts.length}
-          sub={activeAlerts.length ? "needs attention" : "none firing"}
-          tone={activeAlerts.length ? "critical" : "good"}
+          value={activeAlertCount}
+          sub={activeAlertCount ? "needs attention" : "none firing"}
+          tone={activeAlertCount ? "critical" : "good"}
         />
       </div>
 
@@ -206,7 +208,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold">Active alerts</h2>
           <NavLink href="/alerts">View all</NavLink>
         </div>
-        {activeAlerts.length === 0 ? (
+        {activeAlertCount === 0 ? (
           <EmptyCard>
             <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
               <CheckCircleIcon className="h-4 w-4" />

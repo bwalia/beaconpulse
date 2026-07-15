@@ -12,14 +12,17 @@ import {
   LockIcon,
 } from "@/components/icons";
 import { Button, Card, Label, PageHeader, Skeleton } from "@/components/ui";
+import { Pagination, SearchInput } from "@/components/table-controls";
 import { ApiRequestError } from "@/lib/api";
 import {
-  useMonitors,
+  useMonitorsPage,
   useSetMonitorPublic,
   useStatusPageSettings,
   useUpdateStatusPageSettings,
 } from "@/lib/hooks";
 import { DUR, useRevealVariants, useStaggerVariants } from "@/lib/motion";
+
+const DOMAINS_PAGE_SIZE = 10;
 
 /**
  * Owner controls for the public status page.
@@ -31,9 +34,24 @@ import { DUR, useRevealVariants, useStaggerVariants } from "@/lib/motion";
  */
 export default function StatusPageSettings() {
   const { data: settings, isLoading } = useStatusPageSettings();
-  const { data: monitors } = useMonitors();
   const update = useUpdateStatusPageSettings();
   const setPublic = useSetMonitorPublic();
+
+  const [domainPage, setDomainPage] = useState(0);
+  const [domainSearchInput, setDomainSearchInput] = useState("");
+  const [domainSearch, setDomainSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDomainSearch(domainSearchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [domainSearchInput]);
+  useEffect(() => {
+    setDomainPage(0);
+  }, [domainSearch]);
+  const { data: monitors, isPlaceholderData: monitorsBusy } = useMonitorsPage({
+    page: domainPage,
+    pageSize: DOMAINS_PAGE_SIZE,
+    search: domainSearch || undefined,
+  });
 
   const [title, setTitle] = useState("");
   // null until the user edits, so the field shows the saved custom slug first and an
@@ -59,8 +77,13 @@ export default function StatusPageSettings() {
     );
   }
 
-  const published = monitors?.data?.filter((m) => m.public) ?? [];
-  const enabledButEmpty = settings.enabled && published.length === 0;
+  // The authoritative published count comes from the settings API (org-wide), not
+  // the current monitor page — so the "enabled but empty" warning is correct even
+  // when the list below is paginated or filtered.
+  const monitorRows = monitors?.data ?? [];
+  const monitorTotal = monitors?.pagination.total ?? 0;
+  const domainSearching = domainSearch !== "";
+  const enabledButEmpty = settings.enabled && settings.published_count === 0;
 
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
@@ -260,7 +283,7 @@ export default function StatusPageSettings() {
       {/* ---- Which domains are public ---- */}
       <motion.div variants={reveal}>
         <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-6 py-4 dark:border-slate-800">
             <div>
               <h2 className="font-semibold text-slate-900 dark:text-white">Published domains</h2>
               <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
@@ -268,13 +291,26 @@ export default function StatusPageSettings() {
                 configuration.
               </p>
             </div>
-            <span className="shrink-0 font-mono text-sm tabular-nums text-slate-500 dark:text-slate-400">
-              {published.length}/{monitors?.data?.length ?? 0}
+            <span className="shrink-0 font-mono text-sm tabular-nums text-slate-600 dark:text-slate-300">
+              {settings.published_count} of {monitorTotal} public
             </span>
           </div>
 
-          <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-            {(monitors?.data ?? []).map((m) => (
+          {(monitorTotal > 0 || domainSearching) && (
+            <div className="border-b border-slate-200 px-6 py-3 dark:border-slate-800">
+              <SearchInput
+                value={domainSearchInput}
+                onChange={setDomainSearchInput}
+                placeholder="Search monitors…"
+                label="Search monitors to publish"
+              />
+            </div>
+          )}
+
+          <ul
+            className={`divide-y divide-slate-200 dark:divide-slate-800 ${monitorsBusy ? "opacity-60 transition-opacity" : "transition-opacity"}`}
+          >
+            {monitorRows.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-4 px-6 py-4">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900 dark:text-white">{m.name}</p>
@@ -302,10 +338,25 @@ export default function StatusPageSettings() {
             ))}
           </ul>
 
-          {(monitors?.data?.length ?? 0) === 0 && (
+          {monitorTotal === 0 && (
             <p className="px-6 py-10 text-center text-slate-500 dark:text-slate-400">
-              No monitors yet. Add one and it will appear here, private by default.
+              {domainSearching
+                ? "No monitors match your search."
+                : "No monitors yet. Add one and it will appear here, private by default."}
             </p>
+          )}
+
+          {monitorTotal > 0 && (
+            <div className="border-t border-slate-200 px-6 py-3 dark:border-slate-800">
+              <Pagination
+                page={domainPage}
+                pageSize={DOMAINS_PAGE_SIZE}
+                total={monitorTotal}
+                unit="monitors"
+                busy={monitorsBusy}
+                onPageChange={setDomainPage}
+              />
+            </div>
           )}
         </Card>
       </motion.div>

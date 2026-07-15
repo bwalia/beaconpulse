@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 import {
@@ -10,12 +10,15 @@ import {
   useSetChannelEnabled,
   useTestChannel,
 } from "@/lib/hooks";
+import { Pagination, SearchInput } from "@/components/table-controls";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
+
+const NOTIFICATIONS_PAGE_SIZE = 20;
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton } from "@/components/ui";
 import { useConfirm } from "@/components/confirm";
 import type { NotificationChannel } from "@/lib/types";
-import { BellIcon, LockIcon, PlusIcon, XIcon } from "@/components/icons";
+import { BellIcon, LockIcon, PlusIcon, SearchIcon, XIcon } from "@/components/icons";
 import {
   CHANNEL_TYPES,
   channelTypeDef,
@@ -26,11 +29,30 @@ import {
 type Notice = { kind: "ok" | "err"; text: string } | null;
 
 export default function NotificationsPage() {
-  const { data, isLoading } = useChannels();
+  const [page, setPage] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.05);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+  useEffect(() => {
+    setPage(0);
+  }, [search]);
+
+  const { data, isLoading, isPlaceholderData } = useChannels({
+    page,
+    pageSize: NOTIFICATIONS_PAGE_SIZE,
+    search: search || undefined,
+  });
+  const rows = data?.data ?? [];
+  const total = data?.pagination.total ?? 0;
+  const filtering = search !== "";
 
   return (
     <div className="space-y-6">
@@ -60,34 +82,66 @@ export default function NotificationsPage() {
 
       {showForm && <CreateChannelForm onDone={() => setShowForm(false)} setNotice={setNotice} />}
 
+      {(total > 0 || filtering) && !isLoading && (
+        <SearchInput
+          value={searchInput}
+          onChange={setSearchInput}
+          placeholder="Search channels by name…"
+          label="Search notification channels"
+        />
+      )}
+
       {isLoading ? (
         <div className="space-y-3">
           {[0, 1].map((i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
-      ) : !data?.data.length ? (
+      ) : total === 0 ? (
         <EmptyState
-          icon={<BellIcon className="h-5 w-5" />}
-          title="No channels yet"
+          icon={filtering ? <SearchIcon className="h-5 w-5" /> : <BellIcon className="h-5 w-5" />}
+          title={filtering ? "No matching channels" : "No channels yet"}
           action={
-            <Button onClick={() => setShowForm(true)}>
-              <PlusIcon className="h-4 w-4" />
-              Add channel
-            </Button>
+            filtering ? (
+              <Button variant="secondary" onClick={() => setSearchInput("")}>
+                Clear search
+              </Button>
+            ) : (
+              <Button onClick={() => setShowForm(true)}>
+                <PlusIcon className="h-4 w-4" />
+                Add channel
+              </Button>
+            )
           }
         >
-          Connect Slack, email, a webhook or Telegram and Beacon Pulse will alert you the moment a monitor
-          goes down — enriched with AI triage when enabled.
+          {filtering
+            ? "No notification channels match your search."
+            : "Connect Slack, email, a webhook or Telegram and Beacon Pulse will alert you the moment a monitor goes down — enriched with AI triage when enabled."}
         </EmptyState>
       ) : (
-        <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-3">
-          {data.data.map((c) => (
-            <motion.div key={c.id} variants={reveal}>
-              <ChannelRow channel={c} setNotice={setNotice} />
-            </motion.div>
-          ))}
-        </motion.div>
+        <>
+          <motion.div
+            key={page}
+            initial="hidden"
+            animate="show"
+            variants={stagger}
+            className={`space-y-3 ${isPlaceholderData ? "opacity-60 transition-opacity" : "transition-opacity"}`}
+          >
+            {rows.map((c) => (
+              <motion.div key={c.id} variants={reveal}>
+                <ChannelRow channel={c} setNotice={setNotice} />
+              </motion.div>
+            ))}
+          </motion.div>
+          <Pagination
+            page={page}
+            pageSize={NOTIFICATIONS_PAGE_SIZE}
+            total={total}
+            unit="channels"
+            busy={isPlaceholderData}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </div>
   );
