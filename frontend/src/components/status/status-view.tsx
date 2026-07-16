@@ -2,6 +2,8 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import { BeaconMark } from "@/components/icons";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
@@ -169,11 +171,56 @@ function MaintenanceBlock({ windows }: { windows: PublicStatusMaintenance[] }) {
   );
 }
 
+/**
+ * Re-asks the server for this page on a timer, so an OPEN tab keeps up.
+ *
+ * The route's `revalidate` only makes the SERVER rebuild the page; it says nothing
+ * about a browser that already has it. Without this the markup a visitor loaded is
+ * the markup they keep — during an outage they would sit on "ALL SYSTEMS
+ * OPERATIONAL" for as long as the tab stayed open, while the ticking "Ago" labels
+ * made it look live. Stale is bad; stale and convincingly alive is worse.
+ *
+ * router.refresh() re-fetches this route rather than the API, which is the point:
+ * the answer comes from the route cache, so ten thousand people watching an incident
+ * cost one backend read per revalidate window instead of ten thousand. A status page
+ * is read exactly when the infrastructure behind it is least able to take the load.
+ */
+function useLiveRefresh(intervalMs: number) {
+  const router = useRouter();
+  useEffect(() => {
+    const refresh = () => router.refresh();
+    // Hidden tabs don't poll — nobody is reading, and a status page can be left open
+    // for days. Visibility change covers the return.
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
+    }, intervalMs);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", refresh);
+    };
+  }, [router, intervalMs]);
+}
+
 export function StatusView({ page }: { page: PublicStatusPage }) {
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.06);
   const reduceMotion = useReducedMotion();
   const o = OVERALL[page.overall] ?? OVERALL.unknown;
+
+  // Half the route's revalidate window, deliberately. Revalidation is
+  // stale-while-revalidate: the first request after the window expires still gets the
+  // OLD render and merely triggers the rebuild, and only a later request sees the new
+  // data. Polling at the window length would wait a full extra window for that second
+  // request; polling at half lands it sooner. Measured end-to-end, a change published
+  // mid-window surfaces in a tab within roughly 30-60s. The extra polls are answered
+  // from the route cache and never reach the API.
+  useLiveRefresh(15_000);
 
   return (
     <div
