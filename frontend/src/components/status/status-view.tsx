@@ -1,10 +1,11 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { useEffect, useState } from "react";
+import Link from "next/link";
 
 import { BeaconMark } from "@/components/icons";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
+import { useHydrated, useNow } from "@/lib/time";
 import type {
   PublicStatusGroup,
   PublicStatusMaintenance,
@@ -62,44 +63,38 @@ const CRT: React.CSSProperties = {
   ].join(","),
 };
 
-/** "2 minutes ago", rendered client-side to avoid an SSR/CSR clock mismatch. */
+/**
+ * "2 minutes ago". Derived from the shared clock rather than read during render, so
+ * it ticks on its own and the server (which has no matching clock) renders nothing
+ * instead of a number the browser would immediately contradict.
+ */
 function Ago({ iso }: { iso: string | null }) {
-  const [text, setText] = useState<string>("");
-  useEffect(() => {
-    if (!iso) {
-      setText("NEVER");
-      return;
-    }
-    const compute = () => {
-      const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-      if (secs < 60) return `${Math.floor(secs)}S AGO`;
-      if (secs < 3600) return `${Math.floor(secs / 60)}M AGO`;
-      if (secs < 86400) return `${Math.floor(secs / 3600)}H AGO`;
-      return `${Math.floor(secs / 86400)}D AGO`;
-    };
-    setText(compute());
-    const t = setInterval(() => setText(compute()), 30_000);
-    return () => clearInterval(t);
-  }, [iso]);
+  const now = useNow(30_000);
   return (
-    <span suppressHydrationWarning className="tabular-nums text-slate-500">
-      {text}
-    </span>
+    <span className="tabular-nums text-slate-500">{now === null ? "" : agoText(iso, now)}</span>
   );
 }
 
+function agoText(iso: string | null, now: number): string {
+  if (!iso) return "NEVER";
+  const secs = Math.max(0, (now - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return `${Math.floor(secs)}S AGO`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}M AGO`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}H AGO`;
+  return `${Math.floor(secs / 86400)}D AGO`;
+}
+
+/** Local-time window bounds — gated on hydration because the server cannot know the
+ *  reader's timezone or locale, and would render a string the browser replaces. */
 function WindowWhen({ startsAt, endsAt }: { startsAt: string; endsAt: string }) {
-  const [text, setText] = useState<string>("");
-  useEffect(() => {
-    const fmt = (iso: string) =>
-      new Date(iso)
-        .toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
-        .toUpperCase();
-    setText(`${fmt(startsAt)} → ${fmt(endsAt)}`);
-  }, [startsAt, endsAt]);
+  const hydrated = useHydrated();
+  const fmt = (iso: string) =>
+    new Date(iso)
+      .toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+      .toUpperCase();
   return (
-    <span suppressHydrationWarning className="tabular-nums text-orange-300/80">
-      {text}
+    <span className="tabular-nums text-orange-300/80">
+      {hydrated ? `${fmt(startsAt)} → ${fmt(endsAt)}` : ""}
     </span>
   );
 }
@@ -207,7 +202,7 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
             variants={reveal}
             className="mb-5 flex items-center justify-between border-b border-slate-800 pb-4"
           >
-            <a
+            <Link
               href="/"
               className="group flex items-center gap-2.5 text-orange-400 focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
             >
@@ -215,13 +210,13 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
               <span className="text-xs uppercase tracking-[0.2em] group-hover:text-orange-300 sm:text-sm">
                 Beacon&nbsp;Pulse
               </span>
-            </a>
-            <a
+            </Link>
+            <Link
               href="/"
               className="text-[11px] uppercase tracking-[0.25em] text-slate-500 underline-offset-4 hover:text-orange-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
             >
               ← Home
-            </a>
+            </Link>
           </motion.header>
 
           {/* Terminal window */}
@@ -232,7 +227,7 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
             {/* Title bar */}
             <div className="flex items-center justify-between border-b border-slate-700/70 bg-white/[0.02] px-4 py-2.5 text-[11px] uppercase tracking-widest">
               <span className="truncate text-slate-400">
-                BEACONPULSE<span className="text-slate-600"> // </span>
+                BEACONPULSE<span className="text-slate-600">{" // "}</span>
                 <span className="text-slate-300">{page.title}</span>
               </span>
               <span className="flex shrink-0 items-center gap-2 text-emerald-400">
@@ -272,12 +267,12 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
             {/* Footer strip */}
             <div className="flex items-center justify-between border-t border-slate-700/70 bg-white/[0.02] px-4 py-2.5 text-[11px] uppercase tracking-widest text-slate-600">
               <span>{page.org_name}</span>
-              <a
+              <Link
                 href="/"
                 className="text-slate-500 underline-offset-4 hover:text-orange-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
               >
                 POWERED BY BEACON PULSE
-              </a>
+              </Link>
             </div>
           </motion.div>
 

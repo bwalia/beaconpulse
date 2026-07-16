@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { DisplayIcon, MoonIcon, SunIcon } from "@/components/icons";
 
 export type Theme = "light" | "dark" | "system";
@@ -26,14 +26,31 @@ function readTheme(): Theme {
   return raw === "light" || raw === "dark" ? raw : "system";
 }
 
-export function useTheme(): [Theme, (t: Theme) => void] {
-  // Start at "system" so server and first client render agree; the inline script
-  // has already painted the correct colours, so there is no flash to correct.
-  const [theme, setThemeState] = useState<Theme>("system");
+// The stored theme IS the state, so it is subscribed to rather than copied into
+// React state on mount. Copying meant a first render that always claimed "system"
+// followed by a correcting one, and it left other tabs out of sync. Listeners are
+// notified explicitly because a tab does not receive its own `storage` event.
+const listeners = new Set<() => void>();
 
-  useEffect(() => {
-    setThemeState(readTheme());
-  }, []);
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+// Safe as a snapshot: it returns one of three interned strings, so React's
+// Object.is check settles instead of re-rendering forever.
+const getSnapshot = () => readTheme();
+// "system" server-side, matching the inline no-FOUC script in app/layout.tsx, which
+// has already painted the real colours before React arrives — so there is nothing to
+// correct and no flash.
+const getServerSnapshot = (): Theme => "system";
+
+export function useTheme(): [Theme, (t: Theme) => void] {
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   // Follow the OS while (and only while) the user has chosen "system".
   useEffect(() => {
@@ -44,12 +61,12 @@ export function useTheme(): [Theme, (t: Theme) => void] {
     return () => mql.removeEventListener("change", onChange);
   }, [theme]);
 
-  const setTheme = (next: Theme) => {
-    setThemeState(next);
+  const setTheme = useCallback((next: Theme) => {
     if (next === "system") window.localStorage.removeItem(THEME_KEY);
     else window.localStorage.setItem(THEME_KEY, next);
     applyTheme(next);
-  };
+    for (const listener of listeners) listener();
+  }, []);
 
   return [theme, setTheme];
 }

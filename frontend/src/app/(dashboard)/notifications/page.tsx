@@ -37,13 +37,16 @@ export default function NotificationsPage() {
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.05);
 
+  // The debounced search lands and the page resets together: a new query has a
+  // different first page, so resetting here (rather than in an effect keyed on
+  // `search`) keeps the two as one change instead of two renders.
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
-  useEffect(() => {
-    setPage(0);
-  }, [search]);
 
   const { data, isLoading, isPlaceholderData } = useChannels({
     page,

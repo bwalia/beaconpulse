@@ -2,6 +2,8 @@
 // vague — an unpublished org and a non-existent one look identical, so this page is
 // never an oracle for which orgs exist.
 
+import Link from "next/link";
+
 const CRT: React.CSSProperties = {
   backgroundImage: [
     "repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 3px)",
@@ -27,12 +29,12 @@ export default function StatusNotFound() {
         <p className="mt-2 text-sm text-slate-500">
           The page may not exist, or its owner has not published one. Check the address and try again.
         </p>
-        <a
+        <Link
           href="/"
           className="mt-6 inline-block text-xs uppercase tracking-[0.25em] text-slate-500 underline-offset-4 hover:text-orange-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
         >
           ▮ RETURN TO BEACON PULSE
-        </a>
+        </Link>
       </div>
     </div>
   );

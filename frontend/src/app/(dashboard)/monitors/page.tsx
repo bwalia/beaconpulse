@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -191,16 +191,23 @@ export default function MonitorsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
 
-  // Debounce the search box so we don't refetch on every keystroke.
+  // Debounce the search box so we don't refetch on every keystroke. The page reset
+  // rides along with the debounced value: a new query has a different first page, so
+  // the two belong to one change rather than an effect reconciling them afterwards.
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
-  // Any filter change returns to the first page — otherwise you could sit on an
-  // out-of-range page showing nothing.
-  useEffect(() => {
+
+  // Same for the status filter — otherwise you could sit on an out-of-range page
+  // showing nothing.
+  const changeStatus = (next: string) => {
+    setStatus(next);
     setPage(0);
-  }, [search, status]);
+  };
 
   const { data, isLoading, isPlaceholderData } = useMonitorsPage({
     page,
@@ -281,7 +288,7 @@ export default function MonitorsPage() {
           />
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => changeStatus(e.target.value)}
             aria-label="Filter by status"
             className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-44"
           >
@@ -312,7 +319,7 @@ export default function MonitorsPage() {
                 variant="secondary"
                 onClick={() => {
                   setSearchInput("");
-                  setStatus("");
+                  changeStatus("");
                 }}
               >
                 Clear filters
@@ -759,7 +766,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -768,7 +775,10 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [created, setCreated] = useState<Monitor | null>(null);
-  const type = watch("type");
+  // useWatch subscribes this component to one field. watch() re-reads the whole form
+  // through a closure the compiler cannot see through, so it is opaque to
+  // memoization; useWatch is the subscription-shaped API built for that.
+  const type = useWatch({ control, name: "type" });
   const isHTTP = type === "http" || type === "https" || type === "ssl";
   const isHeartbeat = type === "heartbeat";
 

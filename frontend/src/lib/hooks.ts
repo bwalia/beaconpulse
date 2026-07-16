@@ -20,6 +20,23 @@ import type {
   Usage,
 } from "./types";
 
+// live is the refetch policy for anything that answers "what is happening RIGHT
+// NOW?" — monitor status, firing alerts, live rollups. The whole product's promise
+// is that the screen matches reality, so these queries are never treated as fresh
+// (staleTime 0) and re-ask the API on every focus rather than trusting a value that
+// could predate an outage. Returning to the tab is exactly when someone is checking
+// after trouble, and it must not answer with a cached "up".
+//
+// Polling still pauses while the tab is hidden (TanStack's default), so a
+// backgrounded dashboard costs nothing — the focus refetch is what makes it correct
+// again on return, which is why "always" matters more than a shorter interval.
+const live = (intervalMs: number) =>
+  ({
+    refetchInterval: intervalMs,
+    staleTime: 0,
+    refetchOnWindowFocus: "always",
+  }) as const;
+
 // ---- Projects ----
 
 // useProjects fetches up to 200 projects at once — for the project SELECTORS
@@ -73,7 +90,7 @@ export function useMonitors(projectId?: string) {
   return useQuery({
     queryKey: ["monitors", projectId ?? "all"],
     queryFn: () => api.get<ListResponse<Monitor>>(`/api/v1/monitors?limit=200${query}`),
-    refetchInterval: 15000, // near-real-time status without websockets in this slice
+    ...live(15_000), // near-real-time status without websockets in this slice
   });
 }
 
@@ -103,7 +120,7 @@ export function useMonitorsPage(p: MonitorPageParams) {
   return useQuery({
     queryKey: ["monitors", "page", p],
     queryFn: () => api.get<ListResponse<Monitor>>(`/api/v1/monitors?${qs.toString()}`),
-    refetchInterval: 15000,
+    ...live(15_000),
     placeholderData: (previous) => previous,
   });
 }
@@ -256,7 +273,7 @@ export function useActiveAlerts(p?: AlertPageParams) {
   return useQuery({
     queryKey: ["alerts", p ?? "default"],
     queryFn: () => api.get<ListResponse<ActiveAlert>>(`/api/v1/alerts${query ? `?${query}` : ""}`),
-    refetchInterval: 15000,
+    ...live(15_000),
     placeholderData: (previous) => previous,
   });
 }
@@ -268,7 +285,7 @@ export function useOverview(hours: number = 24) {
   return useQuery({
     queryKey: ["overview", hours],
     queryFn: () => api.get<Overview>(`/api/v1/overview?hours=${hours}`),
-    refetchInterval: 30000,
+    ...live(30_000),
     // Keep the previous window on screen while the new one loads, so switching
     // range dissolves rather than flashing a skeleton.
     placeholderData: (previous) => previous,
@@ -303,7 +320,7 @@ export function useMonitorMetrics(id: string | null) {
     queryKey: ["monitor-metrics", id],
     queryFn: () => api.get<MonitorMetrics>(`/api/v1/monitors/${id}/metrics`),
     enabled: !!id,
-    refetchInterval: 30000,
+    ...live(30_000),
   });
 }
 
@@ -361,7 +378,7 @@ export function useMaintenanceWindows(p?: MaintenancePageParams) {
     queryFn: () => api.get<ListResponse<MaintenanceWindow>>(`/api/v1/maintenance-windows?${qs.toString()}`),
     // A window flips active/ended on the server clock; refresh so the badge and
     // the "now under maintenance" state do not go stale on an open tab.
-    refetchInterval: 30000,
+    ...live(30_000),
     placeholderData: (previous) => previous,
   });
 }

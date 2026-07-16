@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 
 import { useActiveAlerts } from "@/lib/hooks";
@@ -8,12 +8,13 @@ import { Card, EmptyState, PageHeader, Skeleton } from "@/components/ui";
 import { AlertTriangleIcon, CheckCircleIcon, ClockIcon, SearchIcon, WrenchIcon } from "@/components/icons";
 import { Pagination } from "@/components/table-controls";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
+import { useNow } from "@/lib/time";
 
 const ALERTS_PAGE_SIZE = 20;
 
-function sinceLabel(since?: string): string {
+function sinceLabel(since: string | undefined, now: number): string {
   if (!since) return "";
-  const ms = Date.now() - new Date(since).getTime();
+  const ms = now - new Date(since).getTime();
   if (ms < 0) return "just now";
   const mins = Math.floor(ms / 60000);
   if (mins < 60) return `${mins}m`;
@@ -25,9 +26,14 @@ function sinceLabel(since?: string): string {
 export default function AlertsPage() {
   const [page, setPage] = useState(0);
   const [severity, setSeverity] = useState("");
-  useEffect(() => {
+
+  // Filtering returns to the first page, done here rather than in an effect keyed on
+  // `severity`: the page reset is part of what "change the filter" means, not a
+  // consequence to reconcile on a later render.
+  const changeSeverity = (next: string) => {
+    setSeverity(next);
     setPage(0);
-  }, [severity]);
+  };
 
   const { data, isLoading, isPlaceholderData } = useActiveAlerts({
     page,
@@ -38,6 +44,8 @@ export default function AlertsPage() {
   const total = data?.pagination.total ?? 0;
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.05);
+  // Ages tick on their own, so "firing 5m" keeps counting between polls.
+  const now = useNow(30_000);
 
   return (
     <div className="space-y-6">
@@ -58,7 +66,7 @@ export default function AlertsPage() {
         <div className="flex justify-end">
           <select
             value={severity}
-            onChange={(e) => setSeverity(e.target.value)}
+            onChange={(e) => changeSeverity(e.target.value)}
             aria-label="Filter by severity"
             className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-48"
           >
@@ -88,7 +96,7 @@ export default function AlertsPage() {
           action={
             severity ? (
               <button
-                onClick={() => setSeverity("")}
+                onClick={() => changeSeverity("")}
                 className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-400"
               >
                 Clear filter
@@ -150,7 +158,7 @@ export default function AlertsPage() {
                     {a.since && (
                       <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs tabular-nums text-slate-500 dark:text-slate-400">
                         <ClockIcon className="h-3.5 w-3.5" />
-                        firing {sinceLabel(a.since)}
+                        firing {now === null ? "" : sinceLabel(a.since, now)}
                       </span>
                     )}
                   </div>
