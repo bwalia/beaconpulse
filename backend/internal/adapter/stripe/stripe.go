@@ -6,7 +6,9 @@ package stripe
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +20,20 @@ import (
 	"beacon/internal/domain/billing"
 	"beacon/internal/domain/plan"
 )
+
+// customerInvalid reports whether err is Stripe rejecting a checkout because the
+// customer id we passed does not exist in this account. It's the signal the
+// billing service uses to recreate the customer and retry, rather than 500. This
+// happens after the Stripe account/key is switched (the stored customer belongs to
+// the old account) or a customer is deleted in the Stripe dashboard.
+func customerInvalid(err error) bool {
+	var se *stripe.Error
+	if !errors.As(err, &se) {
+		return false
+	}
+	return se.Code == stripe.ErrorCodeResourceMissing &&
+		(se.Param == "customer" || strings.Contains(strings.ToLower(se.Msg), "customer"))
+}
 
 // Client implements billing.Payments over Stripe.
 type Client struct {
@@ -103,6 +119,9 @@ func (c *Client) SubscriptionCheckoutURL(ctx context.Context, in billing.Checkou
 	params.SubscriptionData.AddMetadata("org_id", in.OrgID.String())
 	sess, err := session.New(params)
 	if err != nil {
+		if customerInvalid(err) {
+			return "", fmt.Errorf("stripe subscription checkout: %w", billing.ErrCustomerInvalid)
+		}
 		return "", fmt.Errorf("stripe subscription checkout: %w", err)
 	}
 	return sess.URL, nil
@@ -133,6 +152,9 @@ func (c *Client) TopUpCheckoutURL(ctx context.Context, in billing.TopUpInput) (s
 	params.AddMetadata("kind", "topup")
 	sess, err := session.New(params)
 	if err != nil {
+		if customerInvalid(err) {
+			return "", fmt.Errorf("stripe top-up checkout: %w", billing.ErrCustomerInvalid)
+		}
 		return "", fmt.Errorf("stripe top-up checkout: %w", err)
 	}
 	return sess.URL, nil

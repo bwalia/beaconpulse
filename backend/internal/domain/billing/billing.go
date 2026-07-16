@@ -14,6 +14,7 @@ package billing
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +24,13 @@ import (
 	"beacon/internal/domain/plan"
 	"beacon/internal/platform/apperror"
 )
+
+// ErrCustomerInvalid signals that the org's stored Stripe customer id no longer
+// exists in the active Stripe account — typically after the account/key is
+// switched, or the customer is deleted in Stripe. A Payments adapter returns it
+// (wrapped) from a checkout call; the service recreates the customer under the
+// current account and retries once instead of surfacing a 500.
+var ErrCustomerInvalid = errors.New("stripe customer no longer exists")
 
 // State is an org's billing snapshot.
 type State struct {
@@ -164,11 +172,9 @@ func (s *Service) StartTopUp(ctx context.Context, actor Actor, amountCents int64
 		return "", apperror.Validation("amount too small",
 			apperror.FieldError{Field: "amount", Message: "minimum top-up is $1"})
 	}
-	cust, err := s.ensureCustomer(ctx, actor)
-	if err != nil {
-		return "", err
-	}
-	return s.pay.TopUpCheckoutURL(ctx, TopUpInput{OrgID: actor.OrgID, CustomerID: cust, AmountCents: amountCents})
+	return s.startCheckout(ctx, actor, func(cust string) (string, error) {
+		return s.pay.TopUpCheckoutURL(ctx, TopUpInput{OrgID: actor.OrgID, CustomerID: cust, AmountCents: amountCents})
+	})
 }
 
 // StartSubscription creates a Stripe Checkout session for a recurring tier.
@@ -184,11 +190,9 @@ func (s *Service) StartSubscription(ctx context.Context, actor Actor, p plan.Pla
 		return "", apperror.Validation("subscriptions are not set up for this plan yet",
 			apperror.FieldError{Field: "plan", Message: "no Stripe price is configured — use pay-as-you-go, or ask an admin to set STRIPE_PRICE_*"})
 	}
-	cust, err := s.ensureCustomer(ctx, actor)
-	if err != nil {
-		return "", err
-	}
-	return s.pay.SubscriptionCheckoutURL(ctx, CheckoutInput{OrgID: actor.OrgID, CustomerID: cust, Plan: p})
+	return s.startCheckout(ctx, actor, func(cust string) (string, error) {
+		return s.pay.SubscriptionCheckoutURL(ctx, CheckoutInput{OrgID: actor.OrgID, CustomerID: cust, Plan: p})
+	})
 }
 
 // Kind is a normalized webhook event category the service knows how to apply.
@@ -296,4 +300,28 @@ func (s *Service) ensureCustomer(ctx context.Context, actor Actor) (string, erro
 		return "", err
 	}
 	return cust, nil
+}
+
+// startCheckout runs a checkout that needs the org's Stripe customer, healing a
+// stale customer id once. If Stripe rejects the stored customer as non-existent
+// (ErrCustomerInvalid — e.g. the account was switched or the customer deleted in
+// Stripe), it forgets that id, creates a fresh customer under the active account,
+// and retries the checkout exactly once instead of returning a 500.
+func (s *Service) startCheckout(ctx context.Context, actor Actor, checkout func(customerID string) (string, error)) (string, error) {
+	cust, err := s.ensureCustomer(ctx, actor)
+	if err != nil {
+		return "", err
+	}
+	url, err := checkout(cust)
+	if !errors.Is(err, ErrCustomerInvalid) {
+		return url, err
+	}
+	fresh, err := s.pay.EnsureCustomer(ctx, actor.OrgID, actor.Email)
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.SetCustomerID(ctx, actor.OrgID, fresh); err != nil {
+		return "", err
+	}
+	return checkout(fresh)
 }
