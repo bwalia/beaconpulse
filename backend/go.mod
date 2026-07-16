@@ -11,7 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/prometheus/client_golang v1.20.5
 	github.com/redis/go-redis/v9 v9.7.0
-	github.com/stripe/stripe-go/v79 v79.12.0
+	github.com/stripe/stripe-go/v86 v86.1.1
 	golang.org/x/crypto v0.28.0
 	gopkg.in/yaml.v3 v3.0.1
 )

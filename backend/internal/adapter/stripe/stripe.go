@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	stripe "github.com/stripe/stripe-go/v79"
-	"github.com/stripe/stripe-go/v79/checkout/session"
-	"github.com/stripe/stripe-go/v79/customer"
-	"github.com/stripe/stripe-go/v79/webhook"
+	stripe "github.com/stripe/stripe-go/v86"
+	"github.com/stripe/stripe-go/v86/checkout/session"
+	"github.com/stripe/stripe-go/v86/customer"
+	"github.com/stripe/stripe-go/v86/webhook"
 
 	"beacon/internal/domain/billing"
 	"beacon/internal/domain/plan"
@@ -165,6 +165,14 @@ func (c *Client) TopUpCheckoutURL(ctx context.Context, in billing.TopUpInput) (s
 func (c *Client) ParseWebhook(payload []byte, sigHeader string) (billing.WebhookEvent, error) {
 	ev, err := webhook.ConstructEvent(payload, sigHeader, c.webhookSecret)
 	if err != nil {
+		// ConstructEvent rejects more than bad signatures — notably an API version
+		// mismatch between the endpoint's version and the one this SDK is pinned to.
+		// Distinguish them: reporting a version mismatch as "invalid signature" sends
+		// you hunting a secret that was never wrong.
+		if !errors.Is(err, webhook.ErrNotSigned) && !errors.Is(err, webhook.ErrInvalidHeader) &&
+			!errors.Is(err, webhook.ErrNoValidSignature) && !errors.Is(err, webhook.ErrTooOld) {
+			return billing.WebhookEvent{}, fmt.Errorf("%w: %w", billing.ErrWebhookNotSignature, err)
+		}
 		return billing.WebhookEvent{}, fmt.Errorf("verify stripe signature: %w", err)
 	}
 	out := billing.WebhookEvent{ID: ev.ID, Kind: billing.KindIgnore}
@@ -241,9 +249,18 @@ func parseUUID(s string) uuid.UUID {
 }
 
 // periodEnd reads the subscription's current period end (Unix seconds → UTC).
+// Stripe moved current_period_end off the subscription and onto each item as of
+// API version 2025-03-31, so it is read from the items here. Our subscriptions are
+// always single-item (one tier price), and items of one subscription share a
+// billing period, so the first item carrying a period is authoritative.
 func periodEnd(sub *stripe.Subscription) time.Time {
-	if sub.CurrentPeriodEnd > 0 {
-		return time.Unix(sub.CurrentPeriodEnd, 0).UTC()
+	if sub.Items == nil {
+		return time.Time{}
+	}
+	for _, it := range sub.Items.Data {
+		if it != nil && it.CurrentPeriodEnd > 0 {
+			return time.Unix(it.CurrentPeriodEnd, 0).UTC()
+		}
 	}
 	return time.Time{}
 }

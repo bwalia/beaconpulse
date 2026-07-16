@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -176,7 +177,14 @@ func (h *BillingHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	}
 	ev, err := h.stripe.ParseWebhook(payload, r.Header.Get("Stripe-Signature"))
 	if err != nil {
-		// A bad signature is a 400; do not reveal detail.
+		// A bad signature is a 400 and stays opaque: the caller is unauthenticated, so
+		// detail would only help someone forge one. A rejection that is NOT about the
+		// signature (an API-version mismatch) is an operator misconfiguration we own —
+		// name it, so it is not mistaken for a wrong secret and sent chasing a rotation.
+		if errors.Is(err, billing.ErrWebhookNotSignature) {
+			httpx.Error(w, r, apperror.Validation("webhook rejected: the endpoint's Stripe API version does not match this server's Stripe SDK"))
+			return
+		}
 		httpx.Error(w, r, apperror.Validation("invalid webhook signature"))
 		return
 	}

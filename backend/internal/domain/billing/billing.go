@@ -32,6 +32,13 @@ import (
 // current account and retries once instead of surfacing a 500.
 var ErrCustomerInvalid = errors.New("stripe customer no longer exists")
 
+// ErrWebhookNotSignature marks a webhook the provider rejected for a reason OTHER
+// than a bad signature — in practice, the endpoint sending events built for a
+// different API version than the SDK is pinned to. It exists so the endpoint can
+// report that honestly: a version mismatch surfaced as "invalid signature" sends
+// operators rotating a secret that was never wrong.
+var ErrWebhookNotSignature = errors.New("webhook rejected (not a signature failure)")
+
 // State is an org's billing snapshot.
 type State struct {
 	// Plan is the SUBSCRIBED tier (free by default); it is not the effective tier.
