@@ -8,6 +8,7 @@ import { api } from "./api";
 import type {
   ActiveAlert,
   BillingInfo,
+  Diagnosis,
   ListResponse,
   MaintenanceScope,
   MaintenanceWindow,
@@ -415,5 +416,17 @@ export function useDeleteMaintenanceWindow() {
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/api/v1/maintenance-windows/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["maintenance-windows"] }),
+  });
+}
+
+// ---- AI diagnosis ----
+
+// useDiagnose runs an on-demand diagnosis of a failing monitor. A mutation, not a
+// query: it makes the server open sockets to a third party and spend a model's time,
+// so it must happen only when someone asks — never on mount, focus, or a retry.
+export function useDiagnose() {
+  return useMutation({
+    mutationFn: (monitorId: string) => api.post<Diagnosis>(`/api/v1/monitors/${monitorId}/diagnose`),
+    retry: false, // a failed diagnosis is re-run by the user, not silently re-billed
   });
 }

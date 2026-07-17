@@ -11,6 +11,7 @@ import {
   useMonitorMetrics,
   useMonitorsPage,
   useProjects,
+  useDiagnose,
   useSetMonitorEnabled,
   useUpdateMonitor,
   useUsage,
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui";
 import { ActivityIcon, CheckCircleIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
 import { useConfirm } from "@/components/confirm";
+import { DiagnosePanel, DiagnoseUpsell } from "@/components/diagnose-panel";
 import { Pagination, SearchInput } from "@/components/table-controls";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import type { MetricPoint, Monitor } from "@/lib/types";
@@ -399,11 +401,39 @@ function MonitorRow({
   const deleteMonitor = useDeleteMonitor();
   const confirm = useConfirm();
   const reveal = useRevealVariants();
+  const diagnose = useDiagnose();
+  const [showUpsell, setShowUpsell] = useState(false);
 
   const target =
     monitor.type === "heartbeat" && monitor.ping_url ? monitor.ping_url : monitor.target;
 
+  // Offered only where it has something to explain. A "Diagnose" button on a healthy
+  // monitor invites people to spend a model's time proving nothing is wrong.
+  const failing = monitor.enabled && (monitor.last_status === "down" || monitor.last_status === "degraded");
+
+  const runDiagnose = () => {
+    setShowUpsell(false);
+    diagnose.mutate(monitor.id, {
+      // 422 is the paid-plan gate, not a failure: the server says the caller is fine
+      // and the plan is not, so it becomes an offer rather than a red error.
+      onError: (err) => {
+        if (err instanceof ApiRequestError && err.status === 422) setShowUpsell(true);
+      },
+    });
+  };
+
+  const panel = showUpsell ? (
+    <DiagnoseUpsell onDismiss={() => setShowUpsell(false)} />
+  ) : diagnose.data ? (
+    <DiagnosePanel d={diagnose.data} />
+  ) : diagnose.isError ? (
+    <Card className="mt-3 p-4 text-sm text-red-700 dark:text-red-400">
+      {diagnose.error instanceof ApiRequestError ? diagnose.error.message : "The diagnosis could not be run."}
+    </Card>
+  ) : null;
+
   return (
+    <>
     <motion.tr
       variants={reveal}
       className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40"
@@ -452,6 +482,17 @@ function MonitorRow({
             separated and de-emphasised, so `Delete` isn't the loudest thing on the
             page six times over. */}
         <div className="flex items-center justify-end gap-1">
+          {failing && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={runDiagnose}
+              disabled={diagnose.isPending}
+              className="text-brand-700 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/40"
+            >
+              {diagnose.isPending ? "Diagnosing…" : "Diagnose with AI"}
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={onMetrics}>
             Metrics
           </Button>
@@ -490,6 +531,16 @@ function MonitorRow({
         </div>
       </td>
     </motion.tr>
+      {panel && (
+        <tr>
+          {/* Spans the table so the diagnosis reads as part of this monitor's row
+              rather than as a new column of anything. */}
+          <td colSpan={7} className="px-4 pb-4 pt-0">
+            {panel}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
