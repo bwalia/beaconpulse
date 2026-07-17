@@ -143,6 +143,13 @@ export interface BillingInfo {
   period_end?: string;
   /** Remaining pay-as-you-go balance, in monitor-seconds. */
   credit_seconds: number;
+  /** Every monitor-second ever bought, and how many have been burned through. */
+  granted_credit_seconds: number;
+  consumed_credit_seconds: number;
+  /** AI diagnoses a subscribed tier gets per calendar month (0 for free/payg). */
+  monthly_diagnoses: number;
+  /** What one AI diagnosis costs a pay-as-you-go org, in monitor-seconds. */
+  diagnosis_cost_seconds: number;
   max_monitors: number;
   /** Pay-as-you-go rate: $1 buys this many monitor-hours. */
   monitor_hours_per_dollar: number;

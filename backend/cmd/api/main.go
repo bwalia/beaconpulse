@@ -201,6 +201,8 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 			orgPlanRepo,
 			netprobe.New(cfg.AI.DiagnoseAllowPrivate),
 			explainer,
+			billingRepo, // owns credit_seconds, so it owns the charge
+			cfg.AI.DiagnoseCostSeconds,
 		)
 		log.Info("AI diagnosis enabled", slog.Bool("allow_private_targets", cfg.AI.DiagnoseAllowPrivate))
 	}
@@ -244,7 +246,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Maintenance:        rest.NewMaintenanceHandler(maintenanceSvc, validator, authn),
 		Alert:              rest.NewAlertHandler(dispatcher, cfg.Notify.WebhookToken),
 		Insight:            rest.NewInsightHandler(insightSvc, maintenanceSvc),
-		Billing:            rest.NewBillingHandler(billingSvc, stripeWebhook, validator, authn),
+		Billing:            rest.NewBillingHandler(billingSvc, stripeWebhook, validator, authn, cfg.AI.DiagnoseCostSeconds),
 		StatusPage:         rest.NewStatusPageHandler(statusPageSvc),
 		Heartbeat:          rest.NewHeartbeatHandler(heartbeatSvc),
 		StatusPageSettings: rest.NewStatusPageSettingsHandler(statusPageSettingsSvc, validator, authn),

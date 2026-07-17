@@ -81,6 +81,9 @@ type Repository interface {
 	// DeductCredit burns `elapsedSeconds` × (enabled monitor count) from every org
 	// that has credit, flooring at zero. This is the pay-as-you-go meter.
 	DeductCredit(ctx context.Context, elapsedSeconds int64) error
+	// CreditTotals reports credit ever granted and credit remaining, so the UI can
+	// tell someone what they have SPENT rather than only what is left.
+	CreditTotals(ctx context.Context, orgID uuid.UUID) (granted, remaining int64, err error)
 }
 
 // Payments is the payment provider (Stripe). Kept an interface so the domain and
@@ -154,6 +157,12 @@ type Overview struct {
 	PeriodEnd          time.Time
 	CreditSeconds      int64
 	Limits             plan.Limits
+	// GrantedCreditSeconds is everything ever bought; ConsumedCreditSeconds is what
+	// monitoring has burned through. Both are surfaced because a balance alone does
+	// not answer the question people actually ask — "how long have I had, and how
+	// long do I have left?" — and leaves them reconstructing it from receipts.
+	GrantedCreditSeconds  int64
+	ConsumedCreditSeconds int64
 }
 
 // Overview returns the caller org's billing state.
@@ -163,13 +172,21 @@ func (s *Service) Overview(ctx context.Context, actor Actor) (Overview, error) {
 		return Overview{}, err
 	}
 	eff := st.Effective()
+	// Best-effort: a balance is still worth showing if the totals query fails.
+	granted, remaining, terr := s.repo.CreditTotals(ctx, actor.OrgID)
+	consumed := int64(0)
+	if terr == nil && granted > remaining {
+		consumed = granted - remaining
+	}
 	return Overview{
-		SubscribedPlan:     st.Plan,
-		EffectivePlan:      eff,
-		SubscriptionStatus: st.SubscriptionStatus,
-		PeriodEnd:          st.PeriodEnd,
-		CreditSeconds:      st.CreditSeconds,
-		Limits:             plan.LimitsFor(eff),
+		SubscribedPlan:        st.Plan,
+		EffectivePlan:         eff,
+		SubscriptionStatus:    st.SubscriptionStatus,
+		PeriodEnd:             st.PeriodEnd,
+		CreditSeconds:         st.CreditSeconds,
+		Limits:                plan.LimitsFor(eff),
+		GrantedCreditSeconds:  granted,
+		ConsumedCreditSeconds: consumed,
 	}, nil
 }
 
