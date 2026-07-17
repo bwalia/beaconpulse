@@ -3,6 +3,8 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
+import { useNow } from "@/lib/time";
+
 import { useBilling, useStartSubscription, useStartTopUp, useUsage } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
 import { ApiRequestError } from "@/lib/api";
@@ -11,6 +13,18 @@ import { CheckIcon } from "@/components/icons";
 import type { BillingInfo, PlanInfo } from "@/lib/types";
 
 type Notice = { kind: "ok" | "err"; text: string } | null;
+
+// Hours are the unit people buy in, but "0.4 hours left" is not a sentence anyone
+// says — and under an hour is exactly when the number matters most.
+function formatDuration(hours: number): string {
+  if (hours >= 48) return `${Math.round(hours / 24)} days`;
+  if (hours >= 1) {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return m > 0 ? `${h}h ${m}m` : `${h} hours`;
+  }
+  return `${Math.max(1, Math.round(hours * 60))} minutes`;
+}
 
 const PLAN_LABEL: Record<string, string> = {
   free: "Free",
@@ -128,6 +142,23 @@ function CreditCard({
   const monitorHours = info.credit_seconds / 3600;
   // "How long will this last?" — credit ÷ (enabled monitors) at the current count.
   const wallHours = monitors > 0 ? info.credit_seconds / monitors / 3600 : null;
+  const consumedHours = info.consumed_credit_seconds / 3600;
+  const grantedHours = info.granted_credit_seconds / 3600;
+
+  // Derived from the ticking clock rather than read during render: an estimate of
+  // when the credit runs out is a time value, and computing it in render would both
+  // freeze it and disagree with the server that rendered the shell.
+  const now = useNow(60_000);
+  const runsOutAt =
+    now !== null && wallHours !== null && info.credit_seconds > 0
+      ? new Date(now + wallHours * 3600_000).toLocaleString(undefined, {
+          weekday: "short",
+          hour: "numeric",
+          minute: "2-digit",
+          day: "numeric",
+          month: "short",
+        })
+      : null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,21 +189,42 @@ function CreditCard({
             {monitorHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}{" "}
             <span className="text-lg font-medium text-slate-500 dark:text-slate-400">monitor-hours</span>
           </p>
+          {/* Said plainly, because a balance alone does not answer what people
+              actually ask — how long have I had, how long is left, and when does it
+              stop. Leaving them to work that out from Stripe receipts is how someone
+              ends up asking why the number looks wrong. */}
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             {wallHours !== null && info.credit_seconds > 0 ? (
               <>
-                ≈{" "}
+                That is{" "}
                 <span className="font-medium text-slate-900 dark:text-white tabular-nums">
-                  {wallHours.toLocaleString(undefined, { maximumFractionDigits: 1 })} hours
+                  {formatDuration(wallHours)}
                 </span>{" "}
-                at your current {monitors} monitor{monitors === 1 ? "" : "s"}.
+                of monitoring left at your current {monitors} monitor{monitors === 1 ? "" : "s"}
+                {runsOutAt && <> — running out around <span className="font-medium text-slate-900 dark:text-white">{runsOutAt}</span></>}.
               </>
-            ) : (
+            ) : info.credit_seconds > 0 ? (
               <>Each monitor uses one hour of credit per hour it runs.</>
-            )}{" "}
-            <span className="text-slate-500 dark:text-slate-400">
-              $1 = {info.monitor_hours_per_dollar} monitor-hours.
-            </span>
+            ) : (
+              <>Your credit has run out, so monitoring has dropped back to the Free limits.</>
+            )}
+          </p>
+          {consumedHours > 0 && (
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              You have used{" "}
+              <span className="font-medium tabular-nums text-slate-700 dark:text-slate-200">
+                {formatDuration(consumedHours)}
+              </span>{" "}
+              of monitoring so far, from{" "}
+              <span className="tabular-nums">{grantedHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span>{" "}
+              monitor-hours bought.
+            </p>
+          )}
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            $1 = {info.monitor_hours_per_dollar} monitor-hours
+            {info.diagnosis_cost_seconds > 0 && (
+              <> · one AI diagnosis costs {Math.round(info.diagnosis_cost_seconds / 60)} monitor-minutes</>
+            )}
           </p>
         </div>
 

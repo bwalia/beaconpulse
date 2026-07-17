@@ -5,6 +5,8 @@
 // migration; the organization row only stores which plan it is on.
 package plan
 
+import "time"
+
 // Plan identifies a subscription tier.
 type Plan string
 
@@ -18,20 +20,46 @@ const (
 	PayAsYouGo Plan = "payg"
 )
 
+// MonthStart is when a monthly allowance last reset: the 1st, UTC.
+//
+// It lives here, in the package that defines the allowance, because two callers need
+// it — the service that spends the quota and the page that reports what is left — and
+// a quota whose reset is defined twice is a quota that eventually disagrees with the
+// number shown to the customer.
+//
+// A calendar month rather than a rolling window: a reset you cannot predict is one you
+// have to ration against. UTC so the answer does not depend on where the reader is.
+func MonthStart(t time.Time) time.Time {
+	u := t.UTC()
+	return time.Date(u.Year(), u.Month(), 1, 0, 0, 0, 0, time.UTC)
+}
+
 // Limits are the per-organization resource caps a plan grants.
 type Limits struct {
 	// MaxMonitors caps the number of non-deleted monitors an org may have.
 	MaxMonitors int
 	// MinIntervalSeconds is the fastest check interval the org may configure.
 	MinIntervalSeconds int
+	// MonthlyDiagnoses caps AI diagnoses per calendar month for SUBSCRIBED tiers,
+	// which pay a flat fee and so need a ceiling on a per-use cost.
+	//
+	// Zero for Free (which cannot diagnose at all) and for pay-as-you-go, which is
+	// metered per run against its credit instead — that org has already paid for
+	// each diagnosis, and capping it too would be charging twice.
+	MonthlyDiagnoses int
 }
 
 // registry maps each plan to its limits. Tune here, no migration needed.
+//
+// Diagnosis quotas track each tier's monitor cap rather than its price: the number of
+// times you need to ask why something broke follows how much you are watching, not
+// what you paid. Generous enough that a normal team never meets the ceiling, low
+// enough that one subscriber cannot consume unbounded GPU for a flat fee.
 var registry = map[Plan]Limits{
-	Free:       {MaxMonitors: 10, MinIntervalSeconds: 60},
-	Starter:    {MaxMonitors: 50, MinIntervalSeconds: 30},
-	Pro:        {MaxMonitors: 500, MinIntervalSeconds: 10},
-	PayAsYouGo: {MaxMonitors: 500, MinIntervalSeconds: 30},
+	Free:       {MaxMonitors: 10, MinIntervalSeconds: 60, MonthlyDiagnoses: 0},
+	Starter:    {MaxMonitors: 50, MinIntervalSeconds: 30, MonthlyDiagnoses: 100},
+	Pro:        {MaxMonitors: 500, MinIntervalSeconds: 10, MonthlyDiagnoses: 1000},
+	PayAsYouGo: {MaxMonitors: 500, MinIntervalSeconds: 30, MonthlyDiagnoses: 0},
 }
 
 // Valid reports whether p is a known plan.

@@ -71,6 +71,13 @@ type AI struct {
 	// services, where the caller already owns the network and there is nothing to
 	// disclose to them.
 	DiagnoseAllowPrivate bool
+	// DiagnoseCostSeconds is what one AI diagnosis costs a pay-as-you-go org, in
+	// monitor-seconds. Defaults to 5 monitor-minutes (~1.7¢) — about what five
+	// minutes of monitoring one domain costs, which is the point: the price is meant
+	// to be explainable, not to earn. The model runs on our own hardware, so what a
+	// run really costs is GPU seconds already paid for. Subscribed tiers ignore this
+	// and spend a monthly allowance instead.
+	DiagnoseCostSeconds int64
 }
 
 // Notify holds notification/alerting configuration.
@@ -272,6 +279,7 @@ func Load() (Config, error) {
 			APIKey:  getStr("BEACON_AI_API_KEY", ""),
 			Timeout: getDur("BEACON_AI_TIMEOUT", 20*time.Second, add),
 			DiagnoseAllowPrivate: getBool("BEACON_AI_DIAGNOSE_ALLOW_PRIVATE", false, add),
+			DiagnoseCostSeconds:  int64(getInt("BEACON_AI_DIAGNOSE_COST_SECONDS", 5*60, add)),
 		},
 	}
 

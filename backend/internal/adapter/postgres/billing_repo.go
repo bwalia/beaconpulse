@@ -161,3 +161,87 @@ func (r *BillingRepository) DeductCredit(ctx context.Context, elapsedSeconds int
 	}
 	return nil
 }
+
+// ---- AI diagnosis metering ----
+//
+// These live on the billing repository because credit_seconds does. One owner for the
+// money means the diagnosis charge and the per-minute meter cannot drift into two
+// different ideas of what a balance is.
+
+// ChargeCredit debits costSeconds if — and only if — the balance covers it, in a
+// single statement.
+//
+// The WHERE clause is the whole safety property. Reading the balance and then writing
+// it back would let two simultaneous clicks both see enough credit and both spend it,
+// so an org with one diagnosis left could take several. Here the second UPDATE simply
+// matches no row.
+func (r *BillingRepository) ChargeCredit(ctx context.Context, orgID uuid.UUID, costSeconds int64) (bool, error) {
+	if costSeconds <= 0 {
+		return true, nil
+	}
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE organizations
+		    SET credit_seconds = credit_seconds - $2
+		  WHERE id = $1 AND deleted_at IS NULL AND credit_seconds >= $2`,
+		orgID, costSeconds)
+	if err != nil {
+		return false, apperror.Internal(fmt.Errorf("charge diagnosis credit: %w", err))
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// RefundCredit returns a charge for a diagnosis that was never delivered.
+func (r *BillingRepository) RefundCredit(ctx context.Context, orgID uuid.UUID, costSeconds int64) error {
+	if costSeconds <= 0 {
+		return nil
+	}
+	if _, err := r.pool.Exec(ctx,
+		`UPDATE organizations SET credit_seconds = credit_seconds + $2
+		  WHERE id = $1 AND deleted_at IS NULL`, orgID, costSeconds); err != nil {
+		return apperror.Internal(fmt.Errorf("refund diagnosis credit: %w", err))
+	}
+	return nil
+}
+
+// CountRunsSince counts delivered diagnoses in the current allowance window.
+func (r *BillingRepository) CountRunsSince(ctx context.Context, orgID uuid.UUID, since time.Time) (int, error) {
+	var n int
+	if err := r.pool.QueryRow(ctx,
+		`SELECT count(*) FROM diagnose_runs WHERE org_id = $1 AND created_at >= $2`,
+		orgID, since).Scan(&n); err != nil {
+		return 0, apperror.Internal(fmt.Errorf("count diagnoses: %w", err))
+	}
+	return n, nil
+}
+
+// RecordRun writes a delivered diagnosis to the ledger.
+func (r *BillingRepository) RecordRun(ctx context.Context, orgID, monitorID uuid.UUID, costSeconds int64) error {
+	if _, err := r.pool.Exec(ctx,
+		`INSERT INTO diagnose_runs (id, org_id, monitor_id, credit_seconds)
+		 VALUES ($1,$2,$3,$4)`,
+		uuid.New(), orgID, monitorID, costSeconds); err != nil {
+		return apperror.Internal(fmt.Errorf("record diagnosis: %w", err))
+	}
+	return nil
+}
+
+// CreditTotals reports how much credit an org has ever been given and how much it has
+// spent, so the billing page can say "you have monitored X hours, Y left" instead of
+// only naming a balance.
+//
+// Consumed is DERIVED (granted − remaining) rather than tracked in its own column:
+// every grant is already an immutable row in billing_events, and the balance is
+// authoritative, so a separate counter could only ever disagree with them. It also
+// means the number is correct for credit spent before this was written.
+func (r *BillingRepository) CreditTotals(ctx context.Context, orgID uuid.UUID) (granted, remaining int64, err error) {
+	err = r.pool.QueryRow(ctx,
+		`SELECT COALESCE((SELECT sum(credit_added_seconds) FROM billing_events
+		                   WHERE org_id = $1 AND type = 'topup'), 0),
+		        COALESCE((SELECT credit_seconds FROM organizations
+		                   WHERE id = $1 AND deleted_at IS NULL), 0)`,
+		orgID).Scan(&granted, &remaining)
+	if err != nil {
+		return 0, 0, apperror.Internal(fmt.Errorf("credit totals: %w", err))
+	}
+	return granted, remaining, nil
+}

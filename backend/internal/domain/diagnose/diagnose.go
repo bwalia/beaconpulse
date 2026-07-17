@@ -15,6 +15,8 @@ package diagnose
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -135,20 +137,64 @@ type OrgPlanReader interface {
 	Plan(ctx context.Context, orgID uuid.UUID) (plan.Plan, error)
 }
 
+// Meter prices a diagnosis. The two plan shapes need two different answers —
+// pay-as-you-go spends credit per run, a subscription spends a monthly allowance —
+// and the service picks; the Meter only does what it is told.
+type Meter interface {
+	// ChargeCredit debits costSeconds in ONE statement, refusing rather than
+	// overdrawing, and reports whether it succeeded. Atomicity is the point: a
+	// read-then-write would let two fast clicks both see a sufficient balance and
+	// both spend it, handing out a diagnosis nobody paid for.
+	ChargeCredit(ctx context.Context, orgID uuid.UUID, costSeconds int64) (bool, error)
+	// RefundCredit returns a charge for work that was not delivered.
+	RefundCredit(ctx context.Context, orgID uuid.UUID, costSeconds int64) error
+	// CountRunsSince counts recorded diagnoses, for the subscription quota.
+	CountRunsSince(ctx context.Context, orgID uuid.UUID, since time.Time) (int, error)
+	// RecordRun writes a delivered diagnosis to the ledger.
+	RecordRun(ctx context.Context, orgID, monitorID uuid.UUID, costSeconds int64) error
+}
+
 // Service runs diagnoses.
 type Service struct {
-	monitors MonitorReader
-	plans    OrgPlanReader
-	prober   Prober
-	explain  Explainer
+	monitors    MonitorReader
+	plans       OrgPlanReader
+	prober      Prober
+	explain     Explainer
+	meter       Meter
+	costSeconds int64
+	now         func() time.Time
 }
 
 // NewService builds a Service. explain may be nil when no model is configured: the
 // probes still run and the evidence is still returned, because the measurements are
 // the part that cannot be guessed at.
-func NewService(monitors MonitorReader, plans OrgPlanReader, prober Prober, explain Explainer) *Service {
-	return &Service{monitors: monitors, plans: plans, prober: prober, explain: explain}
+//
+// costSeconds is what one diagnosis costs a pay-as-you-go org, in monitor-seconds.
+func NewService(monitors MonitorReader, plans OrgPlanReader, prober Prober, explain Explainer, meter Meter, costSeconds int64) *Service {
+	if costSeconds <= 0 {
+		costSeconds = DefaultCostSeconds
+	}
+	return &Service{
+		monitors: monitors, plans: plans, prober: prober, explain: explain,
+		meter: meter, costSeconds: costSeconds, now: time.Now,
+	}
 }
+
+// DefaultCostSeconds is 5 monitor-minutes — about 1.7¢, or roughly what five minutes
+// of watching one domain costs. Priced to be explainable rather than to earn: a
+// diagnosis costs about what five minutes of monitoring costs, and that sentence is
+// the whole pricing policy.
+//
+// Kept cheap on purpose. The model runs on our own hardware, so the marginal cost of
+// a diagnosis is GPU seconds we have already paid for, and the thing worth optimising
+// is that people actually use it. This button is pressed during an outage; a price
+// that makes someone hesitate to ask why their site is down has defeated the feature
+// it was protecting.
+//
+// It follows that the price is NOT the abuse control — at this rate a few dollars buys
+// hundreds of runs — so the rate limit in front of the endpoint is what stops one org
+// saturating the model, and it has to stay there.
+const DefaultCostSeconds int64 = 5 * 60
 
 // ErrPaidPlanRequired is returned to a Free org. It is a Validation rather than a
 // Forbidden on purpose: nothing about the caller is wrong, and the UI turns it into
@@ -180,23 +226,96 @@ func (s *Service) Run(ctx context.Context, actor Actor, monitorID uuid.UUID) (*D
 		return nil, err
 	}
 
-	ev, err := s.prober.Probe(ctx, target, monitorType)
+	// Pay for it before doing it. Charging afterwards would let a handful of
+	// simultaneous clicks all pass the balance check and all be served.
+	charged, err := s.meterIn(ctx, actor.OrgID, p)
 	if err != nil {
 		return nil, err
 	}
 
-	out := &Diagnosis{Evidence: ev}
-	if s.explain == nil {
-		out.AnalysisError = "AI analysis is not configured on this deployment"
-		return out, nil
-	}
-	analysis, err := s.explain.Explain(ctx, ev)
+	// From here the org has paid, so every path out either delivers an analysis or
+	// gives the money back. Nothing in between.
+	ev, err := s.prober.Probe(ctx, target, monitorType)
 	if err != nil {
-		// A model that is slow, down, or talking nonsense must not cost the user the
-		// evidence. Degrade to the facts rather than failing the request.
-		out.AnalysisError = "AI analysis is unavailable right now — the measurements below are still complete"
+		s.refund(ctx, actor.OrgID, charged)
+		return nil, err
+	}
+
+	out := &Diagnosis{Evidence: ev}
+	analysis, aerr := s.analyze(ctx, ev)
+	if aerr != nil {
+		// The model failed, so this is not the thing they paid for. Refund and keep
+		// the evidence: measurements are still worth reading, but they are not a
+		// diagnosis and must not be billed as one.
+		s.refund(ctx, actor.OrgID, charged)
+		out.AnalysisError = aerr.Error()
 		return out, nil
 	}
+
 	out.Analysis = analysis
+	// Recorded only now, once an answer exists. A quota spent on an answer nobody
+	// received is the same theft as a charge for one.
+	if err := s.meter.RecordRun(ctx, actor.OrgID, monitorID, charged); err != nil {
+		// The diagnosis is done and paid for; failing the request now would charge
+		// them for something we then refuse to hand over. Under-counting a quota is
+		// the cheaper mistake.
+		return out, nil
+	}
 	return out, nil
+}
+
+// meterIn takes payment for one diagnosis and returns what was charged in
+// monitor-seconds (zero for a subscription, which spends allowance instead).
+func (s *Service) meterIn(ctx context.Context, orgID uuid.UUID, p plan.Plan) (int64, error) {
+	if p == plan.PayAsYouGo {
+		ok, err := s.meter.ChargeCredit(ctx, orgID, s.costSeconds)
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			return 0, apperror.Validation("not enough credit for an AI diagnosis",
+				apperror.FieldError{
+					Field: "credit",
+					Message: fmt.Sprintf("a diagnosis costs %d monitor-minutes of credit — add more to run one",
+						s.costSeconds/60),
+				})
+		}
+		return s.costSeconds, nil
+	}
+
+	// A subscribed tier: flat fee, so the ceiling is a count rather than a balance.
+	limit := plan.LimitsFor(p).MonthlyDiagnoses
+	used, err := s.meter.CountRunsSince(ctx, orgID, plan.MonthStart(s.now()))
+	if err != nil {
+		return 0, err
+	}
+	if used >= limit {
+		return 0, apperror.Validation("monthly AI diagnosis limit reached",
+			apperror.FieldError{
+				Field: "plan",
+				Message: fmt.Sprintf("your plan includes %d diagnoses per month and %d have been used; the allowance resets on the 1st",
+					limit, used),
+			})
+	}
+	return 0, nil
+}
+
+// refund returns a charge. Best-effort by design: the caller is already handling a
+// failure, and turning a failed diagnosis into a failed request as well would leave
+// the user with neither an answer nor an explanation.
+func (s *Service) refund(ctx context.Context, orgID uuid.UUID, charged int64) {
+	if charged > 0 {
+		_ = s.meter.RefundCredit(ctx, orgID, charged)
+	}
+}
+
+func (s *Service) analyze(ctx context.Context, ev Evidence) (*Analysis, error) {
+	if s.explain == nil {
+		return nil, errors.New("AI analysis is not configured on this deployment")
+	}
+	a, err := s.explain.Explain(ctx, ev)
+	if err != nil {
+		return nil, errors.New("AI analysis is unavailable right now — you have not been charged, and the measurements below are still complete")
+	}
+	return a, nil
 }

@@ -17,7 +17,8 @@ import (
 type fakeRepo struct {
 	state    State
 	credited int64
-	seen     map[string]bool // stripe event ids already applied
+	seen      map[string]bool // stripe event ids already applied
+	diagnoses int
 }
 
 func newFakeRepo(st State) *fakeRepo { return &fakeRepo{state: st, seen: map[string]bool{}} }
@@ -46,6 +47,14 @@ func (f *fakeRepo) ApplySubscription(_ context.Context, _ uuid.UUID, p plan.Plan
 	return true, nil
 }
 func (f *fakeRepo) DeductCredit(context.Context, int64) error { return nil }
+func (f *fakeRepo) CountRunsSince(context.Context, uuid.UUID, time.Time) (int, error) {
+	return f.diagnoses, nil
+}
+func (f *fakeRepo) CreditTotals(context.Context, uuid.UUID) (int64, int64, error) {
+	// Granted is everything ever credited; remaining is the live balance. Consumed is
+	// the difference, which is why neither is tracked separately.
+	return f.credited, f.state.CreditSeconds, nil
+}
 
 // fakePay returns fixed URLs and records the last inputs. undelivered stands in for
 // the payments Stripe took but could not hand us; listCalls counts the polls.

@@ -29,11 +29,14 @@ type BillingHandler struct {
 	stripe    StripeWebhook
 	validator *validate.Validator
 	auth      *middleware.Authenticator
+	// diagnosisCostSeconds is shown so the billing page can price the button before
+	// it is pressed, rather than after.
+	diagnosisCostSeconds int64
 }
 
 // NewBillingHandler builds a BillingHandler. stripe may be nil (billing disabled).
-func NewBillingHandler(svc *billing.Service, stripe StripeWebhook, v *validate.Validator, a *middleware.Authenticator) *BillingHandler {
-	return &BillingHandler{svc: svc, stripe: stripe, validator: v, auth: a}
+func NewBillingHandler(svc *billing.Service, stripe StripeWebhook, v *validate.Validator, a *middleware.Authenticator, diagnosisCostSeconds int64) *BillingHandler {
+	return &BillingHandler{svc: svc, stripe: stripe, validator: v, auth: a, diagnosisCostSeconds: diagnosisCostSeconds}
 }
 
 // Routes returns the AUTHENTICATED billing routes. The webhook is mounted
@@ -68,6 +71,13 @@ type billingResponse struct {
 	SubscriptionStatus    string             `json:"subscription_status"`
 	PeriodEnd             *time.Time         `json:"period_end,omitempty"`
 	CreditSeconds         int64              `json:"credit_seconds"`
+	// Granted/Consumed answer "how long have I had, and how long is left?" — the
+	// question a bare balance leaves people reconstructing from Stripe receipts.
+	GrantedCreditSeconds  int64              `json:"granted_credit_seconds"`
+	ConsumedCreditSeconds int64              `json:"consumed_credit_seconds"`
+	MonthlyDiagnoses       int               `json:"monthly_diagnoses"`
+	DiagnosesUsedThisMonth int               `json:"diagnoses_used_this_month"`
+	DiagnosisCostSeconds  int64              `json:"diagnosis_cost_seconds"`
 	MaxMonitors           int                `json:"max_monitors"`
 	MonitorHoursPerDollar int                `json:"monitor_hours_per_dollar"`
 	BillingEnabled        bool               `json:"billing_enabled"`
@@ -106,6 +116,11 @@ func (h *BillingHandler) get(w http.ResponseWriter, r *http.Request) {
 		EffectivePlan:         string(ov.EffectivePlan),
 		SubscriptionStatus:    ov.SubscriptionStatus,
 		CreditSeconds:         ov.CreditSeconds,
+		GrantedCreditSeconds:  ov.GrantedCreditSeconds,
+		ConsumedCreditSeconds: ov.ConsumedCreditSeconds,
+		MonthlyDiagnoses:       ov.Limits.MonthlyDiagnoses,
+		DiagnosesUsedThisMonth: ov.DiagnosesUsedThisMonth,
+		DiagnosisCostSeconds:  h.diagnosisCostSeconds,
 		MaxMonitors:           ov.Limits.MaxMonitors,
 		MonitorHoursPerDollar: h.svc.MonitorHoursPerDollar(),
 		BillingEnabled:        h.svc.Enabled(),
