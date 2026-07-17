@@ -123,64 +123,9 @@ Be specific and practical. Do not repeat the raw alert text verbatim.`
 // failure is returned as an error so the dispatcher can deliver the alert
 // unenriched.
 func (a *OllamaAnalyzer) Analyze(ctx context.Context, ev notification.AlertEvent) (*notification.AlertAnalysis, error) {
-	noThink := false
-	reqBody := chatRequest{
-		Model:  a.model,
-		Stream: false,
-		Format: "json",
-		Think:  &noThink,
-		Options: map[string]any{
-			"temperature": 0.2,
-			"num_predict": 400,
-		},
-		Messages: []chatMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: buildUserPrompt(ev)},
-		},
-	}
-	buf, err := json.Marshal(reqBody)
+	content, err := a.chat(ctx, systemPrompt, buildUserPrompt(ev), 400)
 	if err != nil {
-		return nil, fmt.Errorf("ai: marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/api/chat", bytes.NewReader(buf))
-	if err != nil {
-		return nil, fmt.Errorf("ai: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if len(a.secret) > 0 {
-		token, err := a.mintToken()
-		if err != nil {
-			return nil, fmt.Errorf("ai: sign auth token: %w", err)
-		}
-		req.Header.Set("x-api-key", token)
-	}
-
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("ai: request failed: %w", err)
-	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf("ai: endpoint returned %s: %s", resp.Status, strings.TrimSpace(string(body)))
-	}
-
-	var cr chatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&cr); err != nil {
-		return nil, fmt.Errorf("ai: decode response: %w", err)
-	}
-	if cr.Error != "" {
-		return nil, fmt.Errorf("ai: model error: %s", cr.Error)
-	}
-
-	content := strings.TrimSpace(cr.Message.Content)
-	if content == "" {
-		return nil, fmt.Errorf("ai: empty model response")
+		return nil, err
 	}
 
 	var parsed analysisJSON
@@ -195,6 +140,78 @@ func (a *OllamaAnalyzer) Analyze(ctx context.Context, ev notification.AlertEvent
 		SuggestedFix: clamp(parsed.SuggestedFix),
 		Model:        a.model,
 	}, nil
+}
+
+// chat sends one system+user exchange and returns the model's raw content. Shared by
+// every prompt in this package so auth, the JSON grammar, the disabled thinking
+// channel and error handling are settled in exactly one place — the parts that are
+// easy to get subtly wrong and expensive to debug through a model.
+//
+// numPredict is the output budget: enough for the answer, low enough that a model
+// which starts rambling is cut off rather than paid for.
+func (a *OllamaAnalyzer) chat(ctx context.Context, system, user string, numPredict int) (string, error) {
+	noThink := false
+	reqBody := chatRequest{
+		Model:  a.model,
+		Stream: false,
+		Format: "json",
+		Think:  &noThink,
+		Options: map[string]any{
+			// Low, not zero: this is diagnosis, and we want the most probable
+			// reading of the evidence rather than a creative one.
+			"temperature": 0.2,
+			"num_predict": numPredict,
+		},
+		Messages: []chatMessage{
+			{Role: "system", Content: system},
+			{Role: "user", Content: user},
+		},
+	}
+	buf, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("ai: marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/api/chat", bytes.NewReader(buf))
+	if err != nil {
+		return "", fmt.Errorf("ai: build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if len(a.secret) > 0 {
+		token, err := a.mintToken()
+		if err != nil {
+			return "", fmt.Errorf("ai: sign auth token: %w", err)
+		}
+		req.Header.Set("x-api-key", token)
+	}
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("ai: request failed: %w", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return "", fmt.Errorf("ai: endpoint returned %s: %s", resp.Status, strings.TrimSpace(string(body)))
+	}
+
+	var cr chatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&cr); err != nil {
+		return "", fmt.Errorf("ai: decode response: %w", err)
+	}
+	if cr.Error != "" {
+		return "", fmt.Errorf("ai: model error: %s", cr.Error)
+	}
+
+	content := strings.TrimSpace(cr.Message.Content)
+	if content == "" {
+		return "", fmt.Errorf("ai: empty model response")
+	}
+	return content, nil
 }
 
 // buildUserPrompt renders the alert as a compact, labelled block for the model.

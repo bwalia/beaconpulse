@@ -15,7 +15,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useActiveAlerts, useMonitors, useOverview } from "@/lib/hooks";
+import { useActiveAlerts, useMonitors, useOverview, useProjects } from "@/lib/hooks";
+import { isFailing, useDiagnoseControl } from "@/components/diagnose-panel";
+import { Button } from "@/components/ui";
 import { useChartTheme } from "@/lib/use-chart-theme";
 import {
   RANGES,
@@ -47,6 +49,7 @@ export default function DashboardPage() {
   const [hours, setHours] = useState<RangeHours>(24);
 
   const { data: monitors } = useMonitors();
+  const { data: projects } = useProjects();
   const { data: alerts } = useActiveAlerts();
   const { data: overview, isLoading: loadingOverview, isError: overviewFailed, isFetching } = useOverview(hours);
 
@@ -63,6 +66,15 @@ export default function DashboardPage() {
 
   // Triage order: what's broken floats to the top. Nobody should scroll to find an outage.
   const triaged = [...list].sort((a, b) => severityRank(a) - severityRank(b) || a.name.localeCompare(b.name));
+
+  // Grouped by project, but triage still wins. Grouping alone would bury a live
+  // outage under whichever project sorted first, which is the one thing this page
+  // exists to prevent — so the cap is applied to the TRIAGED list (the worst few are
+  // still the ones shown), and the groups themselves are ordered by their sickest
+  // monitor. A project that is on fire is the first heading you see.
+  const projectNames = new Map((projects?.data ?? []).map((p) => [p.id, p.name]));
+  const shown = triaged.slice(0, DASHBOARD_MONITOR_CAP);
+  const grouped = groupByProject(shown, projectNames);
 
   const uptimeSeries = overview?.uptime_series ?? [];
   const responseSeries = overview?.response_series ?? [];
@@ -182,9 +194,26 @@ export default function DashboardPage() {
           <>
             {/* The dashboard is a summary, not the full list — show the worst few and
                 link out. Otherwise 100+ monitors would bury everything below them. */}
-            <div className="grid gap-2.5">
-              {triaged.slice(0, DASHBOARD_MONITOR_CAP).map((m) => (
-                <MonitorRow key={m.id} monitor={m} hist={histById.get(m.id)} winShort={winShort} />
+            <div className="space-y-5">
+              {grouped.map((g) => (
+                <div key={g.id}>
+                  <div className="mb-2 flex items-baseline gap-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {g.name}
+                    </h3>
+                    <span aria-hidden className="h-px min-w-4 flex-1 bg-slate-200 dark:bg-slate-800" />
+                    {g.down > 0 && (
+                      <span className="text-xs font-semibold text-red-700 dark:text-red-400">
+                        {g.down} down
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid gap-2.5">
+                    {g.monitors.map((m) => (
+                      <MonitorRow key={m.id} monitor={m} hist={histById.get(m.id)} winShort={winShort} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
             {list.length > DASHBOARD_MONITOR_CAP && (
@@ -262,6 +291,36 @@ const TRIAGE_ORDER: Record<string, number> = { down: 0, degraded: 1, unknown: 2,
 
 const statusOf = (m: Monitor) => (m.enabled ? m.last_status : "paused");
 const severityRank = (m: Monitor) => TRIAGE_ORDER[statusOf(m)] ?? 9;
+
+interface MonitorGroup {
+  id: string;
+  name: string;
+  monitors: Monitor[];
+  down: number;
+}
+
+// groupByProject buckets monitors by project while keeping triage intact: the input
+// is already sorted worst-first, so each bucket inherits that order, and the buckets
+// themselves come back ordered by their sickest member. Grouping must not cost this
+// page its one job — surfacing an outage without being scrolled.
+function groupByProject(monitors: Monitor[], names: Map<string, string>): MonitorGroup[] {
+  const byProject = new Map<string, Monitor[]>();
+  for (const m of monitors) {
+    const bucket = byProject.get(m.project_id);
+    if (bucket) bucket.push(m);
+    else byProject.set(m.project_id, [m]);
+  }
+  return [...byProject.entries()]
+    .map(([id, ms]) => ({
+      id,
+      // A project the list hasn't loaded (or that was deleted out from under a
+      // monitor) still gets a heading rather than an empty one.
+      name: names.get(id) ?? "Ungrouped",
+      monitors: ms,
+      down: ms.filter((m) => statusOf(m) === "down").length,
+    }))
+    .sort((a, b) => severityRank(a.monitors[0]) - severityRank(b.monitors[0]) || a.name.localeCompare(b.name));
+}
 
 function uptimeTone(pct?: number): Tone | undefined {
   if (pct == null) return undefined;
@@ -677,6 +736,7 @@ function MonitorRow({
   winShort: string;
 }) {
   const status = statusOf(monitor);
+  const diagnose = useDiagnoseControl(monitor.id);
   const pts = hist?.points ?? [];
   const passed = pts.filter((p) => p.v === 1).length;
   const uptimePct = pts.length ? round1((passed / pts.length) * 100) : null;
@@ -723,6 +783,23 @@ function MonitorRow({
           <span>now</span>
         </div>
       </div>
+
+      {/* Offered right where the outage is being read, so nobody has to find the
+          Monitors page to ask why. Same control as there — one flow, one behaviour. */}
+      {isFailing(monitor) && (
+        <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={diagnose.run}
+            disabled={diagnose.isPending}
+            className="text-brand-700 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/40"
+          >
+            {diagnose.isPending ? "Diagnosing…" : "Diagnose with AI"}
+          </Button>
+        </div>
+      )}
+      {diagnose.panel}
     </article>
   );
 }

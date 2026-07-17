@@ -30,6 +30,7 @@ import {
 } from "@/components/ui";
 import { ActivityIcon, CheckCircleIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
 import { useConfirm } from "@/components/confirm";
+import { isFailing, useDiagnoseControl } from "@/components/diagnose-panel";
 import { Pagination, SearchInput } from "@/components/table-controls";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import type { MetricPoint, Monitor } from "@/lib/types";
@@ -399,11 +400,13 @@ function MonitorRow({
   const deleteMonitor = useDeleteMonitor();
   const confirm = useConfirm();
   const reveal = useRevealVariants();
+  const diagnose = useDiagnoseControl(monitor.id);
 
   const target =
     monitor.type === "heartbeat" && monitor.ping_url ? monitor.ping_url : monitor.target;
 
   return (
+    <>
     <motion.tr
       variants={reveal}
       className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40"
@@ -452,6 +455,17 @@ function MonitorRow({
             separated and de-emphasised, so `Delete` isn't the loudest thing on the
             page six times over. */}
         <div className="flex items-center justify-end gap-1">
+          {isFailing(monitor) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={diagnose.run}
+              disabled={diagnose.isPending}
+              className="text-brand-700 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/40"
+            >
+              {diagnose.isPending ? "Diagnosing…" : "Diagnose with AI"}
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={onMetrics}>
             Metrics
           </Button>
@@ -490,6 +504,16 @@ function MonitorRow({
         </div>
       </td>
     </motion.tr>
+      {diagnose.panel && (
+        <tr>
+          {/* Spans the table so the diagnosis reads as part of this monitor's row
+              rather than as a new column of anything. */}
+          <td colSpan={7} className="px-4 pb-4 pt-0">
+            {diagnose.panel}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

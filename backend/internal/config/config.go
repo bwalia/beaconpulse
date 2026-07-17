@@ -59,6 +59,18 @@ type AI struct {
 	// Timeout bounds a single analysis call. On expiry the alert is delivered
 	// without enrichment.
 	Timeout time.Duration
+	// DiagnoseAllowPrivate lets AI diagnosis probe private, loopback and
+	// link-local addresses. OFF by default, and it must stay off anywhere the
+	// monitors are not yours.
+	//
+	// Diagnosis reports resolved addresses, certificate subjects and connection
+	// errors back to whoever asked, and the target is a value they chose. Pointed
+	// at an internal range that turns Beacon into a port scanner they can drive
+	// from the outside — the cloud metadata endpoint, the Kubernetes API, Postgres.
+	// This exists for the single-tenant operator diagnosing their own internal
+	// services, where the caller already owns the network and there is nothing to
+	// disclose to them.
+	DiagnoseAllowPrivate bool
 }
 
 // Notify holds notification/alerting configuration.
@@ -259,6 +271,7 @@ func Load() (Config, error) {
 			Model:   getStr("BEACON_AI_MODEL", ""),
 			APIKey:  getStr("BEACON_AI_API_KEY", ""),
 			Timeout: getDur("BEACON_AI_TIMEOUT", 20*time.Second, add),
+			DiagnoseAllowPrivate: getBool("BEACON_AI_DIAGNOSE_ALLOW_PRIVATE", false, add),
 		},
 	}
 

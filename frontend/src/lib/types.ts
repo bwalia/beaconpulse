@@ -271,3 +271,58 @@ export interface MaintenanceWindow {
   created_at: string;
   updated_at: string;
 }
+
+// ---- AI diagnosis ----
+
+// Evidence is what the server MEASURED, returned alongside the model's reading of
+// it. Shown to the user, not just fed to the model: the measurements are checkable
+// and the prose is not, and someone mid-incident deserves to see what was actually
+// observed rather than being asked to trust a summary of it.
+export interface DiagnoseEvidence {
+  target: string;
+  monitor_type: string;
+  checked_at: string;
+  dns: {
+    resolved: boolean;
+    addresses?: string[];
+    cname?: string;
+    nameservers?: string[];
+    lookup_ms: number;
+    error?: string;
+  };
+  tcp: { attempted: boolean; connected: boolean; address?: string; connect_ms: number; error?: string };
+  tls: {
+    attempted: boolean;
+    handshake_ok: boolean;
+    issuer?: string;
+    subject?: string;
+    not_after?: string;
+    days_remaining?: number;
+    expired: boolean;
+    hostname_ok: boolean;
+    error?: string;
+  };
+  http: {
+    attempted: boolean;
+    status_code?: number;
+    response_ms: number;
+    redirect_chain?: string[];
+    server?: string;
+    error?: string;
+  };
+}
+
+export interface DiagnoseAnalysis {
+  summary: string;
+  likely_cause: string;
+  suggested_fix: string;
+  /** The model's own hedge — surfaced so an unsure answer doesn't read like a sure one. */
+  confidence: "high" | "medium" | "low";
+}
+
+export interface Diagnosis {
+  evidence: DiagnoseEvidence;
+  analysis?: DiagnoseAnalysis;
+  /** Set when the model failed. The evidence is still complete and still worth reading. */
+  analysis_error?: string;
+}

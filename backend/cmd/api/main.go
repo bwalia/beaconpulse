@@ -18,6 +18,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"beacon/internal/adapter/ai"
+	"beacon/internal/adapter/netprobe"
 	"beacon/internal/adapter/notifier"
 	"beacon/internal/adapter/postgres"
 	"beacon/internal/adapter/promapi"
@@ -27,6 +28,7 @@ import (
 	"beacon/internal/domain/audit"
 	"beacon/internal/domain/auth"
 	"beacon/internal/domain/billing"
+	"beacon/internal/domain/diagnose"
 	"beacon/internal/domain/heartbeat"
 	"beacon/internal/domain/insight"
 	"beacon/internal/domain/maintenance"
@@ -185,6 +187,24 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	}
 	billingSvc := billing.NewService(billingRepo, payments, auditRec, cfg.Billing.MonitorHoursPerDollar)
 
+	// AI diagnosis. The prober is what actually measures anything, so it is built
+	// whenever the feature is on; the explainer is optional and a nil one degrades to
+	// returning the measurements without prose.
+	var diagnoseSvc *diagnose.Service
+	if cfg.AI.Enabled {
+		var explainer diagnose.Explainer
+		if cfg.AI.BaseURL != "" && cfg.AI.Model != "" {
+			explainer = ai.NewOllamaAnalyzer(cfg.AI.BaseURL, cfg.AI.Model, cfg.AI.APIKey, cfg.AI.Timeout)
+		}
+		diagnoseSvc = diagnose.NewService(
+			monitorRepo,
+			orgPlanRepo,
+			netprobe.New(cfg.AI.DiagnoseAllowPrivate),
+			explainer,
+		)
+		log.Info("AI diagnosis enabled", slog.Bool("allow_private_targets", cfg.AI.DiagnoseAllowPrivate))
+	}
+
 	// Services.
 	authSvc := auth.NewService(userRepo, refreshRepo, tokens, hasher, auditRec)
 	projectSvc := project.NewService(projectRepo, syncEnqueuer, auditRec)
@@ -198,6 +218,14 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	// Transport.
 	m := metrics.New()
 	authn := middleware.NewAuthenticator(tokens)
+
+	// Nil handler when diagnosis is off, so the route is absent rather than present
+	// and broken.
+	var diagnoseHandler *rest.DiagnoseHandler
+	if diagnoseSvc != nil {
+		diagnoseHandler = rest.NewDiagnoseHandler(diagnoseSvc, authn)
+	}
+
 	health := rest.NewHealthHandler(version, time.Now(),
 		rest.Checker{Name: "postgres", Check: func(ctx context.Context) error { return pool.Ping(ctx) }},
 		rest.Checker{Name: "redis", Check: func(ctx context.Context) error { return rdb.Ping(ctx).Err() }},
@@ -220,6 +248,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		StatusPage:         rest.NewStatusPageHandler(statusPageSvc),
 		Heartbeat:          rest.NewHeartbeatHandler(heartbeatSvc),
 		StatusPageSettings: rest.NewStatusPageSettingsHandler(statusPageSettingsSvc, validator, authn),
+		Diagnose:           diagnoseHandler,
 	}), nil
 }
 
