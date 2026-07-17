@@ -40,3 +40,14 @@ ingress:
 # Images for this environment live on its own SpectonCR host.
 image:
   registry: test-spectoncr.diytaxreturn.co.uk
+  # Same arrangement as int: the namespace already carries a `nebulacr-login`
+  # dockerconfigjson whose auth covers test-spectoncr.diytaxreturn.co.uk,
+  # so the chart references it rather than minting a second copy of the same
+  # registry credentials. One place to rotate, and no registry password in this
+  # repo's sealed files at all.
+  #
+  # The chart does NOT own this secret. If it is ever absent from the namespace, or
+  # its auth stops covering this host, the symptom is ImagePullBackOff on every pod
+  # rather than a failed deploy — helm has nothing to check here.
+  pullSecret: nebulacr-login
+  pullSecretCreate: false
