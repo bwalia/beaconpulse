@@ -23,7 +23,10 @@ import (
 	"beacon/internal/adapter/postgres"
 	"beacon/internal/adapter/promapi"
 	"beacon/internal/adapter/queue"
+	stripeadapter "beacon/internal/adapter/stripe"
 	"beacon/internal/config"
+	"beacon/internal/domain/audit"
+	"beacon/internal/domain/billing"
 	"beacon/internal/platform/cache"
 	"beacon/internal/platform/database"
 	"beacon/internal/platform/logger"
@@ -31,6 +34,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+)
+
+const (
+	// How often to ask Stripe what it failed to deliver. Frequent enough that a
+	// customer who paid during an outage is made whole in minutes rather than
+	// noticing themselves, and cheap: it asks only for undelivered events, which is
+	// almost always none.
+	billingReconcileEvery = 10 * time.Minute
+	// How far back each pass looks. Comfortably past Stripe's ~3-day retry window, so
+	// a payment is still repaired even after Stripe has given up on it entirely —
+	// that abandoned event is the one nothing else in the system will ever fix.
+	// Stripe only retains events for 30 days, which is the real ceiling.
+	billingReconcileLookback = 7 * 24 * time.Hour
 )
 
 func main() {
@@ -67,6 +83,27 @@ func run() error {
 	monitorRepo := postgres.NewMonitorRepository(pool)
 	refreshRepo := postgres.NewRefreshTokenRepository(pool)
 	billingRepo := postgres.NewBillingRepository(pool)
+
+	// Billing service, for the reconciler. payments stays nil when Stripe is not
+	// configured, which makes Reconcile a no-op rather than an error — the worker must
+	// still run everything else on a deployment that does not sell anything.
+	var payments billing.Payments
+	if cfg.Billing.Enabled() {
+		payments = stripeadapter.New(stripeadapter.Config{
+			SecretKey:     cfg.Billing.StripeSecretKey,
+			PriceStarter:  cfg.Billing.PriceStarter,
+			PricePro:      cfg.Billing.PricePro,
+			SuccessURL:    cfg.Billing.SuccessURL,
+			CancelURL:     cfg.Billing.CancelURL,
+			WebhookSecret: cfg.Billing.StripeWebhookSecret,
+		})
+	}
+	billingSvc := billing.NewService(
+		billingRepo,
+		payments,
+		audit.NewRecorder(postgres.NewAuditRepository(pool)),
+		cfg.Billing.MonitorHoursPerDollar,
+	)
 	reloader := controlplane.NewReloader(cfg.CtrlPlane.PromReloadURL, cfg.CtrlPlane.BlackboxReloadURL)
 	syncer := controlplane.NewSyncer(
 		monitorRepo,
@@ -128,6 +165,32 @@ func run() error {
 			Name:     "credit-meter",
 			Interval: time.Minute,
 			Run:      func(ctx context.Context) error { return billingRepo.DeductCredit(ctx, 60) },
+		},
+		worker.Task{
+			// The safety net under the billing webhook: ask Stripe for the payments it
+			// could not deliver to us and credit them. Without this, a webhook Stripe
+			// gives up on means money taken and nothing given, silently and for good —
+			// which has already happened once here.
+			//
+			// RunAtStart because a deploy is exactly when the endpoint was unreachable,
+			// so the first thing a new worker should do is find out what it missed.
+			Name:       "billing-reconcile",
+			Interval:   billingReconcileEvery,
+			RunAtStart: true,
+			Run: func(ctx context.Context) error {
+				repaired, err := billingSvc.Reconcile(ctx, time.Now().Add(-billingReconcileLookback))
+				if err != nil {
+					return err
+				}
+				if repaired > 0 {
+					// Loud on purpose: every one of these is a payment that would
+					// otherwise have been lost, and a rising count means the webhook
+					// is broken and wants fixing at the source.
+					log.Warn("billing reconcile credited payments the webhook never delivered",
+						slog.Int("repaired", repaired))
+				}
+				return nil
+			},
 		},
 		worker.Task{
 			Name:     "expired-token-cleanup",
