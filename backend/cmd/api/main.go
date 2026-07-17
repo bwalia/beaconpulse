@@ -228,7 +228,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		diagnoseHandler = rest.NewDiagnoseHandler(diagnoseSvc, authn)
 	}
 
-	health := rest.NewHealthHandler(version, time.Now(),
+	health := rest.NewHealthHandler(version, string(cfg.Env), time.Now(),
 		rest.Checker{Name: "postgres", Check: func(ctx context.Context) error { return pool.Ping(ctx) }},
 		rest.Checker{Name: "redis", Check: func(ctx context.Context) error { return rdb.Ping(ctx).Err() }},
 	)

@@ -335,3 +335,15 @@ export interface Diagnosis {
   /** Set when the model failed. The evidence is still complete and still worth reading. */
   analysis_error?: string;
 }
+
+/** Build/runtime info for the footer — what is running, where, and since when. */
+export interface SystemInfo {
+  status: string;
+  /** The git SHA the running binary was built from ("dev" outside CI). */
+  version: string;
+  /** int | test | acc | prod — read at RUNTIME, so a promoted image tells the truth. */
+  env: string;
+  /** When the process started, RFC3339. Effectively the deploy. */
+  started_at: string;
+  uptime_seconds: number;
+}

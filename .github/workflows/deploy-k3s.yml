@@ -193,6 +193,7 @@ jobs:
           # (BuildKit's direct --push emits an OCI index, which it mishandles).
           docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
             -f deploy/docker/Dockerfile.backend \
+            --build-arg BEACON_VERSION="$SHA" \
             -t "$NS/api:$SHA" -t "$NS/api:latest" \
             -t "$NS/worker:$SHA" -t "$NS/worker:latest" .
           ./deploy/scripts/assert-image-arch.sh "$NS/api:$SHA"
