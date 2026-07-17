@@ -265,12 +265,12 @@ ARGS=(generic beacon-secrets
 for _sk in STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_STARTER STRIPE_PRICE_PRO; do
   if [[ -n "${!_sk}" ]]; then
     ARGS+=(--from-literal="$_sk=${!_sk}")
-    note "including $_sk from deploy/.env"
+    note "including $_sk"
   fi
 done
 if [[ -n "$BEACON_AI_API_KEY" ]]; then
   ARGS+=(--from-literal=BEACON_AI_API_KEY="$BEACON_AI_API_KEY")
-  note "including BEACON_AI_API_KEY from deploy/.env"
+  note "including BEACON_AI_API_KEY"
 else
   note "BEACON_AI_API_KEY absent from deploy/.env — omitting (AI enrichment degrades to no-analysis)"
 fi
