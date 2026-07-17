@@ -66,6 +66,11 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Mount("/public/status", d.StatusPage.Routes())
 		// PUBLIC, unauthenticated: heartbeat ping ingest. The URL token is the
 		// credential; rate-limited per token inside the handler.
+		// Same payload as /healthz, mounted where a BROWSER can reach it: the gateway
+		// routes /api to the API, and /healthz only answers to the orchestrator. Public,
+		// like /healthz already is — the version it discloses is disclosed there too, and
+		// the environment is legible from the hostname.
+		api.Get("/system/info", d.Health.Health)
 		api.Mount("/ping", d.Heartbeat.Routes())
 
 		api.Mount("/auth", d.Auth.Routes())

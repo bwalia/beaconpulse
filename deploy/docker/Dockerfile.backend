@@ -19,6 +19,11 @@ WORKDIR /src
 # Populated by buildx from --platform (e.g. linux/amd64).
 ARG TARGETOS
 ARG TARGETARCH
+# The version stamped into the binary and reported by /healthz and the dashboard
+# footer. It MUST be declared here: the RUN below interpolates ${BEACON_VERSION},
+# and without an ARG that expanded to nothing, so every image ever built silently
+# fell back to "docker" and the ldflags hook never worked. CI passes the git SHA.
+ARG BEACON_VERSION
 
 # Cache dependencies separately from source for faster rebuilds.
 COPY backend/go.mod backend/go.sum ./

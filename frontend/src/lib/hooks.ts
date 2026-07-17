@@ -18,6 +18,7 @@ import type {
   Overview,
   Project,
   StatusPageSettings,
+  SystemInfo,
   Usage,
 } from "./types";
 
@@ -428,5 +429,18 @@ export function useDiagnose() {
   return useMutation({
     mutationFn: (monitorId: string) => api.post<Diagnosis>(`/api/v1/monitors/${monitorId}/diagnose`),
     retry: false, // a failed diagnosis is re-run by the user, not silently re-billed
+  });
+}
+
+// useSystemInfo backs the footer: which build is running, in which environment, and
+// since when. Polled slowly — it only changes on a deploy, and the point of the
+// footer is to notice that a deploy happened without reaching for kubectl.
+export function useSystemInfo() {
+  return useQuery({
+    queryKey: ["system-info"],
+    queryFn: () => api.get<SystemInfo>("/api/v1/system/info"),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    retry: false,
   });
 }

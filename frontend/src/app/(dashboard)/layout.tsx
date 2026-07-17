@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui";
+import { BuildFooter } from "@/components/build-footer";
 import { ConfirmProvider } from "@/components/confirm";
 import { ThemeToggle } from "@/lib/theme";
 import {
@@ -106,7 +107,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <main className="flex-1 p-4 sm:p-6">
           {/* Single content container for every route, so page widths never drift
               and wide screens aren't wasted on empty gutters. */}
-          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+          <div className="mx-auto w-full max-w-[1600px]">
+            {children}
+            {/* In the layout, so it is on every dashboard page: "which environment am
+                I on, and is this the build I just shipped?" is asked from wherever you
+                happen to be standing, not from one page you have to navigate to. */}
+            <BuildFooter />
+          </div>
         </main>
       </div>
     </div>

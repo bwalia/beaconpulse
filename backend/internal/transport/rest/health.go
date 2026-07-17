@@ -19,14 +19,20 @@ type Checker struct {
 // "the process can serve traffic" (all critical dependencies reachable).
 type HealthHandler struct {
 	version  string
+	env      string
 	started  time.Time
 	checkers []Checker
 	now      func() time.Time
 }
 
 // NewHealthHandler builds a HealthHandler with the given dependency checkers.
-func NewHealthHandler(version string, started time.Time, checkers ...Checker) *HealthHandler {
-	return &HealthHandler{version: version, started: started, checkers: checkers, now: time.Now}
+//
+// env comes from config at RUNTIME rather than being compiled in, and that is the
+// whole point of reporting it: one image is promoted from int to test to prod, so
+// anything baked into it can only ever name the environment it was BUILT for. The
+// footer's job is to say which environment you are looking at now.
+func NewHealthHandler(version, env string, started time.Time, checkers ...Checker) *HealthHandler {
+	return &HealthHandler{version: version, env: env, started: started, checkers: checkers, now: time.Now}
 }
 
 // Live always returns 200 while the process is running.
@@ -34,11 +40,23 @@ func (h *HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, map[string]any{"status": "ok"})
 }
 
-// Health returns basic build/runtime info.
+// Health returns basic build/runtime info: which build is running, in which
+// environment, and since when.
+//
+// started_at is sent as well as uptime_seconds because uptime is a number that was
+// true when the response left. The dashboard footer ticks "deployed 2h ago" off its
+// own clock, and it can only do that from an instant, not a duration.
+//
+// "Deployed" is honest but not exact: this is when the PROCESS started, which is the
+// deploy in every ordinary case, since a rollout replaces the pods. A crash-restart
+// or a node drain also resets it, and it is worth knowing that before treating this
+// as an audit trail.
 func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	httpx.OK(w, map[string]any{
 		"status":         "ok",
 		"version":        h.version,
+		"env":            h.env,
+		"started_at":     h.started.UTC().Format(time.RFC3339),
 		"uptime_seconds": int64(h.now().Sub(h.started).Seconds()),
 	})
 }
