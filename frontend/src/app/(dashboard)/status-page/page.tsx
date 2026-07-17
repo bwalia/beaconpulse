@@ -40,33 +40,33 @@ export default function StatusPageSettings() {
   const [domainPage, setDomainPage] = useState(0);
   const [domainSearchInput, setDomainSearchInput] = useState("");
   const [domainSearch, setDomainSearch] = useState("");
+  // The debounced search and the page reset land together: a new query has a
+  // different first page, so they are one change, not an effect reconciling the
+  // second after the first.
   useEffect(() => {
-    const t = setTimeout(() => setDomainSearch(domainSearchInput.trim()), 300);
+    const t = setTimeout(() => {
+      setDomainSearch(domainSearchInput.trim());
+      setDomainPage(0);
+    }, 300);
     return () => clearTimeout(t);
   }, [domainSearchInput]);
-  useEffect(() => {
-    setDomainPage(0);
-  }, [domainSearch]);
   const { data: monitors, isPlaceholderData: monitorsBusy } = useMonitorsPage({
     page: domainPage,
     pageSize: DOMAINS_PAGE_SIZE,
     search: domainSearch || undefined,
   });
 
-  const [title, setTitle] = useState("");
-  // null until the user edits, so the field shows the saved custom slug first and an
-  // empty edit clearly means "reset to the default".
+  // Both editors follow the same rule: null means "untouched", so the field shows
+  // whatever the server has until the user actually types. That makes the saved
+  // value the single source of truth — no effect copying it into state once it
+  // arrives, and no chance a refetch overwrites an edit in progress. It also fixes
+  // the older `title === ""` seeding, which treated a deliberately-cleared field as
+  // untouched and silently refilled it on the next refetch.
+  const [titleEdit, setTitleEdit] = useState<string | null>(null);
   const [slug, setSlug] = useState<string | null>(null);
   const [slugError, setSlugError] = useState<string | null>(null);
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants();
-
-  // Seed the input once settings arrive, without clobbering what the user is
-  // mid-way through typing.
-  useEffect(() => {
-    if (settings && title === "") setTitle(settings.title);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.title]);
 
   if (isLoading || !settings) {
     return (
@@ -76,6 +76,9 @@ export default function StatusPageSettings() {
       </div>
     );
   }
+
+  // Derived, not copied: the saved title shows through until the user edits.
+  const title = titleEdit ?? settings.title;
 
   // The authoritative published count comes from the settings API (org-wide), not
   // the current monitor page — so the "enabled but empty" warning is correct even
@@ -265,7 +268,7 @@ export default function StatusPageSettings() {
                 id="status-heading"
                 value={title}
                 maxLength={120}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => setTitleEdit(e.target.value)}
                 placeholder={settings.org_name}
                 className="w-full min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               />

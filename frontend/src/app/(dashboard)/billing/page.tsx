@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 import { useBilling, useStartSubscription, useStartTopUp, useUsage } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
@@ -18,24 +19,44 @@ const PLAN_LABEL: Record<string, string> = {
   payg: "Pay-as-you-go",
 };
 
+function checkoutNotice(param: string | null): Notice {
+  if (param === "success")
+    return { kind: "ok", text: "Payment received — your account updates within a few seconds." };
+  if (param === "cancel") return { kind: "err", text: "Checkout canceled. Nothing was charged." };
+  return null;
+}
+
+// useSearchParams reads the query without touching window during render, so it needs
+// a Suspense boundary on a prerendered route. Everything below it is client data
+// anyway, so the shell costs nothing.
 export default function BillingPage() {
+  return (
+    <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+      <BillingContent />
+    </Suspense>
+  );
+}
+
+function BillingContent() {
   const { data, isLoading } = useBilling();
   const { data: usage } = useUsage();
   const { user } = useAuth();
-  const [notice, setNotice] = useState<Notice>(null);
+  const params = useSearchParams();
+
+  // Captured once, on purpose. The Checkout result has to outlive the query string
+  // being scrubbed below, so deriving it every render would blank it the instant the
+  // URL is cleaned.
+  const [notice, setNotice] = useState<Notice>(() => checkoutNotice(params.get("checkout")));
 
   const canManage = user?.role === "owner" || user?.role === "admin";
 
-  // Surface the Stripe Checkout return (?checkout=success|cancel) as a notice.
+  // Drop ?checkout= once captured so a refresh doesn't replay it. No setState here —
+  // this only edits the address bar.
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get("checkout");
-    if (p === "success") {
-      setNotice({ kind: "ok", text: "Payment received — your account updates within a few seconds." });
-    } else if (p === "cancel") {
-      setNotice({ kind: "err", text: "Checkout canceled. Nothing was charged." });
+    if (params.get("checkout")) {
+      window.history.replaceState(null, "", window.location.pathname);
     }
-    if (p) window.history.replaceState(null, "", window.location.pathname);
-  }, []);
+  }, [params]);
 
   return (
     <div className="space-y-6">
@@ -118,7 +139,7 @@ function CreditCard({
     }
     try {
       const { checkout_url } = await topUp.mutateAsync(amount);
-      window.location.href = checkout_url; // hand off to Stripe Checkout
+      window.location.assign(checkout_url); // hand off to Stripe Checkout
     } catch (err) {
       setNotice({ kind: "err", text: err instanceof ApiRequestError ? err.message : "Could not start checkout" });
     }
@@ -199,7 +220,7 @@ function PlansGrid({
     setNotice(null);
     try {
       const { checkout_url } = await subscribe.mutateAsync(p.id);
-      window.location.href = checkout_url;
+      window.location.assign(checkout_url);
     } catch (err) {
       setNotice({ kind: "err", text: err instanceof ApiRequestError ? err.message : "Could not start checkout" });
     }

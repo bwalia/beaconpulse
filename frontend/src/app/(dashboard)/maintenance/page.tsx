@@ -15,6 +15,7 @@ import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton, Textarea 
 import { useConfirm } from "@/components/confirm";
 import { Pagination } from "@/components/table-controls";
 import { PlusIcon, WrenchIcon, XIcon } from "@/components/icons";
+import { useNow } from "@/lib/time";
 import type { MaintenanceScope, MaintenanceWindow } from "@/lib/types";
 
 type Notice = { kind: "ok" | "err"; text: string } | null;
@@ -204,7 +205,12 @@ function WindowRow({ window: w, setNotice }: { window: MaintenanceWindow; setNot
     return names.length ? `Monitors: ${names.join(", ")}` : `${w.scope_ids.length} monitor(s)`;
   }, [w, projects, monitors]);
 
-  const ended = new Date(w.ends_at).getTime() < Date.now();
+  // Ticks from the shared clock rather than reading it during render: a render
+  // that calls Date.now() is impure, so the value could be memoized and a window
+  // would keep claiming it was running long after it ended. Now it flips on its
+  // own, with no refresh.
+  const now = useNow(30_000);
+  const ended = now !== null && new Date(w.ends_at).getTime() < now;
 
   return (
     <Card className="flex flex-wrap items-center justify-between gap-3">

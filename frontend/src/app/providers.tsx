@@ -9,7 +9,16 @@ export function Providers({ children }: { children: ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { retry: 1, staleTime: 10_000, refetchOnWindowFocus: false },
+          queries: {
+            retry: 1,
+            staleTime: 10_000,
+            // A monitoring UI must never answer "is it up?" with a stale yes. Coming
+            // back to the tab refetches instead of waiting out the remaining poll
+            // interval, and a dropped connection resyncs the moment it returns —
+            // both are moments the user is most likely to be checking after trouble.
+            refetchOnWindowFocus: true,
+            refetchOnReconnect: true,
+          },
         },
       }),
   );

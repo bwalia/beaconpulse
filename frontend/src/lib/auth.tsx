@@ -30,16 +30,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Hydrate the session from a stored token, if any.
-    if (!tokenStore.access) {
-      setLoading(false);
-      return;
-    }
-    api
-      .get<User>("/api/v1/me")
-      .then(setUser)
-      .catch(() => tokenStore.clear())
-      .finally(() => setLoading(false));
+    // Hydrate the session from a stored token, if any. `loading` is resolved on the
+    // way out of the promise rather than synchronously in the no-token branch: the
+    // token lives in localStorage, so it cannot seed useState without the server and
+    // the browser disagreeing, and settling it here keeps both paths to one update.
+    let cancelled = false;
+
+    const hydrate = async () => {
+      if (!tokenStore.access) return;
+      try {
+        const me = await api.get<User>("/api/v1/me");
+        if (!cancelled) setUser(me);
+      } catch {
+        tokenStore.clear();
+      }
+    };
+
+    void hydrate().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const applyAuth = useCallback((res: AuthResponse) => {

@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   CartesianGrid,
   Line,
@@ -52,15 +53,20 @@ const SERIES_COLORS = [VIZ.blue, VIZ.good, VIZ.warning, VIZ.critical, "#7c3aed",
 
 type Mode = "instant" | "range";
 
+// What the user actually asked for, as opposed to what they are still typing. It is
+// the query key, so "Execute" is just "publish the form", and the default value is
+// why the page has a chart on arrival instead of a blank slate — no mount effect.
+interface Submitted {
+  expr: string;
+  mode: Mode;
+  hours: number;
+}
+
 export default function ExplorePage() {
   const [expr, setExpr] = useState("probe_success");
   const [mode, setMode] = useState<Mode>("range");
   const [hours, setHours] = useState<number>(1);
-
-  const [data, setData] = useState<PromResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
-  const [names, setNames] = useState<string[]>([]);
+  const [submitted, setSubmitted] = useState<Submitted>({ expr: "probe_success", mode: "range", hours: 1 });
 
   const listId = useId();
   const theme = useChartTheme();
@@ -68,31 +74,35 @@ export default function ExplorePage() {
   const stagger = useStaggerVariants();
 
   // Metric names for autocomplete — already scoped to this tenant by the proxy.
-  useEffect(() => {
-    metricNames().then(setNames).catch(() => setNames([]));
-  }, []);
+  const { data: names = [] } = useQuery({
+    queryKey: ["metric-names"],
+    queryFn: metricNames,
+    staleTime: 5 * 60_000,
+  });
 
-  async function run(e?: React.FormEvent) {
+  // Keyed on the SUBMITTED query, never on `expr`, so editing the box does not fire
+  // a request per keystroke. Re-running an identical query is served from cache.
+  const {
+    data = null,
+    error: queryError,
+    isFetching: running,
+  } = useQuery<PromResult>({
+    queryKey: ["explore", submitted],
+    queryFn: () =>
+      submitted.mode === "range"
+        ? queryRange(submitted.expr, submitted.hours)
+        : queryInstant(submitted.expr),
+    retry: false, // a PromQL syntax error is not worth retrying
+    placeholderData: (previous) => previous,
+  });
+  const error = queryError ? (queryError instanceof Error ? queryError.message : "Query failed") : null;
+
+  const run = (e?: React.FormEvent) => {
     e?.preventDefault();
     const q = expr.trim();
     if (!q) return;
-    setRunning(true);
-    setError(null);
-    try {
-      setData(mode === "range" ? await queryRange(q, hours) : await queryInstant(q));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Query failed");
-      setData(null);
-    } finally {
-      setRunning(false);
-    }
-  }
-
-  // Run the default query once on mount so the page is never a blank slate.
-  useEffect(() => {
-    void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    setSubmitted({ expr: q, mode, hours });
+  };
 
   // Reshape matrix results into recharts rows: one row per timestamp, one key per
   // series. Done in a memo because it is O(series × points) and must not re-run on

@@ -45,13 +45,22 @@ export default function ProjectsPage() {
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.04);
 
+  // The debounced search lands and the page resets together: a new query has a
+  // different first page, so resetting here (rather than in an effect keyed on
+  // `search`) keeps the two as one change instead of two renders.
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput.trim()), 300);
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
-  useEffect(() => {
+  // Changing the filter is what returns you to the first page — otherwise you
+  // could sit on an out-of-range page showing nothing.
+  const changeEnvironment = (next: string) => {
+    setEnvironment(next);
     setPage(0);
-  }, [search, environment]);
+  };
 
   const { data, isLoading, isPlaceholderData } = useProjectsPage({
     page,
@@ -88,7 +97,7 @@ export default function ProjectsPage() {
           />
           <select
             value={environment}
-            onChange={(e) => setEnvironment(e.target.value)}
+            onChange={(e) => changeEnvironment(e.target.value)}
             aria-label="Filter by environment"
             className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-48"
           >
@@ -116,7 +125,7 @@ export default function ProjectsPage() {
                 variant="secondary"
                 onClick={() => {
                   setSearchInput("");
-                  setEnvironment("");
+                  changeEnvironment("");
                 }}
               >
                 Clear filters
