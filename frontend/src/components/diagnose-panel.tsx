@@ -1,9 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useState } from "react";
 
 import { Button, Card } from "@/components/ui";
 import { AlertTriangleIcon, CheckCircleIcon } from "@/components/icons";
+import { ApiRequestError } from "@/lib/api";
+import { useDiagnose } from "@/lib/hooks";
 import { useRevealVariants } from "@/lib/motion";
 import type { Diagnosis } from "@/lib/types";
 
@@ -192,4 +195,48 @@ export function DiagnoseUpsell({ onDismiss }: { onDismiss: () => void }) {
       </div>
     </Card>
   );
+}
+
+/**
+ * isFailing decides where the button is offered at all. A "Diagnose" button on a
+ * healthy monitor invites people to spend a model's time proving nothing is wrong.
+ */
+export function isFailing(m: { enabled: boolean; last_status: string }): boolean {
+  return m.enabled && (m.last_status === "down" || m.last_status === "degraded");
+}
+
+/**
+ * useDiagnoseControl owns the whole diagnose interaction — the request, the paid-plan
+ * offer, the failure card — so every surface that offers the button behaves the same.
+ * Two pages showing the same feature is exactly how one of them ends up quietly
+ * rendering a 422 as a red error.
+ */
+export function useDiagnoseControl(monitorId: string) {
+  const diagnose = useDiagnose();
+  const [showUpsell, setShowUpsell] = useState(false);
+
+  const run = () => {
+    setShowUpsell(false);
+    diagnose.mutate(monitorId, {
+      // 422 is the paid-plan gate, not a failure: the server is saying the caller is
+      // fine and the plan is not. That is an offer, not an error.
+      onError: (err) => {
+        if (err instanceof ApiRequestError && err.status === 422) setShowUpsell(true);
+      },
+    });
+  };
+
+  const panel = showUpsell ? (
+    <DiagnoseUpsell onDismiss={() => setShowUpsell(false)} />
+  ) : diagnose.data ? (
+    <DiagnosePanel d={diagnose.data} />
+  ) : diagnose.isError ? (
+    <Card className="mt-3 p-4 text-sm text-red-700 dark:text-red-400">
+      {diagnose.error instanceof ApiRequestError
+        ? diagnose.error.message
+        : "The diagnosis could not be run."}
+    </Card>
+  ) : null;
+
+  return { run, isPending: diagnose.isPending, panel };
 }
