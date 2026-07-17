@@ -81,7 +81,7 @@ NAMESPACE="$TARGET_ENV" # one namespace per env, matching the deploy workflow
 OUT_DIR="$CHART_DIR/sealed/$TARGET_ENV"
 CACHE_FILE="$CACHE_DIR/$TARGET_ENV.env"
 
-# ---- load optional inputs from deploy/.env ---------------------------------
+# ---- load optional inputs from deploy/.env (+ per-env overlay) --------------
 # Only the keys we care about, so an unrelated line in .env can never leak in.
 read_env() { # read_env KEY FILE -> value on stdout (empty if absent)
   local key="$1" file="$2"
@@ -89,16 +89,44 @@ read_env() { # read_env KEY FILE -> value on stdout (empty if absent)
   sed -n "s/^${key}=//p" "$file" | tail -n1 | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
 }
 
-BEACON_AI_API_KEY="$(read_env BEACON_AI_API_KEY "$ENV_FILE")"
+# deploy/.env.<env> overlays deploy/.env, key by key.
+#
+# Because some secrets are genuinely per-environment while most are not. The obvious
+# case is Stripe: several environments can share one test-mode ACCOUNT — same secret
+# key, same prices — but each needs its OWN webhook endpoint, since an endpoint points
+# at exactly one hostname. Sharing a whsec_ would mean test's payments were signed for
+# int's URL, so the choice is a per-env value or hand-editing .env before every seal
+# and remembering to put it back. This is that value.
+#
+# Only the overlay's keys win; everything absent from it falls through to the shared
+# file. Both are gitignored (.env.*).
+ENV_OVERLAY="$REPO_ROOT/deploy/.env.${TARGET_ENV}"
+
+read_env_for() { # read_env_for KEY -> overlay value if set, else the shared one
+  local key="$1" v
+  v="$(read_env "$key" "$ENV_OVERLAY")"
+  if [[ -n "$v" ]]; then
+    # To STDERR, deliberately: this function's stdout IS the secret, and note()
+    # prints to stdout, so an un-redirected message here would be captured as part
+    # of the value and sealed into the cluster as "  using STRIPE_... <newline>
+    # whsec_...". Corrupt, silent, and indistinguishable from a wrong secret.
+    note "using $key from deploy/.env.${TARGET_ENV} (per-environment override)" >&2
+    printf '%s' "$v"
+    return
+  fi
+  read_env "$key" "$ENV_FILE"
+}
+
+BEACON_AI_API_KEY="$(read_env_for BEACON_AI_API_KEY)"
 # Stripe billing — all optional. Read from deploy/.env; only the ones present get
 # sealed. An absent key leaves billing disabled (the chart marks the env optional).
-STRIPE_SECRET_KEY="$(read_env STRIPE_SECRET_KEY "$ENV_FILE")"
-STRIPE_PUBLISHABLE_KEY="$(read_env STRIPE_PUBLISHABLE_KEY "$ENV_FILE")"
-STRIPE_WEBHOOK_SECRET="$(read_env STRIPE_WEBHOOK_SECRET "$ENV_FILE")"
-STRIPE_PRICE_STARTER="$(read_env STRIPE_PRICE_STARTER "$ENV_FILE")"
-STRIPE_PRICE_PRO="$(read_env STRIPE_PRICE_PRO "$ENV_FILE")"
-REGISTRY_USERNAME="$(read_env REGISTRY_USERNAME "$ENV_FILE")"
-REGISTRY_PASSWORD="$(read_env REGISTRY_PASSWORD "$ENV_FILE")"
+STRIPE_SECRET_KEY="$(read_env_for STRIPE_SECRET_KEY)"
+STRIPE_PUBLISHABLE_KEY="$(read_env_for STRIPE_PUBLISHABLE_KEY)"
+STRIPE_WEBHOOK_SECRET="$(read_env_for STRIPE_WEBHOOK_SECRET)"
+STRIPE_PRICE_STARTER="$(read_env_for STRIPE_PRICE_STARTER)"
+STRIPE_PRICE_PRO="$(read_env_for STRIPE_PRICE_PRO)"
+REGISTRY_USERNAME="$(read_env_for REGISTRY_USERNAME)"
+REGISTRY_PASSWORD="$(read_env_for REGISTRY_PASSWORD)"
 
 # ---- generated values, cached so re-runs are idempotent --------------------
 mkdir -p "$CACHE_DIR"

@@ -1,8 +1,15 @@
 # ── Test environment ────────────────────────────────────────────────────────
 # Namespace: test   Host: https://test.beaconpulse.net
-# Secrets:   Vault  secret/beaconpulse/test/config
+# Secrets:   SealedSecrets — sealed/test/beacon-secrets.sealed.yaml
+#
+# Not Vault, despite the default: the policy on secret/data/beaconpulse/* answers 403,
+# which is why int moved to sealed secrets too. An ExternalSecret that never resolves
+# fails quietly — helm succeeds, the pods come up with no POSTGRES_PASSWORD, and the
+# only symptom is a dead environment behind a green deploy. Regenerate with:
+#   deploy/scripts/seal-secrets.sh test
 env: test
 host: test.beaconpulse.net
+secretsSource: sealed
 
 app:
   beaconEnv: staging
@@ -12,9 +19,10 @@ app:
     api: 1
     frontend: 1
 
-# AI disabled in test by default; flip enabled + populate Vault to turn on.
+# On, so the feature can actually be exercised here. BEACON_AI_API_KEY is sealed with
+# the rest; an absent key degrades to "no analysis" rather than blocking pod start.
 ai:
-  enabled: false
+  enabled: true
   baseURL: https://ollama.workstation.co.uk
   model: qwen3:30b-a3b
   timeout: 60s
