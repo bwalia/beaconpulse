@@ -283,8 +283,9 @@ func TestRun_SubscriptionOverQuotaIsRefused(t *testing.T) {
 }
 
 // TestMonthStart pins the reset the quota message promises: the 1st, UTC.
+// Lives here because this is the code that spends against it.
 func TestMonthStart(t *testing.T) {
-	got := monthStart(time.Date(2026, 7, 17, 5, 44, 0, 0, time.UTC))
+	got := plan.MonthStart(time.Date(2026, 7, 17, 5, 44, 0, 0, time.UTC))
 	want := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
 	if !got.Equal(want) {
 		t.Fatalf("monthStart = %v, want %v", got, want)

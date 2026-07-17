@@ -5,6 +5,8 @@
 // migration; the organization row only stores which plan it is on.
 package plan
 
+import "time"
+
 // Plan identifies a subscription tier.
 type Plan string
 
@@ -17,6 +19,20 @@ const (
 	// limits are generous (cost is self-limiting: more monitors burn credit faster).
 	PayAsYouGo Plan = "payg"
 )
+
+// MonthStart is when a monthly allowance last reset: the 1st, UTC.
+//
+// It lives here, in the package that defines the allowance, because two callers need
+// it — the service that spends the quota and the page that reports what is left — and
+// a quota whose reset is defined twice is a quota that eventually disagrees with the
+// number shown to the customer.
+//
+// A calendar month rather than a rolling window: a reset you cannot predict is one you
+// have to ration against. UTC so the answer does not depend on where the reader is.
+func MonthStart(t time.Time) time.Time {
+	u := t.UTC()
+	return time.Date(u.Year(), u.Month(), 1, 0, 0, 0, 0, time.UTC)
+}
 
 // Limits are the per-organization resource caps a plan grants.
 type Limits struct {

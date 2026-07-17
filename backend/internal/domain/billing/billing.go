@@ -84,6 +84,10 @@ type Repository interface {
 	// CreditTotals reports credit ever granted and credit remaining, so the UI can
 	// tell someone what they have SPENT rather than only what is left.
 	CreditTotals(ctx context.Context, orgID uuid.UUID) (granted, remaining int64, err error)
+	// CountRunsSince counts AI diagnoses since t — what a subscribed org has spent
+	// of its monthly allowance. Surfaced so the UI can price the button BEFORE it is
+	// pressed rather than report the charge afterwards.
+	CountRunsSince(ctx context.Context, orgID uuid.UUID, since time.Time) (int, error)
 }
 
 // Payments is the payment provider (Stripe). Kept an interface so the domain and
@@ -163,6 +167,8 @@ type Overview struct {
 	// long do I have left?" — and leaves them reconstructing it from receipts.
 	GrantedCreditSeconds  int64
 	ConsumedCreditSeconds int64
+	// DiagnosesUsedThisMonth is what a subscribed org has spent of its allowance.
+	DiagnosesUsedThisMonth int
 }
 
 // Overview returns the caller org's billing state.
@@ -178,6 +184,10 @@ func (s *Service) Overview(ctx context.Context, actor Actor) (Overview, error) {
 	if terr == nil && granted > remaining {
 		consumed = granted - remaining
 	}
+	// Best-effort, like the totals: a count we could not read must not cost the caller
+	// their balance.
+	usedDiagnoses, _ := s.repo.CountRunsSince(ctx, actor.OrgID, plan.MonthStart(time.Now()))
+
 	return Overview{
 		SubscribedPlan:        st.Plan,
 		EffectivePlan:         eff,
@@ -185,8 +195,9 @@ func (s *Service) Overview(ctx context.Context, actor Actor) (Overview, error) {
 		PeriodEnd:             st.PeriodEnd,
 		CreditSeconds:         st.CreditSeconds,
 		Limits:                plan.LimitsFor(eff),
-		GrantedCreditSeconds:  granted,
-		ConsumedCreditSeconds: consumed,
+		GrantedCreditSeconds:   granted,
+		ConsumedCreditSeconds:  consumed,
+		DiagnosesUsedThisMonth: usedDiagnoses,
 	}, nil
 }
 

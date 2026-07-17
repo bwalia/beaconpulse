@@ -3,12 +3,13 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 
+import { useConfirm } from "@/components/confirm";
 import { Button, Card } from "@/components/ui";
 import { AlertTriangleIcon, CheckCircleIcon } from "@/components/icons";
 import { ApiRequestError } from "@/lib/api";
-import { useDiagnose } from "@/lib/hooks";
+import { useBilling, useDiagnose } from "@/lib/hooks";
 import { useRevealVariants } from "@/lib/motion";
-import type { Diagnosis } from "@/lib/types";
+import type { BillingInfo, Diagnosis } from "@/lib/types";
 
 /**
  * The result of an AI diagnosis.
@@ -213,10 +214,27 @@ export function isFailing(m: { enabled: boolean; last_status: string }): boolean
  */
 export function useDiagnoseControl(monitorId: string) {
   const diagnose = useDiagnose();
+  const confirm = useConfirm();
+  const { data: billing } = useBilling();
   const [showUpsell, setShowUpsell] = useState(false);
 
-  const run = () => {
+  const run = async () => {
     setShowUpsell(false);
+
+    // Say the price before taking it. A charge nobody agreed to is a surprise on a
+    // statement, and "you never told me" is a fair complaint if the only place the
+    // cost appears is after it has been spent. Free orgs skip straight through — the
+    // server refuses them and the reply becomes the upsell, so quoting them a price
+    // for something they cannot buy would just be noise.
+    if (billing && billing.effective_plan !== "free") {
+      const ok = await confirm({
+        title: "Run AI diagnosis?",
+        body: <DiagnoseCost info={billing} />,
+        confirmLabel: "Run diagnosis",
+      });
+      if (!ok) return;
+    }
+
     diagnose.mutate(monitorId, {
       // 422 is the paid-plan gate, not a failure: the server is saying the caller is
       // fine and the plan is not. That is an offer, not an error.
@@ -238,5 +256,77 @@ export function useDiagnoseControl(monitorId: string) {
     </Card>
   ) : null;
 
-  return { run, isPending: diagnose.isPending, panel };
+  return { run, isPending: diagnose.isPending, panel, label: diagnoseLabel(billing, diagnose.isPending) };
+}
+
+
+/**
+ * What this click costs, stated before it is spent.
+ *
+ * The two plans are charged differently, so they are told different things — quoting
+ * a subscriber a cash price for something their subscription already covers would be
+ * worse than saying nothing. Both are told the refund rule, because "you are only
+ * charged if we return a diagnosis" is the part that makes the price fair, and it is
+ * true: a failed model refunds and is never recorded.
+ */
+function DiagnoseCost({ info }: { info: BillingInfo }) {
+  const costMinutes = Math.round(info.diagnosis_cost_seconds / 60);
+  const creditMinutes = Math.floor(info.credit_seconds / 60);
+
+  if (info.effective_plan === "payg") {
+    const enough = info.credit_seconds >= info.diagnosis_cost_seconds;
+    return (
+      <div className="space-y-2">
+        <p>
+          This uses{" "}
+          <span className="font-semibold text-slate-900 dark:text-slate-100">
+            {costMinutes} monitor-minutes
+          </span>{" "}
+          of your pay-as-you-go credit.
+        </p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          You have {creditMinutes.toLocaleString()} monitor-minutes left
+          {!enough && " — that is not enough for a diagnosis, so this will be declined"}.
+        </p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          You are only charged if we return a diagnosis. If the analysis fails, the credit
+          is refunded.
+        </p>
+      </div>
+    );
+  }
+
+  const left = Math.max(0, info.monthly_diagnoses - info.diagnoses_used_this_month);
+  return (
+    <div className="space-y-2">
+      <p>
+        This uses{" "}
+        <span className="font-semibold text-slate-900 dark:text-slate-100">1 of your {info.monthly_diagnoses}</span>{" "}
+        AI diagnoses for this month. No extra charge — it is included in your plan.
+      </p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        You have used {info.diagnoses_used_this_month} this month, so {left} remain. The
+        allowance resets on the 1st.
+      </p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        A failed analysis does not count against your allowance.
+      </p>
+    </div>
+  );
+}
+
+
+/**
+ * The button's own label. It carries the price so the cost is visible without having
+ * to press anything and read a dialog — the dialog is where you consent, not where
+ * you find out.
+ */
+export function diagnoseLabel(info: BillingInfo | undefined, pending: boolean): string {
+  if (pending) return "Diagnosing…";
+  if (!info || info.effective_plan === "free") return "Diagnose with AI";
+  if (info.effective_plan === "payg") {
+    return `Diagnose with AI · ${Math.round(info.diagnosis_cost_seconds / 60)} min credit`;
+  }
+  const left = Math.max(0, info.monthly_diagnoses - info.diagnoses_used_this_month);
+  return `Diagnose with AI · ${left} left`;
 }

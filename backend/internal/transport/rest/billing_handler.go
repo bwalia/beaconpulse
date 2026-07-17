@@ -75,7 +75,8 @@ type billingResponse struct {
 	// question a bare balance leaves people reconstructing from Stripe receipts.
 	GrantedCreditSeconds  int64              `json:"granted_credit_seconds"`
 	ConsumedCreditSeconds int64              `json:"consumed_credit_seconds"`
-	MonthlyDiagnoses      int                `json:"monthly_diagnoses"`
+	MonthlyDiagnoses       int               `json:"monthly_diagnoses"`
+	DiagnosesUsedThisMonth int               `json:"diagnoses_used_this_month"`
 	DiagnosisCostSeconds  int64              `json:"diagnosis_cost_seconds"`
 	MaxMonitors           int                `json:"max_monitors"`
 	MonitorHoursPerDollar int                `json:"monitor_hours_per_dollar"`
@@ -117,7 +118,8 @@ func (h *BillingHandler) get(w http.ResponseWriter, r *http.Request) {
 		CreditSeconds:         ov.CreditSeconds,
 		GrantedCreditSeconds:  ov.GrantedCreditSeconds,
 		ConsumedCreditSeconds: ov.ConsumedCreditSeconds,
-		MonthlyDiagnoses:      ov.Limits.MonthlyDiagnoses,
+		MonthlyDiagnoses:       ov.Limits.MonthlyDiagnoses,
+		DiagnosesUsedThisMonth: ov.DiagnosesUsedThisMonth,
 		DiagnosisCostSeconds:  h.diagnosisCostSeconds,
 		MaxMonitors:           ov.Limits.MaxMonitors,
 		MonitorHoursPerDollar: h.svc.MonitorHoursPerDollar(),

@@ -148,6 +148,8 @@ export interface BillingInfo {
   consumed_credit_seconds: number;
   /** AI diagnoses a subscribed tier gets per calendar month (0 for free/payg). */
   monthly_diagnoses: number;
+  /** How many of that allowance the org has already spent this month. */
+  diagnoses_used_this_month: number;
   /** What one AI diagnosis costs a pay-as-you-go org, in monitor-seconds. */
   diagnosis_cost_seconds: number;
   max_monitors: number;

@@ -188,15 +188,6 @@ func NewService(monitors MonitorReader, plans OrgPlanReader, prober Prober, expl
 // feature it is protecting.
 const DefaultCostSeconds int64 = 30 * 60
 
-// monthStart is when the subscription allowance last reset: the 1st, UTC. A calendar
-// month rather than a rolling window because a quota you cannot predict the reset of
-// is one you have to ration against, and UTC so the answer does not depend on where
-// the reader is standing.
-func monthStart(t time.Time) time.Time {
-	u := t.UTC()
-	return time.Date(u.Year(), u.Month(), 1, 0, 0, 0, 0, time.UTC)
-}
-
 // ErrPaidPlanRequired is returned to a Free org. It is a Validation rather than a
 // Forbidden on purpose: nothing about the caller is wrong, and the UI turns it into
 // an upsell rather than an error.
@@ -286,7 +277,7 @@ func (s *Service) meterIn(ctx context.Context, orgID uuid.UUID, p plan.Plan) (in
 
 	// A subscribed tier: flat fee, so the ceiling is a count rather than a balance.
 	limit := plan.LimitsFor(p).MonthlyDiagnoses
-	used, err := s.meter.CountRunsSince(ctx, orgID, monthStart(s.now()))
+	used, err := s.meter.CountRunsSince(ctx, orgID, plan.MonthStart(s.now()))
 	if err != nil {
 		return 0, err
 	}

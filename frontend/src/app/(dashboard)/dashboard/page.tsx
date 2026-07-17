@@ -795,7 +795,7 @@ function MonitorRow({
             disabled={diagnose.isPending}
             className="text-brand-700 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950/40"
           >
-            {diagnose.isPending ? "Diagnosing…" : "Diagnose with AI"}
+            {diagnose.label}
           </Button>
         </div>
       )}
