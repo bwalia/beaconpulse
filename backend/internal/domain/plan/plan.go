@@ -24,14 +24,26 @@ type Limits struct {
 	MaxMonitors int
 	// MinIntervalSeconds is the fastest check interval the org may configure.
 	MinIntervalSeconds int
+	// MonthlyDiagnoses caps AI diagnoses per calendar month for SUBSCRIBED tiers,
+	// which pay a flat fee and so need a ceiling on a per-use cost.
+	//
+	// Zero for Free (which cannot diagnose at all) and for pay-as-you-go, which is
+	// metered per run against its credit instead — that org has already paid for
+	// each diagnosis, and capping it too would be charging twice.
+	MonthlyDiagnoses int
 }
 
 // registry maps each plan to its limits. Tune here, no migration needed.
+//
+// Diagnosis quotas track each tier's monitor cap rather than its price: the number of
+// times you need to ask why something broke follows how much you are watching, not
+// what you paid. Generous enough that a normal team never meets the ceiling, low
+// enough that one subscriber cannot consume unbounded GPU for a flat fee.
 var registry = map[Plan]Limits{
-	Free:       {MaxMonitors: 10, MinIntervalSeconds: 60},
-	Starter:    {MaxMonitors: 50, MinIntervalSeconds: 30},
-	Pro:        {MaxMonitors: 500, MinIntervalSeconds: 10},
-	PayAsYouGo: {MaxMonitors: 500, MinIntervalSeconds: 30},
+	Free:       {MaxMonitors: 10, MinIntervalSeconds: 60, MonthlyDiagnoses: 0},
+	Starter:    {MaxMonitors: 50, MinIntervalSeconds: 30, MonthlyDiagnoses: 100},
+	Pro:        {MaxMonitors: 500, MinIntervalSeconds: 10, MonthlyDiagnoses: 1000},
+	PayAsYouGo: {MaxMonitors: 500, MinIntervalSeconds: 30, MonthlyDiagnoses: 0},
 }
 
 // Valid reports whether p is a known plan.

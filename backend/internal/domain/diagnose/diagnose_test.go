@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -38,6 +39,35 @@ func (f *fakeProber) Probe(context.Context, string, string) (Evidence, error) {
 	return f.ev, f.err
 }
 
+type fakeMeter struct {
+	balance   int64
+	runs      int
+	charged   int64
+	refunded  int64
+	recorded  int
+}
+
+func (m *fakeMeter) ChargeCredit(_ context.Context, _ uuid.UUID, cost int64) (bool, error) {
+	if m.balance < cost {
+		return false, nil
+	}
+	m.balance -= cost
+	m.charged += cost
+	return true, nil
+}
+func (m *fakeMeter) RefundCredit(_ context.Context, _ uuid.UUID, cost int64) error {
+	m.balance += cost
+	m.refunded += cost
+	return nil
+}
+func (m *fakeMeter) CountRunsSince(context.Context, uuid.UUID, time.Time) (int, error) {
+	return m.runs, nil
+}
+func (m *fakeMeter) RecordRun(context.Context, uuid.UUID, uuid.UUID, int64) error {
+	m.recorded++
+	return nil
+}
+
 type fakeExplainer struct {
 	analysis *Analysis
 	err      error
@@ -59,7 +89,7 @@ func actor(org uuid.UUID) Actor {
 func TestRun_FreePlanIsRefusedBeforeProbing(t *testing.T) {
 	prober := &fakeProber{}
 	svc := NewService(&fakeMonitors{target: "https://x.test", monitorType: "https"},
-		fakePlans{plan.Free}, prober, &fakeExplainer{})
+		fakePlans{plan.Free}, prober, &fakeExplainer{}, &fakeMeter{balance: 1e9}, 1800)
 
 	_, err := svc.Run(context.Background(), actor(uuid.New()), uuid.New())
 	if !apperror.IsCode(err, apperror.CodeValidation) {
@@ -78,7 +108,7 @@ func TestRun_PayAsYouGoCounts(t *testing.T) {
 		t.Run(string(p), func(t *testing.T) {
 			prober := &fakeProber{ev: Evidence{Target: "https://x.test"}}
 			svc := NewService(&fakeMonitors{target: "https://x.test", monitorType: "https"},
-				fakePlans{p}, prober, &fakeExplainer{analysis: &Analysis{Summary: "ok"}})
+				fakePlans{p}, prober, &fakeExplainer{analysis: &Analysis{Summary: "ok"}}, &fakeMeter{balance: 1e9}, 1800)
 
 			if _, err := svc.Run(context.Background(), actor(uuid.New()), uuid.New()); err != nil {
 				t.Fatalf("plan %q should be allowed to diagnose: %v", p, err)
@@ -95,7 +125,7 @@ func TestRun_PayAsYouGoCounts(t *testing.T) {
 func TestRun_ScopesTheLookupToTheCallersOrg(t *testing.T) {
 	org := uuid.New()
 	monitors := &fakeMonitors{target: "https://x.test", monitorType: "https"}
-	svc := NewService(monitors, fakePlans{plan.Pro}, &fakeProber{}, &fakeExplainer{})
+	svc := NewService(monitors, fakePlans{plan.Pro}, &fakeProber{}, &fakeExplainer{}, &fakeMeter{balance: 1e9}, 1800)
 
 	if _, err := svc.Run(context.Background(), actor(org), uuid.New()); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -112,7 +142,7 @@ func TestRun_AIFailureStillReturnsTheEvidence(t *testing.T) {
 	ev := Evidence{Target: "https://x.test", TLS: TLSFinding{Attempted: true, Expired: true}}
 	svc := NewService(&fakeMonitors{target: "https://x.test", monitorType: "https"},
 		fakePlans{plan.Pro}, &fakeProber{ev: ev},
-		&fakeExplainer{err: errors.New("model timed out")})
+		&fakeExplainer{err: errors.New("model timed out")}, &fakeMeter{balance: 1e9}, 1800)
 
 	out, err := svc.Run(context.Background(), actor(uuid.New()), uuid.New())
 	if err != nil {
@@ -133,7 +163,7 @@ func TestRun_AIFailureStillReturnsTheEvidence(t *testing.T) {
 // model still answers with facts.
 func TestRun_WithoutAnExplainerReturnsEvidenceOnly(t *testing.T) {
 	svc := NewService(&fakeMonitors{target: "https://x.test", monitorType: "https"},
-		fakePlans{plan.Pro}, &fakeProber{ev: Evidence{Target: "https://x.test"}}, nil)
+		fakePlans{plan.Pro}, &fakeProber{ev: Evidence{Target: "https://x.test"}}, nil, &fakeMeter{balance: 1e9}, 1800)
 
 	out, err := svc.Run(context.Background(), actor(uuid.New()), uuid.New())
 	if err != nil {
@@ -144,5 +174,119 @@ func TestRun_WithoutAnExplainerReturnsEvidenceOnly(t *testing.T) {
 	}
 	if out.Evidence.Target != "https://x.test" {
 		t.Fatal("expected the evidence to be returned regardless")
+	}
+}
+
+
+func metered(p plan.Plan, m *fakeMeter, explain Explainer) *Service {
+	return NewService(&fakeMonitors{target: "https://x.test", monitorType: "https"},
+		fakePlans{p}, &fakeProber{ev: Evidence{Target: "https://x.test"}}, explain, m, 1800)
+}
+
+func ok() *fakeExplainer { return &fakeExplainer{analysis: &Analysis{Summary: "cert expired"}} }
+
+// TestRun_PayAsYouGoIsChargedPerDiagnosis — the credit is the meter, so a run has to
+// move it.
+func TestRun_PayAsYouGoIsChargedPerDiagnosis(t *testing.T) {
+	m := &fakeMeter{balance: 5000}
+	svc := metered(plan.PayAsYouGo, m, ok())
+
+	if _, err := svc.Run(context.Background(), actor(uuid.New()), uuid.New()); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if m.charged != 1800 {
+		t.Fatalf("charged = %d, want 1800", m.charged)
+	}
+	if m.balance != 3200 {
+		t.Fatalf("balance = %d, want 3200", m.balance)
+	}
+	if m.recorded != 1 {
+		t.Fatalf("the run was not recorded")
+	}
+}
+
+// TestRun_PayAsYouGoWithoutEnoughCreditIsRefusedBeforeTheWork — no credit, no GPU.
+func TestRun_PayAsYouGoWithoutEnoughCreditIsRefused(t *testing.T) {
+	m := &fakeMeter{balance: 100} // less than one diagnosis
+	prober := &fakeProber{}
+	svc := NewService(&fakeMonitors{target: "https://x.test", monitorType: "https"},
+		fakePlans{plan.PayAsYouGo}, prober, ok(), m, 1800)
+
+	_, err := svc.Run(context.Background(), actor(uuid.New()), uuid.New())
+	if !apperror.IsCode(err, apperror.CodeValidation) {
+		t.Fatalf("expected a validation error, got %v", err)
+	}
+	if prober.called {
+		t.Fatal("an org that could not pay still made the server probe")
+	}
+	if m.balance != 100 {
+		t.Fatalf("balance moved on a refused run: %d", m.balance)
+	}
+}
+
+// TestRun_RefundsWhenTheModelFails is the fairness property: they paid for a
+// diagnosis and got a probe dump, so they must not be billed for one.
+func TestRun_RefundsWhenTheModelFails(t *testing.T) {
+	m := &fakeMeter{balance: 5000}
+	svc := metered(plan.PayAsYouGo, m, &fakeExplainer{err: errors.New("model down")})
+
+	out, err := svc.Run(context.Background(), actor(uuid.New()), uuid.New())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if out.Analysis != nil {
+		t.Fatal("no analysis expected")
+	}
+	if m.balance != 5000 {
+		t.Fatalf("balance = %d, want 5000 — a failed diagnosis was charged for", m.balance)
+	}
+	if m.refunded != 1800 {
+		t.Fatalf("refunded = %d, want 1800", m.refunded)
+	}
+	if m.recorded != 0 {
+		t.Fatal("a failed diagnosis was written to the ledger")
+	}
+}
+
+// TestRun_SubscriptionSpendsQuotaNotCredit — a subscriber already paid a flat fee;
+// charging their leftover credit too would bill them twice for one feature.
+func TestRun_SubscriptionSpendsQuotaNotCredit(t *testing.T) {
+	m := &fakeMeter{balance: 5000, runs: 3}
+	svc := metered(plan.Starter, m, ok())
+
+	if _, err := svc.Run(context.Background(), actor(uuid.New()), uuid.New()); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if m.charged != 0 || m.balance != 5000 {
+		t.Fatalf("a subscriber's credit was charged: charged=%d balance=%d", m.charged, m.balance)
+	}
+	if m.recorded != 1 {
+		t.Fatal("the run was not counted against the quota")
+	}
+}
+
+// TestRun_SubscriptionOverQuotaIsRefused — and refused before any work.
+func TestRun_SubscriptionOverQuotaIsRefused(t *testing.T) {
+	limit := plan.LimitsFor(plan.Starter).MonthlyDiagnoses
+	m := &fakeMeter{balance: 5000, runs: limit}
+	prober := &fakeProber{}
+	svc := NewService(&fakeMonitors{target: "https://x.test", monitorType: "https"},
+		fakePlans{plan.Starter}, prober, ok(), m, 1800)
+
+	_, err := svc.Run(context.Background(), actor(uuid.New()), uuid.New())
+	if !apperror.IsCode(err, apperror.CodeValidation) {
+		t.Fatalf("expected the quota to refuse, got %v", err)
+	}
+	if prober.called {
+		t.Fatal("an over-quota org still made the server probe")
+	}
+}
+
+// TestMonthStart pins the reset the quota message promises: the 1st, UTC.
+func TestMonthStart(t *testing.T) {
+	got := monthStart(time.Date(2026, 7, 17, 5, 44, 0, 0, time.UTC))
+	want := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("monthStart = %v, want %v", got, want)
 	}
 }
