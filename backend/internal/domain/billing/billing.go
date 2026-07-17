@@ -95,6 +95,10 @@ type Payments interface {
 	SubscriptionCheckoutURL(ctx context.Context, in CheckoutInput) (string, error)
 	// TopUpCheckoutURL returns a Stripe Checkout URL for a one-time custom amount.
 	TopUpCheckoutURL(ctx context.Context, in TopUpInput) (string, error)
+	// RecentTopUps lists top-up payments the provider recorded since `since` that it
+	// could not confirm delivering to us. It is what lets billing be pull-based as
+	// well as push-based; see Service.Reconcile.
+	RecentTopUps(ctx context.Context, since time.Time) ([]WebhookEvent, error)
 }
 
 // CheckoutInput / TopUpInput are what the service hands the payment provider.
@@ -231,16 +235,63 @@ type WebhookEvent struct {
 }
 
 // ApplyWebhook applies a verified, normalized Stripe event idempotently.
-func (s *Service) ApplyWebhook(ctx context.Context, ev WebhookEvent) error {
+// Reconcile credits any top-up the provider took money for but never managed to
+// tell us about, and returns how many it had to repair.
+//
+// Webhooks are best-effort, and treating them as the only path means a delivery
+// failure is indistinguishable from a payment that never happened: the money leaves
+// the customer's card, nothing is credited, and nothing in the system is aware there
+// is anything to notice. That is not hypothetical — it happened here, when the
+// endpoint spent an hour rejecting events over an API version mismatch and a real
+// payment was simply lost. So the provider is also polled: it is the authority on
+// what was paid, and asking it closes the gap that waiting cannot.
+//
+// Replay is safe by construction. Every top-up is keyed by its provider event id and
+// applied through exactly the path a webhook would take, so an event that did arrive
+// is a no-op, a delivery racing this poll cannot double-credit, and running it more
+// often costs nothing but a query.
+//
+// Only top-ups are reconciled. They are additive and idempotent, so replaying one
+// late is always right. Subscription events are last-writer-wins state, where
+// replaying a missed-but-older event could overwrite a newer one and downgrade a
+// paying customer — worse than the gap it would close.
+func (s *Service) Reconcile(ctx context.Context, since time.Time) (int, error) {
+	if s.pay == nil {
+		return 0, nil
+	}
+	events, err := s.pay.RecentTopUps(ctx, since)
+	if err != nil {
+		return 0, err
+	}
+	repaired := 0
+	for _, ev := range events {
+		applied, err := s.ApplyWebhook(ctx, ev)
+		if err != nil {
+			// One bad event must not stall the repair of every other customer's
+			// payment; the next pass retries it anyway.
+			continue
+		}
+		if applied {
+			repaired++
+		}
+	}
+	return repaired, nil
+}
+
+// ApplyWebhook settles one provider event. It reports whether the event actually
+// changed anything: an event already applied — a Stripe retry, or the reconciler and
+// a delivery arriving at once — is a no-op, and the caller can tell the difference
+// between "handled" and "handled for the first time".
+func (s *Service) ApplyWebhook(ctx context.Context, ev WebhookEvent) (bool, error) {
 	switch ev.Kind {
 	case KindTopUp:
 		if ev.OrgID == uuid.Nil {
-			return nil // no org to credit; ignore rather than error a webhook
+			return false, nil // no org to credit; ignore rather than error a webhook
 		}
 		addSeconds := ev.AmountCents * int64(s.monitorHoursPerDollar) * 3600 / 100
 		applied, err := s.repo.ApplyTopUp(ctx, ev.OrgID, addSeconds, ev.AmountCents, ev.ID)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if applied {
 			org := ev.OrgID
@@ -250,14 +301,14 @@ func (s *Service) ApplyWebhook(ctx context.Context, ev WebhookEvent) error {
 				Metadata: map[string]any{"amount_cents": ev.AmountCents, "credit_seconds": addSeconds},
 			})
 		}
-		return nil
+		return applied, nil
 	case KindSubscription:
 		if ev.OrgID == uuid.Nil {
-			return nil
+			return false, nil
 		}
 		applied, err := s.repo.ApplySubscription(ctx, ev.OrgID, ev.Plan, ev.Status, ev.PeriodEnd, ev.ID)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if applied {
 			org := ev.OrgID
@@ -267,9 +318,9 @@ func (s *Service) ApplyWebhook(ctx context.Context, ev WebhookEvent) error {
 				Metadata: map[string]any{"plan": string(ev.Plan), "status": ev.Status},
 			})
 		}
-		return nil
+		return applied, nil
 	default:
-		return nil
+		return false, nil
 	}
 }
 

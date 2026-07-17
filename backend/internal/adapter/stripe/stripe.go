@@ -15,6 +15,7 @@ import (
 	stripe "github.com/stripe/stripe-go/v86"
 	"github.com/stripe/stripe-go/v86/checkout/session"
 	"github.com/stripe/stripe-go/v86/customer"
+	"github.com/stripe/stripe-go/v86/event"
 	"github.com/stripe/stripe-go/v86/webhook"
 
 	"beacon/internal/domain/billing"
@@ -175,6 +176,15 @@ func (c *Client) ParseWebhook(payload []byte, sigHeader string) (billing.Webhook
 		}
 		return billing.WebhookEvent{}, fmt.Errorf("verify stripe signature: %w", err)
 	}
+	return c.normalize(ev)
+}
+
+// normalize turns a Stripe event into the domain's provider-neutral shape. It is
+// deliberately separate from signature checking: an event we fetched from the Stripe
+// API ourselves is already authentic (we asked, over TLS, with our secret key), and
+// it must be interpreted the SAME way as one that arrived by webhook — otherwise the
+// reconciler and the endpoint could disagree about what a payment meant.
+func (c *Client) normalize(ev stripe.Event) (billing.WebhookEvent, error) {
 	out := billing.WebhookEvent{ID: ev.ID, Kind: billing.KindIgnore}
 
 	switch ev.Type {
@@ -208,6 +218,55 @@ func (c *Client) ParseWebhook(payload []byte, sigHeader string) (billing.Webhook
 		if len(sub.Items.Data) > 0 && sub.Items.Data[0].Price != nil {
 			out.Plan = c.planForPrice(sub.Items.Data[0].Price.ID)
 		}
+	}
+	return out, nil
+}
+
+// RecentTopUps lists the completed top-up payments Stripe recorded since `since`,
+// normalized exactly as the webhook path would produce them.
+//
+// This is the safety net under the webhook. A webhook is best-effort: if the endpoint
+// is down, misconfigured, or — as actually happened — rejecting events over an API
+// version mismatch, Stripe eventually stops retrying and the money is simply gone
+// from the customer's card with nothing credited. Nothing in the system notices,
+// because the system never heard about it. Asking Stripe what it *knows* happened,
+// rather than waiting to be told, is the only way a payment cannot be silently lost.
+//
+// Replay is safe because the event id is the idempotency key that the webhook path
+// already uses: anything Stripe did deliver is a no-op here.
+func (c *Client) RecentTopUps(ctx context.Context, since time.Time) ([]billing.WebhookEvent, error) {
+	params := &stripe.EventListParams{
+		Type: stripe.String("checkout.session.completed"),
+		// Ask only for what Stripe could NOT deliver — pending, or failed every
+		// attempt. That is exactly the money-losing set, and it keeps this to a few
+		// rows instead of every payment in the window.
+		//
+		// Sound because the endpoint returns 200 only AFTER the credit transaction
+		// commits, so "delivered" really does imply "credited". An event still in
+		// flight may also appear here; replaying it early is harmless, since the
+		// event id already guards against crediting twice.
+		DeliverySuccess: stripe.Bool(false),
+	}
+	params.Context = ctx
+	// Stripe keeps events for 30 days, which is the real ceiling on how far back
+	// this can ever look.
+	params.CreatedRange = &stripe.RangeQueryParams{GreaterThanOrEqual: since.Unix()}
+
+	var out []billing.WebhookEvent
+	iter := event.List(params)
+	for iter.Next() {
+		ev, err := c.normalize(*iter.Event())
+		if err != nil {
+			// One malformed event must not stall reconciliation for every other
+			// payment; skip it and keep going.
+			continue
+		}
+		if ev.Kind == billing.KindTopUp {
+			out = append(out, ev)
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return nil, fmt.Errorf("stripe list events: %w", err)
 	}
 	return out, nil
 }

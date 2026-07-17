@@ -188,7 +188,10 @@ func (h *BillingHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, apperror.Validation("invalid webhook signature"))
 		return
 	}
-	if err := h.svc.ApplyWebhook(r.Context(), ev); err != nil {
+	// 200 only once the credit has committed, never before: Stripe treats the status
+	// as the record of whether we took the event, and the reconciler trusts that same
+	// signal to decide what still needs repairing.
+	if _, err := h.svc.ApplyWebhook(r.Context(), ev); err != nil {
 		httpx.Error(w, r, err)
 		return
 	}
