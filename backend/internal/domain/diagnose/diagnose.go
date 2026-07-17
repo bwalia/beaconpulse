@@ -180,13 +180,21 @@ func NewService(monitors MonitorReader, plans OrgPlanReader, prober Prober, expl
 	}
 }
 
-// DefaultCostSeconds is 30 monitor-minutes, about 10¢ at the standard rate.
+// DefaultCostSeconds is 5 monitor-minutes — about 1.7¢, or roughly what five minutes
+// of watching one domain costs. Priced to be explainable rather than to earn: a
+// diagnosis costs about what five minutes of monitoring costs, and that sentence is
+// the whole pricing policy.
 //
-// Set well above what a diagnosis actually costs to serve, but deliberately low
-// enough that nobody rations themselves: this button is pressed during an outage, and
-// a price that makes someone hesitate to ask why their site is down has defeated the
-// feature it is protecting.
-const DefaultCostSeconds int64 = 30 * 60
+// Kept cheap on purpose. The model runs on our own hardware, so the marginal cost of
+// a diagnosis is GPU seconds we have already paid for, and the thing worth optimising
+// is that people actually use it. This button is pressed during an outage; a price
+// that makes someone hesitate to ask why their site is down has defeated the feature
+// it was protecting.
+//
+// It follows that the price is NOT the abuse control — at this rate a few dollars buys
+// hundreds of runs — so the rate limit in front of the endpoint is what stops one org
+// saturating the model, and it has to stay there.
+const DefaultCostSeconds int64 = 5 * 60
 
 // ErrPaidPlanRequired is returned to a Free org. It is a Validation rather than a
 // Forbidden on purpose: nothing about the caller is wrong, and the UI turns it into
