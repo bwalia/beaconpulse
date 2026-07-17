@@ -1,12 +1,30 @@
 # ── Production environment ──────────────────────────────────────────────────
 # Namespace: prod   Host: https://beaconpulse.net (apex — the canonical domain)
-# Secrets:   Vault  secret/beaconpulse/prod/config
+# Secrets:   SealedSecrets — sealed/prod/beacon-secrets.sealed.yaml
+#
+# Not Vault, despite the default: the policy on secret/data/beaconpulse/* answers 403,
+# which is why every other environment is sealed too. An ExternalSecret that never
+# resolves fails quietly — helm succeeds, the pods come up with no POSTGRES_PASSWORD,
+# and the only symptom is a dead environment behind a green deploy. Regenerate with:
+#   deploy/scripts/seal-secrets.sh prod
+#
+# Its JWT, encryption and Postgres secrets are generated FOR prod and shared with
+# nothing. That is not tidiness: a JWT secret shared with an environment anyone can
+# sign up on would make a token minted there valid here, and the encryption key is what
+# protects customers' notification credentials at rest.
+#
+# BILLING IS DELIBERATELY OFF: no STRIPE_* is sealed for prod, so checkout is refused
+# and the billing page is read-only. Test-mode keys here would be worse than nothing —
+# Checkout would render and then decline every real card, so a customer trying to pay
+# sees a broken payment instead of an honest "not available yet". Turn it on by sealing
+# live keys the day prod should actually take money, not before.
 #
 # beaconEnv=production enforces strong secrets (no "change-me") + Secure cookies.
 # Ensure the Vault secret has real BEACON_JWT_*, BEACON_ENCRYPTION_KEY (32 bytes),
 # BEACON_WEBHOOK_TOKEN and POSTGRES_PASSWORD before deploying.
 env: prod
 host: beaconpulse.net
+secretsSource: sealed
 
 app:
   beaconEnv: production
@@ -43,3 +61,14 @@ ingress:
 # Images for this environment live on its own SpectonCR host.
 image:
   registry: spectoncr.diytaxreturn.co.uk
+  # Same arrangement as int: the namespace already carries a `nebulacr-login`
+  # dockerconfigjson whose auth covers spectoncr.diytaxreturn.co.uk,
+  # so the chart references it rather than minting a second copy of the same
+  # registry credentials. One place to rotate, and no registry password in this
+  # repo's sealed files at all.
+  #
+  # The chart does NOT own this secret. If it is ever absent from the namespace, or
+  # its auth stops covering this host, the symptom is ImagePullBackOff on every pod
+  # rather than a failed deploy — helm has nothing to check here.
+  pullSecret: nebulacr-login
+  pullSecretCreate: false

@@ -17,6 +17,16 @@
 #
 # Where the values come from:
 #   BEACON_AI_API_KEY                  <- deploy/.env
+#
+# Per-environment overrides live in deploy/.env.<env> (gitignored), which overlays
+# deploy/.env key by key. Two things need it:
+#   - a webhook secret per environment, because several environments can share one
+#     Stripe test ACCOUNT but an endpoint points at exactly one hostname:
+#         deploy/.env.test  ->  STRIPE_WEBHOOK_SECRET=whsec_<test endpoint>
+#   - turning billing OFF for an environment, by naming the key as empty. Presence
+#     wins over value, so an empty line means "this environment has none":
+#         deploy/.env.prod  ->  STRIPE_SECRET_KEY=
+#                               STRIPE_WEBHOOK_SECRET=
 #   REGISTRY_USERNAME/REGISTRY_PASSWORD<- deploy/.env (OPTIONAL — omit to reuse an
 #                                         existing pull secret via pullSecretCreate=false)
 #   everything else                    <- generated here, then remembered in
@@ -81,7 +91,7 @@ NAMESPACE="$TARGET_ENV" # one namespace per env, matching the deploy workflow
 OUT_DIR="$CHART_DIR/sealed/$TARGET_ENV"
 CACHE_FILE="$CACHE_DIR/$TARGET_ENV.env"
 
-# ---- load optional inputs from deploy/.env ---------------------------------
+# ---- load optional inputs from deploy/.env (+ per-env overlay) --------------
 # Only the keys we care about, so an unrelated line in .env can never leak in.
 read_env() { # read_env KEY FILE -> value on stdout (empty if absent)
   local key="$1" file="$2"
@@ -89,16 +99,48 @@ read_env() { # read_env KEY FILE -> value on stdout (empty if absent)
   sed -n "s/^${key}=//p" "$file" | tail -n1 | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
 }
 
-BEACON_AI_API_KEY="$(read_env BEACON_AI_API_KEY "$ENV_FILE")"
+# deploy/.env.<env> overlays deploy/.env, key by key.
+#
+# Because some secrets are genuinely per-environment while most are not. The obvious
+# case is Stripe: several environments can share one test-mode ACCOUNT — same secret
+# key, same prices — but each needs its OWN webhook endpoint, since an endpoint points
+# at exactly one hostname. Sharing a whsec_ would mean test's payments were signed for
+# int's URL, so the choice is a per-env value or hand-editing .env before every seal
+# and remembering to put it back. This is that value.
+#
+# Only the overlay's keys win; everything absent from it falls through to the shared
+# file. Both are gitignored (.env.*).
+ENV_OVERLAY="$REPO_ROOT/deploy/.env.${TARGET_ENV}"
+
+read_env_for() { # read_env_for KEY -> overlay value if the overlay names it, else shared
+  local key="$1"
+  # PRESENCE, not truthiness. An overlay line "STRIPE_SECRET_KEY=" means "this
+  # environment has no Stripe key" — which is how prod ships with billing off while
+  # sharing the same deploy/.env as everywhere else. Testing the VALUE instead would
+  # read that as "unset, fall through" and seal the test-mode keys into production:
+  # Checkout would render on beaconpulse.net and decline every real card.
+  if [[ -f "$ENV_OVERLAY" ]] && grep -qE "^${key}=" "$ENV_OVERLAY"; then
+    # To STDERR, deliberately: this function's stdout IS the secret, and note()
+    # prints to stdout, so an un-redirected message here would be captured as part
+    # of the value and sealed into the cluster as "  using STRIPE_... <newline>
+    # whsec_...". Corrupt, silent, and indistinguishable from a wrong secret.
+    note "using $key from deploy/.env.${TARGET_ENV} (per-environment override)" >&2
+    read_env "$key" "$ENV_OVERLAY"
+    return
+  fi
+  read_env "$key" "$ENV_FILE"
+}
+
+BEACON_AI_API_KEY="$(read_env_for BEACON_AI_API_KEY)"
 # Stripe billing — all optional. Read from deploy/.env; only the ones present get
 # sealed. An absent key leaves billing disabled (the chart marks the env optional).
-STRIPE_SECRET_KEY="$(read_env STRIPE_SECRET_KEY "$ENV_FILE")"
-STRIPE_PUBLISHABLE_KEY="$(read_env STRIPE_PUBLISHABLE_KEY "$ENV_FILE")"
-STRIPE_WEBHOOK_SECRET="$(read_env STRIPE_WEBHOOK_SECRET "$ENV_FILE")"
-STRIPE_PRICE_STARTER="$(read_env STRIPE_PRICE_STARTER "$ENV_FILE")"
-STRIPE_PRICE_PRO="$(read_env STRIPE_PRICE_PRO "$ENV_FILE")"
-REGISTRY_USERNAME="$(read_env REGISTRY_USERNAME "$ENV_FILE")"
-REGISTRY_PASSWORD="$(read_env REGISTRY_PASSWORD "$ENV_FILE")"
+STRIPE_SECRET_KEY="$(read_env_for STRIPE_SECRET_KEY)"
+STRIPE_PUBLISHABLE_KEY="$(read_env_for STRIPE_PUBLISHABLE_KEY)"
+STRIPE_WEBHOOK_SECRET="$(read_env_for STRIPE_WEBHOOK_SECRET)"
+STRIPE_PRICE_STARTER="$(read_env_for STRIPE_PRICE_STARTER)"
+STRIPE_PRICE_PRO="$(read_env_for STRIPE_PRICE_PRO)"
+REGISTRY_USERNAME="$(read_env_for REGISTRY_USERNAME)"
+REGISTRY_PASSWORD="$(read_env_for REGISTRY_PASSWORD)"
 
 # ---- generated values, cached so re-runs are idempotent --------------------
 mkdir -p "$CACHE_DIR"
@@ -223,12 +265,12 @@ ARGS=(generic beacon-secrets
 for _sk in STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PRICE_STARTER STRIPE_PRICE_PRO; do
   if [[ -n "${!_sk}" ]]; then
     ARGS+=(--from-literal="$_sk=${!_sk}")
-    note "including $_sk from deploy/.env"
+    note "including $_sk"
   fi
 done
 if [[ -n "$BEACON_AI_API_KEY" ]]; then
   ARGS+=(--from-literal=BEACON_AI_API_KEY="$BEACON_AI_API_KEY")
-  note "including BEACON_AI_API_KEY from deploy/.env"
+  note "including BEACON_AI_API_KEY"
 else
   note "BEACON_AI_API_KEY absent from deploy/.env — omitting (AI enrichment degrades to no-analysis)"
 fi
