@@ -48,8 +48,16 @@ func TestCipherProducesDistinctCiphertexts(t *testing.T) {
 func TestCipherRejectsTampering(t *testing.T) {
 	c := newTestCipher(t)
 	enc, _ := c.EncryptString("secret")
-	// Flip a character in the base64 to simulate tampering.
-	tampered := "A" + enc[1:]
+	// Flip the first character to one it is definitely not. Hardcoding "A" made this
+	// tamper with nothing whenever the ciphertext already began with 'A' — about one
+	// run in 64, since it opens with a random nonce — and the test then decrypted the
+	// UNCHANGED string, failed, and got re-run. A security assertion that passes 98%
+	// of the time is one people learn to retry, which is how a real regression hides.
+	flip := byte('A')
+	if enc[0] == flip {
+		flip = 'B'
+	}
+	tampered := string(flip) + enc[1:]
 	if _, err := c.DecryptString(tampered); err == nil {
 		t.Fatal("expected decryption of tampered ciphertext to fail")
 	}

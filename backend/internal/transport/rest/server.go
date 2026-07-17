@@ -34,6 +34,8 @@ type RouterDeps struct {
 	StatusPage         *StatusPageHandler
 	Heartbeat          *HeartbeatHandler
 	StatusPageSettings *StatusPageSettingsHandler
+	// Diagnose may be nil when AI is not configured; the route is then not mounted.
+	Diagnose           *DiagnoseHandler
 }
 
 // NewRouter builds the fully-wired HTTP handler: middleware chain, operational
@@ -73,6 +75,13 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Get("/proxy/authorize", d.Auth.Authorize)
 		api.Mount("/projects", d.Project.Routes())
 		api.Mount("/monitors", d.Monitor.Routes())
+		// Mounted as a sibling of the monitors subrouter rather than inside it: the
+		// diagnosis service is not the monitor service, and chi resolves this more
+		// specific path ahead of the mount's wildcard. Nil when AI is unconfigured, so
+		// the endpoint simply does not exist rather than 500ing on every call.
+		if d.Diagnose != nil {
+			api.Mount("/monitors/{id}/diagnose", d.Diagnose.Routes())
+		}
 		api.Mount("/notification-channels", d.Notification.Routes())
 		api.Mount("/maintenance-windows", d.Maintenance.Routes())
 		// Org-scoped active alerts (read from Prometheus, filtered by org_id).

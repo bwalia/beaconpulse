@@ -95,6 +95,27 @@ func (r *MonitorRepository) GetByID(ctx context.Context, orgID, id uuid.UUID) (*
 	return m, nil
 }
 
+// TargetFor returns just what a diagnosis needs to probe, scoped to org.
+//
+// Narrow on purpose: the org id is part of the lookup rather than a check after it,
+// so another tenant's monitor is not "found and rejected" but simply not found — and
+// a diagnosis, which reports resolved addresses and certificate subjects, is the last
+// place to rely on remembering to compare an owner id.
+func (r *MonitorRepository) TargetFor(ctx context.Context, orgID, monitorID uuid.UUID) (string, string, error) {
+	var target, monitorType string
+	err := r.pool.QueryRow(ctx,
+		`SELECT COALESCE(target, ''), type FROM monitors
+		  WHERE id=$1 AND org_id=$2 AND deleted_at IS NULL`, monitorID, orgID).
+		Scan(&target, &monitorType)
+	if err != nil {
+		if isNoRows(err) {
+			return "", "", apperror.NotFound("monitor not found")
+		}
+		return "", "", apperror.Internal(fmt.Errorf("get monitor target: %w", err))
+	}
+	return target, monitorType, nil
+}
+
 // List returns a filtered, paginated page of monitors plus the total count.
 func (r *MonitorRepository) List(ctx context.Context, orgID uuid.UUID, f monitor.ListFilter) ([]monitor.Monitor, int, error) {
 	where := []string{"org_id = $1", "deleted_at IS NULL"}
