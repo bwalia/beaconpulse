@@ -1,8 +1,15 @@
 # ── Acceptance (staging/pre-prod) environment ──────────────────────────────
 # Namespace: acc   Host: https://acc.beaconpulse.net
-# Secrets:   Vault  secret/beaconpulse/acc/config
+# Secrets:   SealedSecrets — sealed/acc/beacon-secrets.sealed.yaml
+#
+# Not Vault, despite the default: the policy on secret/data/beaconpulse/* answers 403,
+# which is why int and test are sealed too. An ExternalSecret that never resolves fails
+# quietly — helm succeeds, the pods come up with no POSTGRES_PASSWORD, and the only
+# symptom is a dead environment behind a green deploy. Regenerate with:
+#   deploy/scripts/seal-secrets.sh acc
 env: acc
 host: acc.beaconpulse.net
+secretsSource: sealed
 
 app:
   beaconEnv: staging

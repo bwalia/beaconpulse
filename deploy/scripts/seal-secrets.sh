@@ -17,6 +17,16 @@
 #
 # Where the values come from:
 #   BEACON_AI_API_KEY                  <- deploy/.env
+#
+# Per-environment overrides live in deploy/.env.<env> (gitignored), which overlays
+# deploy/.env key by key. Two things need it:
+#   - a webhook secret per environment, because several environments can share one
+#     Stripe test ACCOUNT but an endpoint points at exactly one hostname:
+#         deploy/.env.test  ->  STRIPE_WEBHOOK_SECRET=whsec_<test endpoint>
+#   - turning billing OFF for an environment, by naming the key as empty. Presence
+#     wins over value, so an empty line means "this environment has none":
+#         deploy/.env.prod  ->  STRIPE_SECRET_KEY=
+#                               STRIPE_WEBHOOK_SECRET=
 #   REGISTRY_USERNAME/REGISTRY_PASSWORD<- deploy/.env (OPTIONAL — omit to reuse an
 #                                         existing pull secret via pullSecretCreate=false)
 #   everything else                    <- generated here, then remembered in
@@ -102,16 +112,20 @@ read_env() { # read_env KEY FILE -> value on stdout (empty if absent)
 # file. Both are gitignored (.env.*).
 ENV_OVERLAY="$REPO_ROOT/deploy/.env.${TARGET_ENV}"
 
-read_env_for() { # read_env_for KEY -> overlay value if set, else the shared one
-  local key="$1" v
-  v="$(read_env "$key" "$ENV_OVERLAY")"
-  if [[ -n "$v" ]]; then
+read_env_for() { # read_env_for KEY -> overlay value if the overlay names it, else shared
+  local key="$1"
+  # PRESENCE, not truthiness. An overlay line "STRIPE_SECRET_KEY=" means "this
+  # environment has no Stripe key" — which is how prod ships with billing off while
+  # sharing the same deploy/.env as everywhere else. Testing the VALUE instead would
+  # read that as "unset, fall through" and seal the test-mode keys into production:
+  # Checkout would render on beaconpulse.net and decline every real card.
+  if [[ -f "$ENV_OVERLAY" ]] && grep -qE "^${key}=" "$ENV_OVERLAY"; then
     # To STDERR, deliberately: this function's stdout IS the secret, and note()
     # prints to stdout, so an un-redirected message here would be captured as part
     # of the value and sealed into the cluster as "  using STRIPE_... <newline>
     # whsec_...". Corrupt, silent, and indistinguishable from a wrong secret.
     note "using $key from deploy/.env.${TARGET_ENV} (per-environment override)" >&2
-    printf '%s' "$v"
+    read_env "$key" "$ENV_OVERLAY"
     return
   fi
   read_env "$key" "$ENV_FILE"
