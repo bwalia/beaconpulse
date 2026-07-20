@@ -27,6 +27,7 @@ import (
 	"beacon/internal/config"
 	"beacon/internal/domain/audit"
 	"beacon/internal/domain/auth"
+	"beacon/internal/domain/apikey"
 	"beacon/internal/domain/billing"
 	"beacon/internal/domain/diagnose"
 	"beacon/internal/domain/heartbeat"
@@ -36,6 +37,7 @@ import (
 	"beacon/internal/domain/notification"
 	"beacon/internal/domain/project"
 	"beacon/internal/domain/statuspage"
+	"beacon/internal/domain/configsync"
 	"beacon/internal/platform/cache"
 	"beacon/internal/platform/crypto"
 	"beacon/internal/platform/database"
@@ -208,9 +210,14 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	}
 
 	// Services.
-	authSvc := auth.NewService(userRepo, refreshRepo, tokens, hasher, auditRec)
+	authSvc := auth.NewService(userRepo, refreshRepo, tokens, hasher, auditRec).
+		WithEmailPolicy(auth.NewEmailPolicy(cfg.RequireReachableSignupEmail))
 	projectSvc := project.NewService(projectRepo, syncEnqueuer, auditRec)
-	monitorSvc := monitor.NewService(monitorRepo, syncEnqueuer, orgPlanRepo, auditRec)
+	// Tenants choose monitor targets, and Blackbox probes them from inside the cluster,
+	// so where a target may point is a tenant-facing security boundary. Same address
+	// policy as tenant webhooks and AI diagnosis — one block list, one place.
+	monitorSvc := monitor.NewService(monitorRepo, syncEnqueuer, orgPlanRepo, auditRec).
+		WithTargetGuard(safehttp.NewGuard(cfg.AllowPrivateMonitorTargets))
 	// Public status page: the one unauthenticated read. Takes no auditor and no
 	// enqueuer — it is read-only and cannot mutate anything by construction.
 	statusPageSvc := statuspage.NewService(statusPageRepo)
@@ -219,7 +226,12 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 
 	// Transport.
 	m := metrics.New()
-	authn := middleware.NewAuthenticator(tokens)
+	// API keys authenticate as the same Principal a session does, so every endpoint
+	// below inherits org scoping, plan limits and billing without a second code path.
+	apiKeyRepo := postgres.NewAPIKeyRepository(pool)
+	apiKeySvc := apikey.NewService(apiKeyRepo, auditRec)
+	authn := middleware.NewAuthenticator(tokens).WithKeys(apiKeySvc)
+	syncSvc := configsync.NewService(monitorSvc, projectSvc)
 
 	// Nil handler when diagnosis is off, so the route is absent rather than present
 	// and broken.
@@ -251,6 +263,8 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Heartbeat:          rest.NewHeartbeatHandler(heartbeatSvc),
 		StatusPageSettings: rest.NewStatusPageSettingsHandler(statusPageSettingsSvc, validator, authn),
 		Diagnose:           diagnoseHandler,
+		APIKey:             rest.NewAPIKeyHandler(apiKeySvc, validator, authn),
+		Sync:               rest.NewSyncHandler(syncSvc, validator, authn, rest.SyncLimiter()),
 	}), nil
 }
 

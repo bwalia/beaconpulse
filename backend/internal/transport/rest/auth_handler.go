@@ -8,6 +8,7 @@ import (
 
 	"beacon/internal/domain/auth"
 	"beacon/internal/platform/httpx"
+	"beacon/internal/transport/rest/middleware"
 	"beacon/internal/platform/validate"
 )
 
@@ -72,10 +73,30 @@ func (h *AuthHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 }
 
 // Routes returns the public auth routes (no authentication required).
+// Routes mounts the auth endpoints.
+//
+// Register and login carry their own, much tighter limits than the global baseline.
+// They are the only endpoints that are BOTH unauthenticated and expensive, for two
+// different reasons:
+//
+// Registration creates permanent recurring cost. Every org is entitled to ten
+// monitors, and every monitor is a probe every 60 seconds plus a Prometheus series,
+// for as long as it exists. A thousand junk signups is ten thousand probes a minute
+// that nobody asked for and we pay for — an unbounded infrastructure bill available to
+// anyone with curl and a loop.
+//
+// Login is a credential-stuffing surface with a bcrypt on the end: expensive per
+// attempt by design, which is protection against guessing and a lever for exhausting
+// CPU if nothing bounds the rate.
+//
+// Both are keyed by address, because there is no account to key on yet — which is
+// precisely what makes them abusable.
 func (h *AuthHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Post("/register", h.register)
-	r.Post("/login", h.login)
+	r.With(middleware.RateLimit(signupLimiter, middleware.ByIP, time.Minute)).
+		Post("/register", h.register)
+	r.With(middleware.RateLimit(loginLimiter, middleware.ByIP, 30*time.Second)).
+		Post("/login", h.login)
 	r.Post("/refresh", h.refresh)
 	r.Post("/logout", h.logout)
 	return r

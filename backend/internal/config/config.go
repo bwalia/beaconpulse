@@ -37,6 +37,29 @@ type Config struct {
 	Notify    Notify
 	AI        AI
 	Billing   Billing
+
+	// AllowPrivateMonitorTargets lets tenants point monitors at private, loopback and
+	// link-local addresses.
+	//
+	// OFF by default. Blackbox probes from inside the cluster, so an unguarded target
+	// is a port scanner at one bit per probe: a TCP monitor on 10.0.0.5:6443 reports
+	// whether the Kubernetes API is listening. Slow, but free, unattended, and billed
+	// to us.
+	//
+	// ON is right for a single-tenant install, where the operator's own internal
+	// services are exactly what they want to watch and there is nobody to disclose
+	// them to. Never where the monitors are not all yours.
+	AllowPrivateMonitorTargets bool
+
+	// RequireReachableSignupEmail rejects signups from throwaway providers and from
+	// domains with no mail server.
+	//
+	// On by default: every organization created is entitled to ten monitors probing
+	// every minute forever, so a junk signup is recurring spend, and an address nobody
+	// can be reached at cannot be warned when their monitoring stops either. Turn it
+	// off for a private install where users are known and an internal mail domain may
+	// not resolve from wherever this runs.
+	RequireReachableSignupEmail bool
 }
 
 // AI holds optional LLM-based alert enrichment configuration. When Enabled, a
@@ -272,6 +295,8 @@ func Load() (Config, error) {
 			SuccessURL:            getStr("BEACON_BILLING_SUCCESS_URL", "http://localhost:3000/billing?checkout=success"),
 			CancelURL:             getStr("BEACON_BILLING_CANCEL_URL", "http://localhost:3000/billing?checkout=cancel"),
 		},
+		AllowPrivateMonitorTargets:  getBool("BEACON_ALLOW_PRIVATE_MONITOR_TARGETS", false, add),
+		RequireReachableSignupEmail: getBool("BEACON_REQUIRE_REACHABLE_SIGNUP_EMAIL", true, add),
 		AI: AI{
 			Enabled: getBool("BEACON_AI_ENABLED", false, add),
 			BaseURL: strings.TrimRight(getStr("BEACON_AI_BASE_URL", ""), "/"),

@@ -17,6 +17,7 @@ import {
   DashboardIcon,
   FolderIcon,
   GlobeIcon,
+  LockIcon,
   SettingsIcon,
   SearchIcon,
   WrenchIcon,
@@ -37,7 +38,10 @@ const baseNav: NavItem[] = [
 ];
 // The System page exposes the raw (global) Prometheus/Alertmanager tools and is
 // therefore restricted to operators.
-const adminNav: NavItem[] = [{ href: "/system", label: "System", Icon: SettingsIcon }];
+const adminNav: NavItem[] = [
+  { href: "/api-keys", label: "API keys", Icon: LockIcon },
+  { href: "/system", label: "System", Icon: SettingsIcon },
+];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();

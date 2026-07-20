@@ -101,6 +101,33 @@ storage:
 #              commit. Generate with deploy/scripts/seal-secrets.sh <env>.
 #   plain    — a plain Secret from .Values.secrets.* below. Local testing ONLY;
 #              never commit real values.
+# Egress restriction on the probe pod. Blackbox connects to addresses TENANTS choose,
+# from inside the cluster, so without this a monitor pointed at 10.0.0.5:6443 reports
+# whether the Kubernetes API is listening — and a name that resolves publicly at create
+# time and privately afterwards defeats the application-level check entirely.
+#
+# This DOES take effect on k3s: although Flannel alone does not implement
+# NetworkPolicy, k3s ships an embedded kube-router netpol controller and enforces
+# policies unless the server was started with --disable-network-policy.
+#
+# Off by default all the same, and only because of the blast radius if it is subtly
+# wrong. An egress policy that accidentally blocks DNS does not fail loudly — it makes
+# every probe fail, which this product reports as every customer's site being down. So
+# it is opt-in per environment: turn it on in int, confirm monitors still report up,
+# then promote. Verify the controller is running first:
+#
+#   kubectl -n int get pods -l app=beacon-blackbox      # note the current status
+#   helm upgrade ... --set networkPolicy.enabled=true
+#   kubectl -n int logs deploy/beacon-blackbox --tail=20 | grep -i "no such host"
+#
+# Any surge of resolution failures means DNS is being blocked and the policy should
+# come straight back off.
+networkPolicy:
+  enabled: false
+  # CIDRs to re-allow, for internal services the operator owns and wants monitored.
+  # Single-tenant installs only: on a shared one this hands every tenant a route there.
+  allowedInternalCIDRs: []
+
 secretsSource: external
 
 externalSecret:

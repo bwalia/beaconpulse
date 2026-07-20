@@ -2,7 +2,10 @@
 
 Base URL: `http://localhost:8080`. All application endpoints are under `/api/v1`.
 Requests and responses are JSON. Authenticated endpoints require an
-`Authorization: Bearer <access_token>` header.
+`Authorization: Bearer <credential>` header, where the credential is either a session
+access token (dashboard) or an **API key** (machines — see below). Both resolve to the
+same principal, so every endpoint accepts either and applies the same org scoping,
+role checks and plan limits to both.
 
 ## Conventions
 
@@ -48,6 +51,43 @@ Auth response:
   "user": { "id","org_id","email","name","role","is_active","twofa_enabled","created_at" }
 }
 ```
+
+## API keys
+
+Machine credentials. A key is an opaque secret that RESOLVES to an organization; it
+carries no plan or balance of its own, so limits and credit are read live on every
+request and an upgrade or top-up needs no new key.
+
+| Method | Path                    | Auth      | Body / Notes |
+|--------|-------------------------|-----------|--------------|
+| GET    | `/api/v1/api-keys`      | session   | List. Secrets are not stored, so none are returned. |
+| POST   | `/api/v1/api-keys`      | session   | `{ name, role?, expires_in_days? }` → `{ key, secret }`. **`secret` is returned once and is unrecoverable.** |
+| DELETE | `/api/v1/api-keys/{id}` | session   | Revoke. Idempotent. |
+
+- **Session-only, by design.** An API key cannot manage API keys, so a leaked key
+  cannot mint a successor that survives revoking the original.
+- `role` defaults to the creator's and is capped at it — a key can never out-rank the
+  person who made it. Use `viewer` for read-only automation.
+- Owner/admin only.
+
+## Sync (declarative)
+
+| Method | Path            | Auth | Body / Notes |
+|--------|-----------------|------|--------------|
+| POST   | `/api/v1/sync`  | ✓ writer | `{ project?, monitors[], prune?, dry_run? }` → per-item plan/outcome. |
+
+Applies a desired set of monitors: creates what is new, updates what changed, leaves
+the rest alone. **Idempotent** — safe to run on every CI push, which a plain `POST
+/monitors` is not (it would duplicate on every re-run).
+
+- `prune` defaults to **false**: undeclared monitors are *reported* (`would_remove`),
+  never deleted. A workflow whose glob breaks declares zero monitors, and that must not
+  wipe production monitoring.
+- `dry_run` computes the plan and applies nothing.
+- Returns **200 with per-item errors** rather than failing wholesale, so one rejected
+  monitor does not discard the rest. **Check `failed` in the body**, not just the status.
+
+See [AUTOMATION.md](AUTOMATION.md) for the GitHub Actions workflow.
 
 ## Projects
 

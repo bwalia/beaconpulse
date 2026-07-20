@@ -51,3 +51,90 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Documentation prose.
+   
+   Hand-rolled rather than @tailwindcss/typography: this needs a handful of
+   elements styled consistently, and pulling in a plugin to restyle most of it
+   afterwards is more configuration than CSS. Applied by the `prose-docs` class
+   on each docs <article>; components inside (code blocks, callouts, tables)
+   bring their own styling and are excluded where they would clash.
+   --------------------------------------------------------------------------- */
+.prose-docs p {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  line-height: 1.75;
+  color: rgb(71 85 105); /* slate-600 */
+}
+.dark .prose-docs p {
+  color: rgb(203 213 225); /* slate-300 */
+}
+
+.prose-docs ul,
+.prose-docs ol {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+  line-height: 1.75;
+  color: rgb(71 85 105);
+}
+.dark .prose-docs ul,
+.dark .prose-docs ol {
+  color: rgb(203 213 225);
+}
+.prose-docs ul { list-style: disc; }
+.prose-docs ol { list-style: decimal; }
+.prose-docs li { margin-top: 0.375rem; }
+
+/* Links are underlined, not merely coloured: colour alone is not a reliable
+   signal for the same readers the status page already accounts for. */
+.prose-docs a {
+  color: rgb(29 78 216); /* blue-700 */
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.dark .prose-docs a { color: rgb(96 165 250); /* blue-400 */ }
+.prose-docs a:hover { color: rgb(30 64 175); }
+.dark .prose-docs a:hover { color: rgb(147 197 253); }
+
+/* Headings own their own colour (see the H2/H3 components); the anchor inside one
+   is a permalink, not a link to somewhere else, and colouring it blue would make
+   every section title read as a link out.
+   
+   The .dark selectors are NOT redundant. `.dark .prose-docs a` scores two classes
+   and one element, which outranks `.prose-docs h2 a` — one class, two elements —
+   because specificity compares class count first. Without a dark rule of equal
+   class count, headings render link-blue in dark mode only, which is exactly the
+   bug this replaced. */
+.prose-docs h2 a,
+.prose-docs h3 a,
+.prose-docs figcaption a,
+.dark .prose-docs h2 a,
+.dark .prose-docs h3 a,
+.dark .prose-docs figcaption a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.prose-docs strong {
+  font-weight: 600;
+  color: rgb(15 23 42); /* slate-900 */
+}
+.dark .prose-docs strong { color: rgb(241 245 249); /* slate-100 */ }
+
+.prose-docs dt { color: rgb(15 23 42); }
+.dark .prose-docs dt { color: rgb(241 245 249); }
+
+/* An escape hatch for blocks inside .prose-docs that are UI rather than prose — a
+   grid of navigation cards, most of all, where the whole card is one link and the
+   prose underline would strike through the title and the description both.
+   
+   Both selectors are spelled out for the same specificity reason as the headings
+   above: `.dark .prose-docs a` scores two classes, so the dark override needs three
+   to win rather than relying on source order. */
+.prose-docs .not-prose a,
+.dark .prose-docs .not-prose a {
+  color: inherit;
+  text-decoration: none;
+}

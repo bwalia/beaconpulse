@@ -1,0 +1,81 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- /*
+Egress policy for the probe pod.
+
+Blackbox exists to connect to addresses that TENANTS choose, from inside our cluster.
+That is the definition of a confused deputy: the tenant supplies the destination, we
+supply the network position, and by default that network position can reach Postgres,
+Redis, the Kubernetes API and the cloud metadata endpoint.
+
+The application already refuses a target that RESOLVES to a private address when the
+monitor is created. That stops the accident and the casual abuse, and it cannot stop
+the determined version: a name that resolves publicly at create time and privately
+afterwards. No create-time check can, because the resolution that matters happens
+later, inside Blackbox, which does its own DNS.
+
+So the boundary is enforced where the packet actually leaves. This denies egress to
+every private range regardless of what a name resolved to a moment ago, which is the
+one place DNS rebinding has nothing left to lie to.
+
+DNS is allowed explicitly (Blackbox must resolve the names it probes), and the private
+ranges are excluded from the "everywhere else" rule rather than listed as denials,
+because NetworkPolicy has no deny — `except` under an allow is how you say no.
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "beacon.name" "blackbox" }}-egress
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "beacon.selector" "blackbox" | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # DNS, to the cluster resolver only. Without this nothing resolves and every
+    # probe fails; with it broadened, DNS itself becomes the exfiltration channel.
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
+    # The public internet, and nothing else. Every private and special-use range is
+    # carved out: RFC1918, loopback, link-local (which is where cloud instance
+    # credentials live at 169.254.169.254), CGNAT, and the rest.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8          # RFC1918 — cluster pods and services
+              - 172.16.0.0/12       # RFC1918
+              - 192.168.0.0/16      # RFC1918
+              - 127.0.0.0/8         # loopback
+              - 169.254.0.0/16      # link-local, incl. cloud metadata
+              - 100.64.0.0/10       # CGNAT / shared address space
+              - 0.0.0.0/8           # "this network"
+              - 192.0.0.0/24        # IETF protocol assignments
+              - 192.0.2.0/24        # TEST-NET-1
+              - 198.18.0.0/15       # benchmarking
+              - 198.51.100.0/24     # TEST-NET-2
+              - 203.0.113.0/24      # TEST-NET-3
+              - 224.0.0.0/4         # multicast
+              - 240.0.0.0/4         # reserved
+{{- if .Values.networkPolicy.allowedInternalCIDRs }}
+    # Deliberately re-opened by the operator, for internal services they own and
+    # genuinely want monitored. Only meaningful on a single-tenant install: on a shared
+    # one this hands every tenant a route to whatever is listed.
+    - to:
+      {{- range .Values.networkPolicy.allowedInternalCIDRs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+      {{- end }}
+{{- end }}
+{{- end }}

@@ -51,7 +51,16 @@ type Service struct {
 	tm       *TokenManager
 	hasher   *crypto.PasswordHasher
 	auditlog audit.Recorder
-	now      func() time.Time
+	// emailPolicy vets signup addresses. Nil disables the checks.
+	emailPolicy *EmailPolicy
+	now         func() time.Time
+}
+
+// WithEmailPolicy vets the address a signup is made with. See emailpolicy.go for why
+// this is a cost control rather than input validation.
+func (s *Service) WithEmailPolicy(p *EmailPolicy) *Service {
+	s.emailPolicy = p
+	return s
 }
 
 // NewService wires the auth service.
@@ -76,6 +85,13 @@ func NewService(
 // the caller is immediately signed in.
 func (s *Service) Register(ctx context.Context, in RegisterInput, meta RequestMeta) (*AuthResult, error) {
 	in.Email = normalizeEmail(in.Email)
+	// Before the bcrypt, which is the expensive part of this handler: a rejected
+	// signup should cost a DNS lookup, not a key derivation.
+	if s.emailPolicy != nil {
+		if err := s.emailPolicy.Check(ctx, in.Email); err != nil {
+			return nil, err
+		}
+	}
 	if len(in.Password) < 8 {
 		return nil, apperror.Validation("password must be at least 8 characters",
 			apperror.FieldError{Field: "password", Message: "must be at least 8 characters"})
