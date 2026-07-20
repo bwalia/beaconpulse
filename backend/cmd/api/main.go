@@ -259,7 +259,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		StatusPageSettings: rest.NewStatusPageSettingsHandler(statusPageSettingsSvc, validator, authn),
 		Diagnose:           diagnoseHandler,
 		APIKey:             rest.NewAPIKeyHandler(apiKeySvc, validator, authn),
-		Sync:               rest.NewSyncHandler(syncSvc, validator, authn),
+		Sync:               rest.NewSyncHandler(syncSvc, validator, authn, rest.SyncLimiter()),
 	}), nil
 }
 

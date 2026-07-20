@@ -2,12 +2,14 @@ package rest
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"beacon/internal/domain/monitor"
 	"beacon/internal/domain/configsync"
 	"beacon/internal/platform/httpx"
+	"beacon/internal/platform/ratelimit"
 	"beacon/internal/platform/validate"
 	"beacon/internal/transport/rest/middleware"
 )
@@ -17,15 +19,19 @@ type SyncHandler struct {
 	svc       *configsync.Service
 	validator *validate.Validator
 	auth      *middleware.Authenticator
+	limiter   *ratelimit.KeyedLimiter
 }
 
-func NewSyncHandler(svc *configsync.Service, v *validate.Validator, a *middleware.Authenticator) *SyncHandler {
-	return &SyncHandler{svc: svc, validator: v, auth: a}
+func NewSyncHandler(svc *configsync.Service, v *validate.Validator, a *middleware.Authenticator, l *ratelimit.KeyedLimiter) *SyncHandler {
+	return &SyncHandler{svc: svc, validator: v, auth: a, limiter: l}
 }
 
 func (h *SyncHandler) Routes() chi.Router {
 	r := chi.NewRouter()
+	// Auth first, so the limit can key on the ORG rather than the address: CI runs
+	// from a different runner IP every time, and an address key would limit nobody.
 	r.Use(h.auth.RequireWriter)
+	r.Use(middleware.RateLimit(h.limiter, middleware.ByOrg, 10*time.Second))
 	r.Post("/", h.apply)
 	return r
 }
