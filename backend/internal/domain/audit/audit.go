@@ -27,6 +27,9 @@ const (
 	// ActionStatusPageUpdated — the org published/unpublished its public status
 	// page, or renamed it. Security-relevant: it changes what anonymous visitors
 	// can see.
+	ActionAPIKeyCreated Action = "apikey.created"
+	ActionAPIKeyRevoked Action = "apikey.revoked"
+
 	ActionStatusPageUpdated Action = "status_page.updated"
 	ActionProjectDeleted    Action = "project.deleted"
 

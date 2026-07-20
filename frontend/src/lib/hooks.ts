@@ -7,6 +7,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
 import type {
   ActiveAlert,
+  ApiKey,
+  ApiKeyCreated,
   BillingInfo,
   Diagnosis,
   ListResponse,
@@ -442,5 +444,31 @@ export function useSystemInfo() {
     staleTime: 60_000,
     refetchInterval: 60_000,
     retry: false,
+  });
+}
+
+// ---- API keys ----
+
+export function useApiKeys() {
+  return useQuery({
+    queryKey: ["api-keys"],
+    queryFn: () => api.get<ListResponse<ApiKey>>("/api/v1/api-keys"),
+  });
+}
+
+export function useCreateApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; role?: string; expires_in_days?: number }) =>
+      api.post<ApiKeyCreated>("/api/v1/api-keys", input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["api-keys"] }),
+  });
+}
+
+export function useRevokeApiKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/api/v1/api-keys/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["api-keys"] }),
   });
 }

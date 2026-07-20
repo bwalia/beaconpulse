@@ -347,3 +347,22 @@ export interface SystemInfo {
   started_at: string;
   uptime_seconds: number;
 }
+
+/** An API key as stored. The secret is never here — see ApiKeyCreated. */
+export interface ApiKey {
+  id: string;
+  name: string;
+  /** First characters of the key, so a user can tell their keys apart. */
+  prefix: string;
+  role: string;
+  created_at: string;
+  expires_at?: string;
+  revoked_at?: string;
+  last_used_at?: string;
+}
+
+/** The one and only time the secret is returned. It cannot be shown again. */
+export interface ApiKeyCreated {
+  key: ApiKey;
+  secret: string;
+}
