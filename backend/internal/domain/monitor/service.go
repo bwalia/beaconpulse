@@ -4,8 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -15,6 +18,7 @@ import (
 	"beacon/internal/domain/plan"
 	"beacon/internal/platform/apperror"
 	"beacon/internal/platform/logger"
+	"beacon/internal/platform/safehttp"
 )
 
 // Default and boundary values for scheduling. Mirrors the DB CHECK constraints
@@ -59,11 +63,21 @@ type UpdateInput struct {
 }
 
 // Service implements monitor use cases and triggers control-plane syncs.
+// TargetGuard vets that a monitor's target is somewhere a tenant is allowed to aim
+// our probes. Implemented by the safehttp guard; an interface so the domain does not
+// depend on the network layer.
+type TargetGuard interface {
+	// VetHost resolves host and fails if any resolved address is one a tenant must
+	// not be able to reach.
+	VetHost(ctx context.Context, host string) ([]net.IP, error)
+}
+
 type Service struct {
 	repo     Repository
 	syncer   Syncer
 	plans    OrgPlanReader
 	auditlog audit.Recorder
+	guard    TargetGuard // nil = no address restriction (single-tenant deployments)
 	now      func() time.Time
 }
 
@@ -107,6 +121,68 @@ func (s *Service) orgLimits(ctx context.Context, orgID uuid.UUID) (plan.Limits, 
 }
 
 // Create adds a monitor and schedules a control-plane sync so probing begins.
+// WithTargetGuard restricts where monitors may point. Off for a single-tenant
+// deployment, where the operator's own internal services are a legitimate thing to
+// monitor and there is nobody to disclose them to.
+func (s *Service) WithTargetGuard(g TargetGuard) *Service {
+	s.guard = g
+	return s
+}
+
+// vetTarget refuses a target that resolves somewhere a tenant must not reach.
+//
+// Blackbox probes from inside the cluster, so an unguarded target is a port scanner at
+// one bit per probe: point a TCP monitor at 10.0.0.5:6443 and its up/down tells you
+// whether the Kubernetes API is listening. That is slow, but it is free, unattended,
+// and ours to pay for.
+//
+// A host that does not resolve is ALLOWED. Monitoring a domain that is not live yet is
+// an ordinary thing to do, a DNS blip must not fail a legitimate create, and an
+// unresolvable target cannot leak anything because the probe fails too. The case this
+// cannot catch is a name that resolves publicly now and privately later — DNS
+// rebinding — which no create-time check can catch, and which is why the probe pods
+// also carry an egress NetworkPolicy. This layer stops the accident and the casual
+// abuse; the network layer stops the determined attacker.
+func (s *Service) vetTarget(ctx context.Context, t Type, target string) error {
+	if s.guard == nil || target == "" || t == TypeHeartbeat {
+		return nil // a heartbeat has no target: it waits to be pinged
+	}
+	host := hostOf(target)
+	if host == "" {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if _, err := s.guard.VetHost(ctx, host); err != nil {
+		var blocked *safehttp.ErrBlockedAddress
+		if errors.As(err, &blocked) {
+			// Deliberately vague about WHY. "10.0.0.5 is internal" confirms that
+			// something is there, which is the answer a scan is looking for.
+			return apperror.Validation("that target cannot be monitored",
+				apperror.FieldError{
+					Field:   "target",
+					Message: "this address is not reachable from Beacon's probes",
+				})
+		}
+		return nil // could not resolve: allow, and let the probe report the truth
+	}
+	return nil
+}
+
+// hostOf extracts the hostname from a target, which may be a URL, a host:port, or a
+// bare host depending on the monitor type.
+func hostOf(target string) string {
+	target = strings.TrimSpace(target)
+	if u, err := url.Parse(target); err == nil && u.Host != "" {
+		return u.Hostname()
+	}
+	if h, _, err := net.SplitHostPort(target); err == nil {
+		return h
+	}
+	return target
+}
+
 func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Monitor, error) {
 	if !actor.Role.CanWrite() {
 		return nil, apperror.Forbidden("your role does not permit creating monitors")
@@ -128,6 +204,10 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Mon
 		return nil, apperror.QuotaExceeded(fmt.Sprintf(
 			"your plan allows up to %d monitors (you already have %d). Upgrade your plan to add more.",
 			limits.MaxMonitors, count))
+	}
+
+	if err := s.vetTarget(ctx, in.Type, in.Target); err != nil {
+		return nil, err
 	}
 
 	interval := orDefault(in.IntervalSeconds, defaultInterval)
@@ -215,6 +295,15 @@ func (s *Service) Update(ctx context.Context, actor Actor, id uuid.UUID, in Upda
 	m, err := s.repo.GetByID(ctx, actor.OrgID, id)
 	if err != nil {
 		return nil, err
+	}
+
+	// Repointing is the bypass this closes: create a monitor for a public host, pass
+	// the check, then edit the target to an internal one. The guard has to run wherever
+	// the target can change, not only where it is first set.
+	if in.Target != nil {
+		if err := s.vetTarget(ctx, m.Type, *in.Target); err != nil {
+			return nil, err
+		}
 	}
 
 	changed := map[string]any{}

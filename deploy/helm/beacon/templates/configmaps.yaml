@@ -158,7 +158,10 @@ data:
             # ---- Beacon API ----
             location /api/     { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
             location = /healthz { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
-            location = /readyz  { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
+            # /readyz is deliberately NOT exposed. Kubernetes probes it directly on
+            # the pod's :8080, so publishing it buys nothing and costs a round trip to
+            # Postgres AND Redis per anonymous request — the cheapest way for a
+            # stranger to make our database do work.
             location = /livez   { proxy_pass http://{{ include "beacon.name" "api" }}:8080; }
 
             # ============ Prometheus (tenant-filtered API only) ============

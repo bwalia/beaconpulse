@@ -210,9 +210,14 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	}
 
 	// Services.
-	authSvc := auth.NewService(userRepo, refreshRepo, tokens, hasher, auditRec)
+	authSvc := auth.NewService(userRepo, refreshRepo, tokens, hasher, auditRec).
+		WithEmailPolicy(auth.NewEmailPolicy(cfg.RequireReachableSignupEmail))
 	projectSvc := project.NewService(projectRepo, syncEnqueuer, auditRec)
-	monitorSvc := monitor.NewService(monitorRepo, syncEnqueuer, orgPlanRepo, auditRec)
+	// Tenants choose monitor targets, and Blackbox probes them from inside the cluster,
+	// so where a target may point is a tenant-facing security boundary. Same address
+	// policy as tenant webhooks and AI diagnosis — one block list, one place.
+	monitorSvc := monitor.NewService(monitorRepo, syncEnqueuer, orgPlanRepo, auditRec).
+		WithTargetGuard(safehttp.NewGuard(cfg.AllowPrivateMonitorTargets))
 	// Public status page: the one unauthenticated read. Takes no auditor and no
 	// enqueuer — it is read-only and cannot mutate anything by construction.
 	statusPageSvc := statuspage.NewService(statusPageRepo)
