@@ -12,6 +12,9 @@ const LINKS = [
   { href: "#features", label: "Features" },
   { href: "#how", label: "How it works" },
   { href: "#status", label: "Status pages" },
+  // Absolute, not an anchor: this one leaves the page, and the <a> below handles
+  // both because a same-page hash and a route both work as a plain href.
+  { href: "/docs", label: "Docs" },
 ];
 
 /**
