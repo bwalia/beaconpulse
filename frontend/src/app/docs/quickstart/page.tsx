@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, H2, Note } from "@/components/docs/parts";
@@ -66,7 +67,7 @@ export default function Quickstart() {
       </p>
       <Code lang="bash">{`
 # What am I watching, and is any of it broken?
-curl -s https://beaconpulse.net/api/v1/monitors \\
+curl -s https://${brand.apiHost}/api/v1/monitors \\
   -H "Authorization: Bearer $BEACON_API_KEY" | jq '.data[] | {name, last_status}'
 `}</Code>
       <p>

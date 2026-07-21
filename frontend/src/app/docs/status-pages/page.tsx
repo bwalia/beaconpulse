@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, H2, Note } from "@/components/docs/parts";
@@ -63,13 +64,13 @@ export default function StatusPages() {
       <H2 id="api">From the API</H2>
       <Code lang="bash">{`
 # Publish one monitor
-curl -X PATCH https://beaconpulse.net/api/v1/monitors/$ID \\
+curl -X PATCH https://${brand.apiHost}/api/v1/monitors/$ID \\
   -H "Authorization: Bearer $BEACON_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"public": true}'
 
 # The public read model — no credential, this is what your customers get
-curl -s https://beaconpulse.net/api/v1/public/status/your-slug
+curl -s https://${brand.apiHost}/api/v1/public/status/your-slug
 `}</Code>
       <p>
         In a <Link href="/docs/automation">declared file</Link>, set{" "}

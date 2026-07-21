@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { brand } from "@/brand";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -255,7 +256,7 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
             >
               <BeaconMark className="h-5 w-5" />
               <span className="text-xs uppercase tracking-[0.2em] group-hover:text-orange-300 sm:text-sm">
-                Beacon&nbsp;Pulse
+                {brand.name}
               </span>
             </Link>
             <Link
@@ -274,7 +275,7 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
             {/* Title bar */}
             <div className="flex items-center justify-between border-b border-slate-700/70 bg-white/[0.02] px-4 py-2.5 text-[11px] uppercase tracking-widest">
               <span className="truncate text-slate-400">
-                BEACONPULSE<span className="text-slate-600">{" // "}</span>
+                {brand.name.replace(/\s+/g, "").toUpperCase()}<span className="text-slate-600">{" // "}</span>
                 <span className="text-slate-300">{page.title}</span>
               </span>
               <span className="flex shrink-0 items-center gap-2 text-emerald-400">
@@ -286,7 +287,7 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
             {/* Headline: the answer, first, in a live region */}
             <motion.div variants={reveal} aria-live="polite" className="border-b border-slate-800 px-4 py-5 sm:px-5">
               <p className="text-[11px] uppercase tracking-[0.25em] text-slate-600">
-                <span className="text-slate-500">$</span> beaconpulse status --now
+                <span className="text-slate-500">$</span> {brand.name.replace(/\s+/g, "").toLowerCase()} status --now
               </p>
               <p className={`mt-2 flex items-center gap-2 text-xl font-semibold tracking-wide sm:text-2xl ${o.color}`}>
                 <span className="text-slate-600">&gt;</span>
@@ -318,7 +319,7 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
                 href="/"
                 className="text-slate-500 underline-offset-4 hover:text-orange-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
               >
-                POWERED BY BEACON PULSE
+                POWERED BY {brand.name.toUpperCase()}
               </Link>
             </div>
           </motion.div>

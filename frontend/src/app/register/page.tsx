@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 
 import { AuthScreen } from "@/components/auth/auth-screen";
 
@@ -6,9 +7,8 @@ import { AuthScreen } from "@/components/auth/auth-screen";
 // (no blank flash), it is a clean URL to point a campaign or ad at, and it can
 // carry its own metadata.
 export const metadata: Metadata = {
-  title: "Start monitoring free — Beacon Pulse",
-  description:
-    "Create your Beacon Pulse account. Self-hosted, multi-tenant infrastructure monitoring. No credit card.",
+  title: `Start monitoring free — ${brand.name}`,
+  description: `Create your ${brand.name} account. Self-hosted, multi-tenant infrastructure monitoring. No credit card.`,
 };
 
 export default function RegisterPage() {

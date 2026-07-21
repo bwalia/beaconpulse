@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fira_Code, Fira_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { brand, brandCSSVariables } from "@/brand";
 
 // next/font downloads and self-hosts these at BUILD time, so the running app never
 // calls fonts.googleapis.com — important for a self-hosted product — and the font
@@ -26,8 +27,13 @@ const firaCode = Fira_Code({
 });
 
 export const metadata: Metadata = {
-  title: "Beacon Pulse — Infrastructure Monitoring",
-  description: "Self-hosted infrastructure monitoring platform",
+  // The title carries into every page via the template; a page sets its own name and
+  // the brand supplies the suffix. One brand change renames every tab.
+  title: {
+    default: `${brand.name} — Infrastructure Monitoring`,
+    template: `%s — ${brand.name}`,
+  },
+  description: brand.description,
 };
 
 // Runs before first paint, so the page never flashes light before hydration swaps
@@ -49,6 +55,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // hydrates, which is exactly the class/style mismatch React would warn about.
     <html lang="en" className={`${firaSans.variable} ${firaCode.variable}`} suppressHydrationWarning>
       <head>
+        {/* The brand accent, as :root CSS variables the whole `brand-*` palette reads.
+            In <head> so the colours are defined before first paint — no flash of the
+            default tint. Static per build (the brand is chosen at build time), so this
+            is a constant string, not per-request work. */}
+        <style dangerouslySetInnerHTML={{ __html: brandCSSVariables() }} />
         <script dangerouslySetInnerHTML={{ __html: noFlashTheme }} />
       </head>
       <body>

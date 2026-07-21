@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Fields, H2, H3, Note } from "@/components/docs/parts";
@@ -61,7 +62,7 @@ export default function Alerts() {
       <H2 id="ai">AI diagnosis</H2>
       <p>
         On paid plans, a failing monitor has a <strong>Diagnose with AI</strong> button.
-        Beacon probes the target — DNS, the port, the TLS certificate, the response — and
+        {brand.shortName} probes the target — DNS, the port, the TLS certificate, the response — and
         a model reads the results back in plain English: what broke, and what to do.
       </p>
       <p>
@@ -77,7 +78,7 @@ export default function Alerts() {
         of what actually happened while you were working.
       </p>
       <Code lang="bash">{`
-curl -X POST https://beaconpulse.net/api/v1/maintenance-windows \\
+curl -X POST https://${brand.apiHost}/api/v1/maintenance-windows \\
   -H "Authorization: Bearer $BEACON_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
