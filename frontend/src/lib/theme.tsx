@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useTranslations } from "next-intl";
 import { DisplayIcon, MoonIcon, SunIcon } from "@/components/icons";
 
 export type Theme = "light" | "dark" | "system";
@@ -71,21 +72,23 @@ export function useTheme(): [Theme, (t: Theme) => void] {
   return [theme, setTheme];
 }
 
-const OPTIONS: { value: Theme; label: string; Icon: (p: { className?: string }) => React.ReactElement }[] = [
-  { value: "light", label: "Light", Icon: SunIcon },
-  { value: "dark", label: "Dark", Icon: MoonIcon },
-  { value: "system", label: "System", Icon: DisplayIcon },
+const OPTIONS: { value: Theme; Icon: (p: { className?: string }) => React.ReactElement }[] = [
+  { value: "light", Icon: SunIcon },
+  { value: "dark", Icon: MoonIcon },
+  { value: "system", Icon: DisplayIcon },
 ];
 
 export function ThemeToggle() {
+  const t = useTranslations("theme");
   const [theme, setTheme] = useTheme();
   return (
     <div
       role="group"
-      aria-label="Colour theme"
+      aria-label={t("label")}
       className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
-      {OPTIONS.map(({ value, label, Icon }) => {
+      {OPTIONS.map(({ value, Icon }) => {
+        const label = t(value);
         const active = theme === value;
         return (
           <button

@@ -1,0 +1,68 @@
+{
+  "nav": {
+    "features": "Features",
+    "howItWorks": "How it works",
+    "statusPages": "Status pages",
+    "docs": "Docs",
+    "signIn": "Sign in",
+    "getStarted": "Get started",
+    "dashboard": "Dashboard"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "monitors": "Monitors",
+    "alerts": "Alerts",
+    "explore": "Explore",
+    "projects": "Projects",
+    "statusPage": "Status page",
+    "notifications": "Notifications",
+    "maintenance": "Maintenance",
+    "billing": "Billing",
+    "apiKeys": "API keys",
+    "system": "System",
+    "signOut": "Sign out"
+  },
+  "auth": {
+    "welcomeBack": "Welcome back",
+    "startFree": "Start monitoring free",
+    "signInSubtitle": "Sign in to your {brand} dashboard.",
+    "registerSubtitle": "No credit card. Add your first domain in under a minute.",
+    "signInTab": "Sign in",
+    "createAccountTab": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "organizationName": "Organization name",
+    "yourName": "Your name",
+    "signInButton": "Sign in",
+    "createAccountButton": "Create account",
+    "newTo": "New to {brand}?",
+    "alreadyHaveAccount": "Already have an account?",
+    "createOne": "Create an account",
+    "signInLink": "Sign in",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "create": "Create",
+    "close": "Close",
+    "edit": "Edit",
+    "loading": "Loading…",
+    "search": "Search",
+    "add": "Add",
+    "done": "Done",
+    "copy": "Copy",
+    "copied": "Copied",
+    "next": "Next",
+    "previous": "Previous",
+    "language": "Language"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "label": "Colour theme"
+  }
+}

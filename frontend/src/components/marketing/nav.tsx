@@ -5,17 +5,20 @@ import Link from "next/link";
 
 import { BeaconMark } from "@/components/icons";
 import { ThemeToggle } from "@/lib/theme";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/lib/auth";
 import { DUR } from "@/lib/motion";
 
+// href + which translation key labels it. Labels come from the catalog so the whole nav
+// speaks the reader's language.
 const LINKS = [
-  { href: "#features", label: "Features" },
-  { href: "#how", label: "How it works" },
-  { href: "#status", label: "Status pages" },
-  // Absolute, not an anchor: this one leaves the page, and the <a> below handles
-  // both because a same-page hash and a route both work as a plain href.
-  { href: "/docs", label: "Docs" },
-];
+  { href: "#features", key: "features" },
+  { href: "#how", key: "howItWorks" },
+  { href: "#status", key: "statusPages" },
+  // Absolute, not an anchor: this one leaves the page.
+  { href: "/docs", key: "docs" },
+] as const;
 
 /**
  * Marketing header. The bar is transparent over the hero and gains a frosted
@@ -24,6 +27,7 @@ const LINKS = [
  */
 export function MarketingNav() {
   const { user, loading } = useAuth();
+  const t = useTranslations("nav");
   const { scrollY } = useScroll();
 
   // Drive the chrome from scroll position rather than a state + listener, so no
@@ -63,13 +67,14 @@ export function MarketingNav() {
                 href={l.href}
                 className="rounded-lg px-3.5 py-2 text-lg text-slate-600 transition-colors hover:bg-slate-900/5 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
               >
-                {l.label}
+                {t(l.key)}
               </a>
             </li>
           ))}
         </ul>
 
         <div className="ml-auto flex items-center gap-2">
+          <LanguageSwitcher className="hidden sm:inline-flex" />
           <ThemeToggle />
           {/* Until auth resolves, render nothing rather than flashing "Sign in"
               at a user who is already logged in. */}
@@ -79,7 +84,7 @@ export function MarketingNav() {
                 href="/dashboard"
                 className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-lg font-medium text-white transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
               >
-                Go to dashboard
+                {t("dashboard")}
               </Link>
             ) : (
               <>
@@ -87,14 +92,14 @@ export function MarketingNav() {
                   href="/login"
                   className="hidden rounded-lg px-4 py-2.5 text-lg font-medium text-slate-700 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none sm:inline-flex dark:text-slate-300 dark:hover:text-white"
                 >
-                  Sign in
+                  {t("signIn")}
                 </Link>
                 <Link
                   href="/register"
                   className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-lg font-medium text-white transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
                   style={{ transitionDuration: `${DUR.micro}s` }}
                 >
-                  Start free
+                  {t("getStarted")}
                 </Link>
               </>
             ))}

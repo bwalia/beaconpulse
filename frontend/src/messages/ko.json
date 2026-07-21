@@ -1,0 +1,7 @@
+{
+  "nav": { "features": "기능", "howItWorks": "작동 방식", "statusPages": "상태 페이지", "docs": "문서", "signIn": "로그인", "getStarted": "시작하기", "dashboard": "대시보드" },
+  "sidebar": { "dashboard": "대시보드", "monitors": "모니터", "alerts": "알림", "explore": "탐색", "projects": "프로젝트", "statusPage": "상태 페이지", "notifications": "알림", "maintenance": "점검", "billing": "결제", "apiKeys": "API 키", "system": "시스템", "signOut": "로그아웃" },
+  "auth": { "welcomeBack": "다시 오신 것을 환영합니다", "startFree": "무료로 모니터링 시작", "signInSubtitle": "{brand} 대시보드에 로그인하세요.", "registerSubtitle": "신용카드가 필요 없습니다. 1분 이내에 첫 도메인을 추가하세요.", "signInTab": "로그인", "createAccountTab": "계정 만들기", "email": "이메일", "password": "비밀번호", "organizationName": "조직 이름", "yourName": "이름", "signInButton": "로그인", "createAccountButton": "계정 만들기", "newTo": "{brand}가 처음이신가요?", "alreadyHaveAccount": "이미 계정이 있으신가요?", "createOne": "계정 만들기", "signInLink": "로그인", "showPassword": "비밀번호 표시", "hidePassword": "비밀번호 숨기기" },
+  "common": { "save": "저장", "cancel": "취소", "delete": "삭제", "create": "만들기", "close": "닫기", "edit": "편집", "loading": "로딩 중…", "search": "검색", "add": "추가", "done": "완료", "copy": "복사", "copied": "복사됨", "next": "다음", "previous": "이전", "language": "언어" },
+  "theme": { "light": "라이트", "dark": "다크", "system": "시스템", "label": "색상 테마" }
+}

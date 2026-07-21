@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Fira_Code, Fira_Sans } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 import "./globals.css";
 import { Providers } from "./providers";
+import { localeDir, resolveLocale } from "@/i18n/config";
 
 // next/font downloads and self-hosts these at BUILD time, so the running app never
 // calls fonts.googleapis.com — important for a self-hosted product — and the font
@@ -43,16 +46,29 @@ const noFlashTheme = `
 }catch(e){}})();
 `;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The active locale, resolved from the cookie by i18n/request.ts. lang and dir are set
+  // from it so the browser reads the page in the right language and, for Arabic, the
+  // right direction. Messages are provided to the client tree once, here.
+  const locale = resolveLocale(await getLocale());
   return (
     // suppressHydrationWarning: the script below mutates <html> before React
     // hydrates, which is exactly the class/style mismatch React would warn about.
-    <html lang="en" className={`${firaSans.variable} ${firaCode.variable}`} suppressHydrationWarning>
+    <html
+      lang={locale}
+      dir={localeDir(locale)}
+      className={`${firaSans.variable} ${firaCode.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: noFlashTheme }} />
       </head>
       <body>
-        <Providers>{children}</Providers>
+        {/* Messages load automatically from the request config, so no explicit prop is
+            needed — the provider makes them available to every client component. */}
+        <NextIntlClientProvider>
+          <Providers>{children}</Providers>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

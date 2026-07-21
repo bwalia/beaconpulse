@@ -1,0 +1,7 @@
+{
+  "nav": { "features": "الميزات", "howItWorks": "كيف يعمل", "statusPages": "صفحات الحالة", "docs": "الوثائق", "signIn": "تسجيل الدخول", "getStarted": "ابدأ", "dashboard": "لوحة التحكم" },
+  "sidebar": { "dashboard": "لوحة التحكم", "monitors": "المراقبات", "alerts": "التنبيهات", "explore": "استكشاف", "projects": "المشاريع", "statusPage": "صفحة الحالة", "notifications": "الإشعارات", "maintenance": "الصيانة", "billing": "الفوترة", "apiKeys": "مفاتيح API", "system": "النظام", "signOut": "تسجيل الخروج" },
+  "auth": { "welcomeBack": "مرحبًا بعودتك", "startFree": "ابدأ المراقبة مجانًا", "signInSubtitle": "سجّل الدخول إلى لوحة تحكم {brand}.", "registerSubtitle": "بدون بطاقة ائتمان. أضف نطاقك الأول في أقل من دقيقة.", "signInTab": "تسجيل الدخول", "createAccountTab": "إنشاء حساب", "email": "البريد الإلكتروني", "password": "كلمة المرور", "organizationName": "اسم المؤسسة", "yourName": "اسمك", "signInButton": "تسجيل الدخول", "createAccountButton": "إنشاء حساب", "newTo": "جديد على {brand}؟", "alreadyHaveAccount": "لديك حساب بالفعل؟", "createOne": "إنشاء حساب", "signInLink": "تسجيل الدخول", "showPassword": "إظهار كلمة المرور", "hidePassword": "إخفاء كلمة المرور" },
+  "common": { "save": "حفظ", "cancel": "إلغاء", "delete": "حذف", "create": "إنشاء", "close": "إغلاق", "edit": "تعديل", "loading": "جارٍ التحميل…", "search": "بحث", "add": "إضافة", "done": "تم", "copy": "نسخ", "copied": "تم النسخ", "next": "التالي", "previous": "السابق", "language": "اللغة" },
+  "theme": { "light": "فاتح", "dark": "داكن", "system": "النظام", "label": "سمة الألوان" }
+}

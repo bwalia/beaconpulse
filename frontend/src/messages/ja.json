@@ -1,0 +1,7 @@
+{
+  "nav": { "features": "機能", "howItWorks": "仕組み", "statusPages": "ステータスページ", "docs": "ドキュメント", "signIn": "ログイン", "getStarted": "始める", "dashboard": "ダッシュボード" },
+  "sidebar": { "dashboard": "ダッシュボード", "monitors": "モニター", "alerts": "アラート", "explore": "探索", "projects": "プロジェクト", "statusPage": "ステータスページ", "notifications": "通知", "maintenance": "メンテナンス", "billing": "請求", "apiKeys": "APIキー", "system": "システム", "signOut": "ログアウト" },
+  "auth": { "welcomeBack": "おかえりなさい", "startFree": "無料で監視を始める", "signInSubtitle": "{brand} のダッシュボードにログインします。", "registerSubtitle": "クレジットカード不要。最初のドメインを1分以内に追加できます。", "signInTab": "ログイン", "createAccountTab": "アカウント作成", "email": "メールアドレス", "password": "パスワード", "organizationName": "組織名", "yourName": "お名前", "signInButton": "ログイン", "createAccountButton": "アカウントを作成", "newTo": "{brand} は初めてですか？", "alreadyHaveAccount": "すでにアカウントをお持ちですか？", "createOne": "アカウントを作成", "signInLink": "ログイン", "showPassword": "パスワードを表示", "hidePassword": "パスワードを非表示" },
+  "common": { "save": "保存", "cancel": "キャンセル", "delete": "削除", "create": "作成", "close": "閉じる", "edit": "編集", "loading": "読み込み中…", "search": "検索", "add": "追加", "done": "完了", "copy": "コピー", "copied": "コピーしました", "next": "次へ", "previous": "前へ", "language": "言語" },
+  "theme": { "light": "ライト", "dark": "ダーク", "system": "システム", "label": "配色テーマ" }
+}
