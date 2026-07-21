@@ -23,6 +23,7 @@ import { ApiRequestError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { DUR, EASE_OUT, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { ThemeToggle } from "@/lib/theme";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -298,7 +299,8 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
 
       {/* ---- Form panel ---- */}
       <main className="relative flex items-center justify-center bg-white px-6 py-12 dark:bg-slate-950">
-        <div className="absolute right-6 top-6">
+        <div className="absolute right-6 top-6 flex items-center gap-2">
+          <LanguageSwitcher />
           <ThemeToggle />
         </div>
 

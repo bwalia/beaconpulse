@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { GlobeIcon } from "@/components/icons";
-import { LOCALES } from "@/i18n/config";
-import { setLocale } from "@/i18n/actions";
+import { LOCALE_COOKIE, LOCALES, resolveLocale } from "@/i18n/config";
+
+const ONE_YEAR = 60 * 60 * 24 * 365;
 
 /**
  * The language picker.
@@ -17,8 +18,14 @@ import { setLocale } from "@/i18n/actions";
  * its name in its OWN language, because someone looking for their language scans for how
  * THEY write it, not the English label.
  *
- * Choosing persists the locale server-side and refreshes, so the whole tree re-renders
- * translated. useTransition keeps the control responsive while that round trip happens.
+ * The cookie is set CLIENT-SIDE rather than through a server action, deliberately. A
+ * server action is a POST that Next.js guards with an origin check and signs with a
+ * build-time key — behind a reverse proxy, or across more than one frontend replica,
+ * that POST can fail and take down the whole page (which is exactly what a language
+ * switch was doing). A locale is a preference, not a credential, so there is nothing to
+ * protect by routing it through the server: write the cookie here, then refresh so the
+ * server components re-render reading it. No POST, no origin check, no signing key —
+ * nothing that a proxy can break.
  */
 export function LanguageSwitcher({ className }: { className?: string }) {
   const current = useLocale();
@@ -27,9 +34,12 @@ export function LanguageSwitcher({ className }: { className?: string }) {
   const [pending, startTransition] = useTransition();
 
   const onChange = (value: string) => {
-    startTransition(async () => {
-      await setLocale(value);
-      // Re-fetch server components with the new cookie in effect.
+    const locale = resolveLocale(value);
+    // Lax + a year: a language choice should survive the session and follow normal
+    // top-level navigation, and it is deliberately NOT HttpOnly so the client can set it.
+    document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${ONE_YEAR}; samesite=lax`;
+    startTransition(() => {
+      // Re-fetch server components with the new cookie now in place.
       router.refresh();
     });
   };
