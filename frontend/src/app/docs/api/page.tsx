@@ -22,6 +22,12 @@ export default function ApiReference() {
 
       <Note>
         <p>
+          Prefer to try before you read? The <Link href="/docs/console">API console</Link>{" "}
+          lets you paste a key and send any of these requests from your browser.
+        </p>
+      </Note>
+      <Note>
+        <p>
           This is the same API the dashboard uses. There is no reduced &ldquo;public
           API&rdquo; — if you can do it in the UI, you can do it here, under the same
           permissions and the same plan limits.

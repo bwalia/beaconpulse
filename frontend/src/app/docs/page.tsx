@@ -29,6 +29,11 @@ const PATHS = [
     title: "API reference",
     desc: "Every endpoint, with the fields and a curl for each.",
   },
+  {
+    href: "/docs/console",
+    title: "API console",
+    desc: "Paste a key and call the live API from your browser.",
+  },
 ];
 
 export default function DocsHome() {
