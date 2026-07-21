@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useAuth } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
 import { ChartLineIcon, LockIcon, MegaphoneIcon } from "@/components/icons";
@@ -26,6 +28,7 @@ const tools = [
 ];
 
 export default function SystemPage() {
+  const t = useTranslations("pages.system");
   const { user } = useAuth();
   const isOperator = user?.role === "owner" || user?.role === "admin";
 
@@ -41,7 +44,7 @@ export default function SystemPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="System" subtitle="Operator access to the underlying monitoring engines." />
+      <PageHeader title={t("title")} subtitle={t("subtitle")} />
 
       <div className="flex items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
         <LockIcon className="mt-0.5 h-4 w-4 shrink-0" />

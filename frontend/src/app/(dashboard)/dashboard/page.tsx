@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -46,6 +47,7 @@ const SLOT_COUNT = 48;
 const DASHBOARD_MONITOR_CAP = 8;
 
 export default function DashboardPage() {
+  const t = useTranslations("pages.dashboard");
   const [hours, setHours] = useState<RangeHours>(24);
 
   const { data: monitors } = useMonitors();
@@ -151,15 +153,15 @@ export default function DashboardPage() {
           doesn't have to travel to the last pixel of the line. */}
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel
-          title="Availability"
-          subtitle={`Share of monitors passing · SLO ${SLO_PERCENT}%`}
+          title={t("availability")}
+          subtitle={t("availabilitySubtitle", { pct: SLO_PERCENT })}
           value={lastOf(uptimeSeries) != null ? `${round1(lastOf(uptimeSeries)!)}%` : undefined}
         >
           <AvailabilityChart data={uptimeSeries} hours={hours} loading={loadingOverview} failed={overviewFailed} />
         </Panel>
         <Panel
-          title="Response time"
-          subtitle={`Average across all monitors, ${win}`}
+          title={t("responseTime")}
+          subtitle={t("responseTimeSubtitle", { window: win })}
           value={lastOf(responseSeries) != null ? `${Math.round(lastOf(responseSeries)!)}ms` : undefined}
         >
           <ResponseChart data={responseSeries} hours={hours} loading={loadingOverview} failed={overviewFailed} />

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
 import { Hero } from "@/components/marketing/hero";
 import { MarketingNav } from "@/components/marketing/nav";
@@ -28,7 +29,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const t = await getTranslations("marketing");
   return (
     <div className="min-h-dvh bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {/* Skip link: the nav is fixed, so keyboard users need a way past it. */}
@@ -36,7 +38,7 @@ export default function LandingPage() {
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-white dark:focus:bg-white dark:focus:text-slate-900"
       >
-        Skip to content
+        {t("skipToContent")}
       </a>
       <MarketingNav />
       <main id="main">

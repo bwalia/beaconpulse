@@ -1,7 +1,179 @@
 {
-  "nav": { "features": "Funzionalità", "howItWorks": "Come funziona", "statusPages": "Pagine di stato", "docs": "Documentazione", "signIn": "Accedi", "getStarted": "Inizia", "dashboard": "Dashboard" },
-  "sidebar": { "dashboard": "Dashboard", "monitors": "Monitor", "alerts": "Avvisi", "explore": "Esplora", "projects": "Progetti", "statusPage": "Pagina di stato", "notifications": "Notifiche", "maintenance": "Manutenzione", "billing": "Fatturazione", "apiKeys": "Chiavi API", "system": "Sistema", "signOut": "Esci" },
-  "auth": { "welcomeBack": "Bentornato", "startFree": "Inizia a monitorare gratis", "signInSubtitle": "Accedi alla tua dashboard {brand}.", "registerSubtitle": "Nessuna carta di credito. Aggiungi il tuo primo dominio in meno di un minuto.", "signInTab": "Accedi", "createAccountTab": "Crea account", "email": "E-mail", "password": "Password", "organizationName": "Nome dell’organizzazione", "yourName": "Il tuo nome", "signInButton": "Accedi", "createAccountButton": "Crea account", "newTo": "Nuovo su {brand}?", "alreadyHaveAccount": "Hai già un account?", "createOne": "Crea un account", "signInLink": "Accedi", "showPassword": "Mostra password", "hidePassword": "Nascondi password" },
-  "common": { "save": "Salva", "cancel": "Annulla", "delete": "Elimina", "create": "Crea", "close": "Chiudi", "edit": "Modifica", "loading": "Caricamento…", "search": "Cerca", "add": "Aggiungi", "done": "Fatto", "copy": "Copia", "copied": "Copiato", "next": "Avanti", "previous": "Indietro", "language": "Lingua" },
-  "theme": { "light": "Chiaro", "dark": "Scuro", "system": "Sistema", "label": "Tema colore" }
+  "nav": {
+    "features": "Funzionalità",
+    "howItWorks": "Come funziona",
+    "statusPages": "Pagine di stato",
+    "docs": "Documentazione",
+    "signIn": "Accedi",
+    "getStarted": "Inizia",
+    "dashboard": "Dashboard"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "monitors": "Monitor",
+    "alerts": "Avvisi",
+    "explore": "Esplora",
+    "projects": "Progetti",
+    "statusPage": "Pagina di stato",
+    "notifications": "Notifiche",
+    "maintenance": "Manutenzione",
+    "billing": "Fatturazione",
+    "apiKeys": "Chiavi API",
+    "system": "Sistema",
+    "signOut": "Esci"
+  },
+  "auth": {
+    "welcomeBack": "Bentornato",
+    "startFree": "Inizia a monitorare gratis",
+    "signInSubtitle": "Accedi alla tua dashboard {brand}.",
+    "registerSubtitle": "Nessuna carta di credito. Aggiungi il tuo primo dominio in meno di un minuto.",
+    "signInTab": "Accedi",
+    "createAccountTab": "Crea account",
+    "email": "E-mail",
+    "password": "Password",
+    "organizationName": "Nome dell’organizzazione",
+    "yourName": "Il tuo nome",
+    "signInButton": "Accedi",
+    "createAccountButton": "Crea account",
+    "newTo": "Nuovo su {brand}?",
+    "alreadyHaveAccount": "Hai già un account?",
+    "createOne": "Crea un account",
+    "signInLink": "Accedi",
+    "showPassword": "Mostra password",
+    "hidePassword": "Nascondi password"
+  },
+  "common": {
+    "save": "Salva",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "create": "Crea",
+    "close": "Chiudi",
+    "edit": "Modifica",
+    "loading": "Caricamento…",
+    "search": "Cerca",
+    "add": "Aggiungi",
+    "done": "Fatto",
+    "copy": "Copia",
+    "copied": "Copiato",
+    "next": "Avanti",
+    "previous": "Indietro",
+    "language": "Lingua"
+  },
+  "theme": {
+    "light": "Chiaro",
+    "dark": "Scuro",
+    "system": "Sistema",
+    "label": "Tema colore"
+  },
+  "marketing": {
+    "skipToContent": "Vai al contenuto",
+    "badge": "Self-hosted e multi-tenant",
+    "headlineLine1": "Scopri che è giù",
+    "headlineLine2": "prima dei tuoi clienti.",
+    "heroBlurb": "{brand} controlla i tuoi endpoint, certificati e DNS ogni 30 secondi e avvisa la persona giusta nell'istante in cui qualcosa si rompe. I dati restano tuoi, lo esegui ovunque e offri ai clienti una pagina di stato di cui fidarsi davvero.",
+    "ctaStartFree": "Inizia a monitorare gratis",
+    "ctaSeeStatus": "Vedi una pagina di stato",
+    "statUptime": "Uptime monitorato",
+    "statInterval": "Intervallo di controllo",
+    "statTypes": "Tipi di monitor",
+    "liveNow": "Live",
+    "liveInterval": "Intervallo 30s",
+    "liveDown": "giù",
+    "liveSummary": "3 di 4 operativi – avviso inviato 12s fa",
+    "featuresEyebrow": "Tutto in un unico posto",
+    "featuresTitle": "Sostituisci i cinque strumenti che tieni insieme alla bell'e meglio",
+    "featuresBlurb": "{brand} è un unico piano di controllo per uptime, latenza, certificati e avvisi: self-hosted, così i dati non lasciano mai la tua infrastruttura.",
+    "feature1Title": "Sei tipi di monitor",
+    "feature1Body": "Controlli HTTP, HTTPS, TCP, ICMP, DNS e scadenza SSL: un unico piano di controllo invece di cinque strumenti.",
+    "feature2Title": "Avvisi che raggiungono una persona",
+    "feature2Body": "Slack, email, webhook e Telegram, con deduplicazione: così un singolo guasto non diventa cinquanta notifiche.",
+    "feature3Title": "Multi-tenant per progettazione",
+    "feature3Body": "Ogni query è limitata a un'organizzazione. I team condividono un'istanza senza condividere i dati.",
+    "feature4Title": "Latenza su cui puoi agire",
+    "feature4Body": "Tempi di risposta p50/p95 per endpoint, non solo un flag binario su/giù.",
+    "feature5Title": "Riepiloghi degli incidenti con IA",
+    "feature5Body": "Ogni avviso arriva con una spiegazione in linguaggio semplice di cosa probabilmente si è rotto e dove guardare per primo.",
+    "howEyebrow": "Come funziona",
+    "howTitle": "Attivo in circa tre minuti",
+    "howBlurb": "Niente agent, niente sidecar, niente archeologia YAML.",
+    "step1Title": "Raggruppa per progetto",
+    "step1Body": "Crea un progetto per ogni app o team. Ogni monitor appartiene a uno solo, così dashboard e pagine di stato restano ordinate man mano che cresci.",
+    "step2Title": "Aggiungi i tuoi endpoint",
+    "step2Body": "Punta {brand} su una URL, un host o un cluster. Inizia a sondare secondo il tuo intervallo in pochi secondi, senza alcun agent da installare.",
+    "step3Title": "Pubblica una pagina di stato",
+    "step3Body": "Basta un interruttore per condividere una pagina pubblica raggruppata per progetto. I clienti vedono cosa funziona, mai i tuoi dettagli interni.",
+    "statusEyebrow": "Pagine di stato",
+    "statusTitle": "Una pagina di cui i tuoi clienti possono fidarsi",
+    "statusBlurb": "Raggruppa i domini per progetto, pubblica sul tuo dominio e mantieni privati target, IP e dettagli interni: vengono mostrati solo nomi e stato.",
+    "statusAllOperational": "Tutti i sistemi operativi",
+    "statusUpdated": "Aggiornato pochi istanti fa",
+    "statusUp": "{up}/{total} online",
+    "statusOperational": "Operativo",
+    "statusDown": "Non operativo",
+    "statusPrivacyNote": "Target, IP e configurazione dei controlli non vengono mai esposti pubblicamente.",
+    "ctaTitle": "Basta scoprirlo dai tuoi clienti.",
+    "ctaBlurb": "Avvia {brand}, aggiungi il tuo primo dominio e ricevi un avviso prima che qualcuno apra un ticket.",
+    "ctaButton": "Crea il tuo account gratuito",
+    "ctaFinePrint": "Inizi gratis, senza carta di credito.",
+    "footerTagline": "monitoraggio dell'infrastruttura"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "Disponibilità",
+      "availabilitySubtitle": "Quota di monitor superati · SLO {pct}%",
+      "responseTime": "Tempo di risposta",
+      "responseTimeSubtitle": "Media su tutti i monitor, {window}"
+    },
+    "monitors": {
+      "title": "Monitor",
+      "subtitle": "Siti web, API, porte e certificati: sondati da Prometheus + Blackbox.",
+      "empty": "Ancora nessun monitor",
+      "emptyFiltered": "Nessun monitor corrispondente"
+    },
+    "alerts": {
+      "title": "Avvisi",
+      "subtitle": "Avvisi attualmente attivi, solo per la tua organizzazione.",
+      "empty": "Tutto a posto",
+      "emptyFiltered": "Nessun avviso corrispondente"
+    },
+    "explore": {
+      "title": "Esplora",
+      "subtitle": "Esegui PromQL sulle tue metriche. Ogni query è automaticamente limitata alla tua organizzazione.",
+      "empty": "Nessuna serie corrispondente"
+    },
+    "projects": {
+      "title": "Progetti",
+      "subtitle": "Raggruppa i tuoi monitor per applicazione o team.",
+      "empty": "Ancora nessun progetto",
+      "emptyFiltered": "Nessun progetto corrispondente"
+    },
+    "statusPage": {
+      "title": "Pagina di stato",
+      "subtitle": "Pubblica una pagina pubblica di cui i tuoi clienti possono fidarsi. Nulla viene esposto finché non lo decidi tu."
+    },
+    "notifications": {
+      "title": "Notifiche",
+      "subtitle": "Ricevi un avviso nell'istante in cui qualcosa va giù, su Slack, email, un webhook o Telegram.",
+      "empty": "Ancora nessun canale",
+      "emptyFiltered": "Nessun canale corrispondente"
+    },
+    "maintenance": {
+      "title": "Finestre di manutenzione",
+      "subtitle": "Stai pianificando un deploy o un fermo previsto? Comunicalo a {brand} in anticipo, così non lancia falsi allarmi.",
+      "empty": "Nessuna finestra di manutenzione"
+    },
+    "billing": {
+      "title": "Piani e fatturazione",
+      "subtitle": "Paga a consumo ogni ora o abbonati mensilmente. Decidi tu."
+    },
+    "apiKeys": {
+      "title": "Chiavi API",
+      "subtitle": "Gestisci i monitor da uno script, una pipeline o i tuoi strumenti.",
+      "empty": "Ancora nessuna chiave API"
+    },
+    "system": {
+      "title": "Sistema",
+      "subtitle": "Accesso operatore ai motori di monitoraggio sottostanti."
+    }
+  }
 }

@@ -1,7 +1,179 @@
 {
-  "nav": { "features": "機能", "howItWorks": "仕組み", "statusPages": "ステータスページ", "docs": "ドキュメント", "signIn": "ログイン", "getStarted": "始める", "dashboard": "ダッシュボード" },
-  "sidebar": { "dashboard": "ダッシュボード", "monitors": "モニター", "alerts": "アラート", "explore": "探索", "projects": "プロジェクト", "statusPage": "ステータスページ", "notifications": "通知", "maintenance": "メンテナンス", "billing": "請求", "apiKeys": "APIキー", "system": "システム", "signOut": "ログアウト" },
-  "auth": { "welcomeBack": "おかえりなさい", "startFree": "無料で監視を始める", "signInSubtitle": "{brand} のダッシュボードにログインします。", "registerSubtitle": "クレジットカード不要。最初のドメインを1分以内に追加できます。", "signInTab": "ログイン", "createAccountTab": "アカウント作成", "email": "メールアドレス", "password": "パスワード", "organizationName": "組織名", "yourName": "お名前", "signInButton": "ログイン", "createAccountButton": "アカウントを作成", "newTo": "{brand} は初めてですか？", "alreadyHaveAccount": "すでにアカウントをお持ちですか？", "createOne": "アカウントを作成", "signInLink": "ログイン", "showPassword": "パスワードを表示", "hidePassword": "パスワードを非表示" },
-  "common": { "save": "保存", "cancel": "キャンセル", "delete": "削除", "create": "作成", "close": "閉じる", "edit": "編集", "loading": "読み込み中…", "search": "検索", "add": "追加", "done": "完了", "copy": "コピー", "copied": "コピーしました", "next": "次へ", "previous": "前へ", "language": "言語" },
-  "theme": { "light": "ライト", "dark": "ダーク", "system": "システム", "label": "配色テーマ" }
+  "nav": {
+    "features": "機能",
+    "howItWorks": "仕組み",
+    "statusPages": "ステータスページ",
+    "docs": "ドキュメント",
+    "signIn": "ログイン",
+    "getStarted": "始める",
+    "dashboard": "ダッシュボード"
+  },
+  "sidebar": {
+    "dashboard": "ダッシュボード",
+    "monitors": "モニター",
+    "alerts": "アラート",
+    "explore": "探索",
+    "projects": "プロジェクト",
+    "statusPage": "ステータスページ",
+    "notifications": "通知",
+    "maintenance": "メンテナンス",
+    "billing": "請求",
+    "apiKeys": "APIキー",
+    "system": "システム",
+    "signOut": "ログアウト"
+  },
+  "auth": {
+    "welcomeBack": "おかえりなさい",
+    "startFree": "無料で監視を始める",
+    "signInSubtitle": "{brand} のダッシュボードにログインします。",
+    "registerSubtitle": "クレジットカード不要。最初のドメインを1分以内に追加できます。",
+    "signInTab": "ログイン",
+    "createAccountTab": "アカウント作成",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "organizationName": "組織名",
+    "yourName": "お名前",
+    "signInButton": "ログイン",
+    "createAccountButton": "アカウントを作成",
+    "newTo": "{brand} は初めてですか？",
+    "alreadyHaveAccount": "すでにアカウントをお持ちですか？",
+    "createOne": "アカウントを作成",
+    "signInLink": "ログイン",
+    "showPassword": "パスワードを表示",
+    "hidePassword": "パスワードを非表示"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "create": "作成",
+    "close": "閉じる",
+    "edit": "編集",
+    "loading": "読み込み中…",
+    "search": "検索",
+    "add": "追加",
+    "done": "完了",
+    "copy": "コピー",
+    "copied": "コピーしました",
+    "next": "次へ",
+    "previous": "前へ",
+    "language": "言語"
+  },
+  "theme": {
+    "light": "ライト",
+    "dark": "ダーク",
+    "system": "システム",
+    "label": "配色テーマ"
+  },
+  "marketing": {
+    "skipToContent": "コンテンツにスキップ",
+    "badge": "セルフホスト & マルチテナント",
+    "headlineLine1": "障害に気づく",
+    "headlineLine2": "顧客より先に。",
+    "heroBlurb": "{brand}はエンドポイント、証明書、DNSを30秒ごとに監視し、障害が起きた瞬間に適切な担当者へ通知します。データは自社で保有し、どこでも実行でき、顧客には本当に信頼できるステータスページを提供します。",
+    "ctaStartFree": "無料で監視を始める",
+    "ctaSeeStatus": "ステータスページを見る",
+    "statUptime": "稼働率の追跡",
+    "statInterval": "チェック間隔",
+    "statTypes": "モニタータイプ",
+    "liveNow": "ライブ",
+    "liveInterval": "30s 間隔",
+    "liveDown": "ダウン",
+    "liveSummary": "4件中3件が正常 — 12s前にアラート送信",
+    "featuresEyebrow": "すべてを一か所に",
+    "featuresTitle": "つぎはぎで使っている5つのツールを1つに",
+    "featuresBlurb": "{brand}は稼働率、レイテンシ、証明書、アラートを一元管理するコントロールプレーンです。セルフホストなので、データがインフラの外に出ることはありません。",
+    "feature1Title": "6つのモニタータイプ",
+    "feature1Body": "HTTP、HTTPS、TCP、ICMP、DNS、SSL有効期限のチェック — 5つのツールではなく1つのコントロールプレーンで。",
+    "feature2Title": "人に届くアラート",
+    "feature2Body": "Slack、メール、Webhook、Telegramに対応し、重複を排除 — 1件の障害が50件の通知にならないように。",
+    "feature3Title": "設計段階からマルチテナント",
+    "feature3Body": "すべてのクエリは組織単位に限定されます。チームはデータを共有せずに同じインスタンスを利用できます。",
+    "feature4Title": "対応に活かせるレイテンシ",
+    "feature4Body": "単なる稼働 / ダウンのフラグではなく、エンドポイントごとの p50/p95 応答時間を計測。",
+    "feature5Title": "AIによるインシデント要約",
+    "feature5Body": "すべてのアラートには、何が壊れた可能性が高いか、まずどこを見るべきかを平易に説明したメッセージが添えられます。",
+    "howEyebrow": "仕組み",
+    "howTitle": "約3分で稼働",
+    "howBlurb": "エージェントも、サイドカーも、YAMLの発掘作業も不要。",
+    "step1Title": "プロジェクトごとに整理",
+    "step1Body": "アプリやチームごとにプロジェクトを作成。各モニターはいずれかに属するので、規模が拡大してもダッシュボードとステータスページは整理された状態を保てます。",
+    "step2Title": "エンドポイントを追加",
+    "step2Body": "{brand}にURL、ホスト、クラスターを指定するだけ。エージェントのインストールは不要で、数秒で指定した間隔での監視が始まります。",
+    "step3Title": "ステータスページを公開",
+    "step3Body": "スイッチ1つで、プロジェクト別にまとめた公開ページを共有。顧客には稼働状況だけが見え、内部構成が見えることはありません。",
+    "statusEyebrow": "ステータスページ",
+    "statusTitle": "顧客が信頼できるページ",
+    "statusBlurb": "ドメインをプロジェクト別にまとめ、自社ドメインで公開。ターゲット、IP、内部情報は非公開のまま — 公開されるのは名前とステータスだけです。",
+    "statusAllOperational": "すべてのシステムが正常",
+    "statusUpdated": "たった今更新",
+    "statusUp": "{up}/{total} が稼働中",
+    "statusOperational": "正常",
+    "statusDown": "ダウン",
+    "statusPrivacyNote": "ターゲット、IP、チェック設定が公開されることはありません。",
+    "ctaTitle": "顧客から障害を知らされるのは、もう終わりに。",
+    "ctaBlurb": "{brand}を立ち上げ、最初のドメインを追加すれば、誰かがチケットを起票する前に通知が届きます。",
+    "ctaButton": "無料アカウントを作成",
+    "ctaFinePrint": "無料で開始 — クレジットカード不要。",
+    "footerTagline": "インフラ監視"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "可用性",
+      "availabilitySubtitle": "正常なモニターの割合 · SLO {pct}%",
+      "responseTime": "応答時間",
+      "responseTimeSubtitle": "全モニターの平均、{window}"
+    },
+    "monitors": {
+      "title": "モニター",
+      "subtitle": "ウェブサイト、API、ポート、証明書 — Prometheus + Blackbox で監視。",
+      "empty": "モニターがまだありません",
+      "emptyFiltered": "該当するモニターがありません"
+    },
+    "alerts": {
+      "title": "アラート",
+      "subtitle": "自組織で現在発生中のアラートのみ。",
+      "empty": "問題なし",
+      "emptyFiltered": "該当するアラートがありません"
+    },
+    "explore": {
+      "title": "探索",
+      "subtitle": "自分のメトリクスに対して PromQL を実行。すべてのクエリは自動的に自組織に限定されます。",
+      "empty": "該当する系列がありません"
+    },
+    "projects": {
+      "title": "プロジェクト",
+      "subtitle": "モニターをアプリやチームごとにまとめましょう。",
+      "empty": "プロジェクトがまだありません",
+      "emptyFiltered": "該当するプロジェクトがありません"
+    },
+    "statusPage": {
+      "title": "ステータスページ",
+      "subtitle": "顧客が信頼できる公開ページを公開。あなたが許可するまで、何も公開されません。"
+    },
+    "notifications": {
+      "title": "通知",
+      "subtitle": "障害が起きた瞬間に通知 — Slack、メール、Webhook、Telegram で。",
+      "empty": "チャネルがまだありません",
+      "emptyFiltered": "該当するチャネルがありません"
+    },
+    "maintenance": {
+      "title": "メンテナンス期間",
+      "subtitle": "デプロイや予定されたダウンタイムがありますか？ 誤報を防ぐため、事前に{brand}に知らせておきましょう。",
+      "empty": "メンテナンス期間がありません"
+    },
+    "billing": {
+      "title": "プランと請求",
+      "subtitle": "時間単位の従量課金でも、月額サブスクリプションでも。お好みで選べます。"
+    },
+    "apiKeys": {
+      "title": "API キー",
+      "subtitle": "スクリプト、パイプライン、独自のツールからモニターを管理。",
+      "empty": "API キーがまだありません"
+    },
+    "system": {
+      "title": "システム",
+      "subtitle": "基盤となる監視エンジンへのオペレーターアクセス。"
+    }
+  }
 }

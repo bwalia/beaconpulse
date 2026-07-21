@@ -1,7 +1,179 @@
 {
-  "nav": { "features": "功能", "howItWorks": "工作原理", "statusPages": "状态页", "docs": "文档", "signIn": "登录", "getStarted": "开始使用", "dashboard": "仪表盘" },
-  "sidebar": { "dashboard": "仪表盘", "monitors": "监控", "alerts": "告警", "explore": "浏览", "projects": "项目", "statusPage": "状态页", "notifications": "通知", "maintenance": "维护", "billing": "账单", "apiKeys": "API 密钥", "system": "系统", "signOut": "退出登录" },
-  "auth": { "welcomeBack": "欢迎回来", "startFree": "免费开始监控", "signInSubtitle": "登录您的 {brand} 仪表盘。", "registerSubtitle": "无需信用卡。一分钟内添加您的第一个域名。", "signInTab": "登录", "createAccountTab": "创建账户", "email": "电子邮箱", "password": "密码", "organizationName": "组织名称", "yourName": "您的姓名", "signInButton": "登录", "createAccountButton": "创建账户", "newTo": "初次使用 {brand}？", "alreadyHaveAccount": "已有账户？", "createOne": "创建账户", "signInLink": "登录", "showPassword": "显示密码", "hidePassword": "隐藏密码" },
-  "common": { "save": "保存", "cancel": "取消", "delete": "删除", "create": "创建", "close": "关闭", "edit": "编辑", "loading": "加载中…", "search": "搜索", "add": "添加", "done": "完成", "copy": "复制", "copied": "已复制", "next": "下一页", "previous": "上一页", "language": "语言" },
-  "theme": { "light": "浅色", "dark": "深色", "system": "跟随系统", "label": "配色主题" }
+  "nav": {
+    "features": "功能",
+    "howItWorks": "工作原理",
+    "statusPages": "状态页",
+    "docs": "文档",
+    "signIn": "登录",
+    "getStarted": "开始使用",
+    "dashboard": "仪表盘"
+  },
+  "sidebar": {
+    "dashboard": "仪表盘",
+    "monitors": "监控",
+    "alerts": "告警",
+    "explore": "浏览",
+    "projects": "项目",
+    "statusPage": "状态页",
+    "notifications": "通知",
+    "maintenance": "维护",
+    "billing": "账单",
+    "apiKeys": "API 密钥",
+    "system": "系统",
+    "signOut": "退出登录"
+  },
+  "auth": {
+    "welcomeBack": "欢迎回来",
+    "startFree": "免费开始监控",
+    "signInSubtitle": "登录您的 {brand} 仪表盘。",
+    "registerSubtitle": "无需信用卡。一分钟内添加您的第一个域名。",
+    "signInTab": "登录",
+    "createAccountTab": "创建账户",
+    "email": "电子邮箱",
+    "password": "密码",
+    "organizationName": "组织名称",
+    "yourName": "您的姓名",
+    "signInButton": "登录",
+    "createAccountButton": "创建账户",
+    "newTo": "初次使用 {brand}？",
+    "alreadyHaveAccount": "已有账户？",
+    "createOne": "创建账户",
+    "signInLink": "登录",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "create": "创建",
+    "close": "关闭",
+    "edit": "编辑",
+    "loading": "加载中…",
+    "search": "搜索",
+    "add": "添加",
+    "done": "完成",
+    "copy": "复制",
+    "copied": "已复制",
+    "next": "下一页",
+    "previous": "上一页",
+    "language": "语言"
+  },
+  "theme": {
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统",
+    "label": "配色主题"
+  },
+  "marketing": {
+    "skipToContent": "跳至正文",
+    "badge": "自托管 · 多租户",
+    "headlineLine1": "先于用户",
+    "headlineLine2": "发现故障。",
+    "heroBlurb": "{brand} 每 30 秒检查一次你的端点、证书和 DNS，一旦出问题立即通知对的人。数据归你所有，随处部署，为客户提供一个真正值得信赖的状态页。",
+    "ctaStartFree": "免费开始监控",
+    "ctaSeeStatus": "查看状态页",
+    "statUptime": "在线率追踪",
+    "statInterval": "检查间隔",
+    "statTypes": "监控类型",
+    "liveNow": "实时",
+    "liveInterval": "30s 间隔",
+    "liveDown": "宕机",
+    "liveSummary": "4 项中 3 项正常 — 12s 前已发出告警",
+    "featuresEyebrow": "一站式全能",
+    "featuresTitle": "取代你东拼西凑的五款工具",
+    "featuresBlurb": "{brand} 用一个控制平面统管在线率、延迟、证书和告警 — 自托管,数据永不离开你的基础设施。",
+    "feature1Title": "六种监控类型",
+    "feature1Body": "HTTP、HTTPS、TCP、ICMP、DNS 和 SSL 到期检查 — 一个控制平面胜过五款工具。",
+    "feature2Title": "真正触达人的告警",
+    "feature2Body": "支持 Slack、邮件、webhook 和 Telegram,并自动去重 — 一次故障不会变成五十条通知。",
+    "feature3Title": "生而多租户",
+    "feature3Body": "每次查询都限定在所属组织内。团队共用一个实例,却不共享数据。",
+    "feature4Title": "可付诸行动的延迟数据",
+    "feature4Body": "每个端点的 p50/p95 响应时间,而不只是非升即降的开关标记。",
+    "feature5Title": "AI 事件摘要",
+    "feature5Body": "每条告警都附带通俗易懂的解释,说明可能的故障原因,以及该从哪里入手排查。",
+    "howEyebrow": "工作原理",
+    "howTitle": "约三分钟即可上线",
+    "howBlurb": "无需 agent,无需 sidecar,不用啃 YAML。",
+    "step1Title": "按项目分组",
+    "step1Body": "为每个应用或团队创建一个项目。每个监控都归属其中,规模再大,仪表盘和状态页也井然有序。",
+    "step2Title": "添加你的端点",
+    "step2Body": "把 {brand} 指向一个 URL、主机或集群,它数秒内就会按你设定的间隔开始探测 — 无需安装 agent。",
+    "step3Title": "发布状态页",
+    "step3Body": "一键即可分享按项目分组的公开页面。客户看得到运行状态,却看不到你的内部信息。",
+    "statusEyebrow": "状态页",
+    "statusTitle": "一个让客户信赖的页面",
+    "statusBlurb": "按项目分组域名,发布到你自己的域名,同时保密探测目标、IP 和内部信息 — 对外只暴露名称和状态。",
+    "statusAllOperational": "所有系统运行正常",
+    "statusUpdated": "刚刚更新",
+    "statusUp": "{up}/{total} 正常",
+    "statusOperational": "运行正常",
+    "statusDown": "宕机",
+    "statusPrivacyNote": "探测目标、IP 和检查配置绝不对外公开。",
+    "ctaTitle": "别再从客户口中得知故障。",
+    "ctaBlurb": "启动 {brand},添加你的第一个域名,在有人提交工单前就收到告警。",
+    "ctaButton": "创建免费账户",
+    "ctaFinePrint": "免费起步 — 无需信用卡。",
+    "footerTagline": "基础设施监控"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "可用性",
+      "availabilitySubtitle": "通过检查的监控占比 · SLO {pct}%",
+      "responseTime": "响应时间",
+      "responseTimeSubtitle": "所有监控的平均值,{window}"
+    },
+    "monitors": {
+      "title": "监控",
+      "subtitle": "网站、API、端口和证书 — 由 Prometheus + Blackbox 探测。",
+      "empty": "暂无监控",
+      "emptyFiltered": "无匹配的监控"
+    },
+    "alerts": {
+      "title": "告警",
+      "subtitle": "仅显示你所属组织当前正在触发的告警。",
+      "empty": "一切正常",
+      "emptyFiltered": "无匹配的告警"
+    },
+    "explore": {
+      "title": "探索",
+      "subtitle": "对你自己的指标运行 PromQL。每次查询都会自动限定在你所属的组织内。",
+      "empty": "无匹配的序列"
+    },
+    "projects": {
+      "title": "项目",
+      "subtitle": "按应用或团队为监控分组。",
+      "empty": "暂无项目",
+      "emptyFiltered": "无匹配的项目"
+    },
+    "statusPage": {
+      "title": "状态页",
+      "subtitle": "发布一个让客户信赖的公开页面。未经你同意,任何信息都不会对外公开。"
+    },
+    "notifications": {
+      "title": "通知",
+      "subtitle": "一旦出现故障立即收到告警 — 通过 Slack、邮件、webhook 或 Telegram。",
+      "empty": "暂无渠道",
+      "emptyFiltered": "无匹配的渠道"
+    },
+    "maintenance": {
+      "title": "维护窗口",
+      "subtitle": "计划部署或已知停机?提前告知 {brand},免得它虚报警情。",
+      "empty": "暂无维护窗口"
+    },
+    "billing": {
+      "title": "套餐与账单",
+      "subtitle": "按小时即用即付,或按月订阅。悉听尊便。"
+    },
+    "apiKeys": {
+      "title": "API 密钥",
+      "subtitle": "通过脚本、流水线或你自己的工具管理监控。",
+      "empty": "暂无 API 密钥"
+    },
+    "system": {
+      "title": "系统",
+      "subtitle": "对底层监控引擎的运维访问权限。"
+    }
+  }
 }

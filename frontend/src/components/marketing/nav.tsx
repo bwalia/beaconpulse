@@ -7,6 +7,7 @@ import { BeaconMark } from "@/components/icons";
 import { ThemeToggle } from "@/lib/theme";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useTranslations } from "next-intl";
+import { BRAND_NAME } from "@/lib/brand";
 import { useAuth } from "@/lib/auth";
 import { DUR } from "@/lib/motion";
 
@@ -56,7 +57,7 @@ export function MarketingNav() {
         >
           <BeaconMark className="h-8 w-8 text-blue-600 dark:text-blue-400" />
           <span className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-            Beacon Pulse
+            {BRAND_NAME}
           </span>
         </Link>
 

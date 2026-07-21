@@ -64,5 +64,116 @@
     "dark": "Dark",
     "system": "System",
     "label": "Colour theme"
+  },
+  "marketing": {
+    "skipToContent": "Skip to content",
+    "badge": "Self-hosted & multi-tenant",
+    "headlineLine1": "Know it's down",
+    "headlineLine2": "before they do.",
+    "heroBlurb": "{brand} watches your endpoints, certificates and DNS every 30 seconds — then tells the right person the moment something breaks. Own your data, run it anywhere, and give customers a status page they actually trust.",
+    "ctaStartFree": "Start monitoring free",
+    "ctaSeeStatus": "See a status page",
+    "statUptime": "Uptime tracked",
+    "statInterval": "Check interval",
+    "statTypes": "Monitor types",
+    "liveNow": "Live",
+    "liveInterval": "30s interval",
+    "liveDown": "down",
+    "liveSummary": "3 of 4 operational — alert sent 12s ago",
+    "featuresEyebrow": "Everything, one place",
+    "featuresTitle": "Replace the five tools you're duct-taping together",
+    "featuresBlurb": "{brand} is one control plane for uptime, latency, certificates and alerting — self-hosted, so the data never leaves your infrastructure.",
+    "feature1Title": "Six monitor types",
+    "feature1Body": "HTTP, HTTPS, TCP, ICMP, DNS and SSL-expiry checks — one control plane instead of five tools.",
+    "feature2Title": "Alerts that reach a human",
+    "feature2Body": "Slack, email, webhooks and Telegram, with de-duplication — so one outage isn't fifty pings.",
+    "feature3Title": "Multi-tenant by design",
+    "feature3Body": "Every query is scoped to an org. Teams share an instance without sharing data.",
+    "feature4Title": "Latency you can act on",
+    "feature4Body": "p50/p95 response times per endpoint, not just a binary up/down flag.",
+    "feature5Title": "AI incident summaries",
+    "feature5Body": "Every alert arrives with a plain-English explanation of what likely broke, and where to look first.",
+    "howEyebrow": "How it works",
+    "howTitle": "Live in about three minutes",
+    "howBlurb": "No agents, no sidecars, no YAML archaeology.",
+    "step1Title": "Group by project",
+    "step1Body": "Create a project per app or team. Every monitor lives in one, so dashboards and status pages stay organised as you grow.",
+    "step2Title": "Add your endpoints",
+    "step2Body": "Point {brand} at a URL, host or cluster. It starts probing on your interval within seconds — no agent to install.",
+    "step3Title": "Publish a status page",
+    "step3Body": "Flip one switch to share a public page grouped by project. Customers see what's up; they never see your internals.",
+    "statusEyebrow": "Status pages",
+    "statusTitle": "A page your customers can trust",
+    "statusBlurb": "Group domains by project, publish on your own domain, and keep targets, IPs and internals private — only names and status are ever exposed.",
+    "statusAllOperational": "All systems operational",
+    "statusUpdated": "Updated moments ago",
+    "statusUp": "{up}/{total} up",
+    "statusOperational": "Operational",
+    "statusDown": "Down",
+    "statusPrivacyNote": "Targets, IPs and check config are never exposed publicly.",
+    "ctaTitle": "Stop finding out from your customers.",
+    "ctaBlurb": "Spin up {brand}, add your first domain, and get alerted before anyone opens a ticket.",
+    "ctaButton": "Create your free account",
+    "ctaFinePrint": "Free to start — no credit card.",
+    "footerTagline": "infrastructure monitoring"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "Availability",
+      "availabilitySubtitle": "Share of monitors passing · SLO {pct}%",
+      "responseTime": "Response time",
+      "responseTimeSubtitle": "Average across all monitors, {window}"
+    },
+    "monitors": {
+      "title": "Monitors",
+      "subtitle": "Websites, APIs, ports and certificates — probed by Prometheus + Blackbox.",
+      "empty": "No monitors yet",
+      "emptyFiltered": "No matching monitors"
+    },
+    "alerts": {
+      "title": "Alerts",
+      "subtitle": "Currently-firing alerts for your organization only.",
+      "empty": "All clear",
+      "emptyFiltered": "No matching alerts"
+    },
+    "explore": {
+      "title": "Explore",
+      "subtitle": "Run PromQL against your own metrics. Every query is automatically scoped to your organization.",
+      "empty": "No series matched"
+    },
+    "projects": {
+      "title": "Projects",
+      "subtitle": "Group your monitors by application or team.",
+      "empty": "No projects yet",
+      "emptyFiltered": "No matching projects"
+    },
+    "statusPage": {
+      "title": "Status page",
+      "subtitle": "Publish a public page your customers can trust. Nothing is exposed until you say so."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "subtitle": "Get alerted the moment something goes down — on Slack, email, a webhook or Telegram.",
+      "empty": "No channels yet",
+      "emptyFiltered": "No matching channels"
+    },
+    "maintenance": {
+      "title": "Maintenance windows",
+      "subtitle": "Planning a deploy or known downtime? Tell {brand} in advance so it doesn't cry wolf.",
+      "empty": "No maintenance windows"
+    },
+    "billing": {
+      "title": "Plans & billing",
+      "subtitle": "Pay as you go by the hour, or subscribe monthly. It's your call."
+    },
+    "apiKeys": {
+      "title": "API keys",
+      "subtitle": "Manage monitors from a script, a pipeline, or your own tooling.",
+      "empty": "No API keys yet"
+    },
+    "system": {
+      "title": "System",
+      "subtitle": "Operator access to the underlying monitoring engines."
+    }
   }
 }

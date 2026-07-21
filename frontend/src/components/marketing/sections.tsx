@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -17,6 +18,7 @@ import {
   GaugeIcon,
   LockIcon,
 } from "@/components/icons";
+import { BRAND_NAME } from "@/lib/brand";
 import { IN_VIEW, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { GlowCard } from "./pointer";
 
@@ -62,37 +64,18 @@ function SectionHead({
   );
 }
 
+// The visual metadata (icon, wide) lives in code; the words come from the catalog,
+// keyed by name, so the whole grid speaks the reader's language.
 const FEATURES = [
-  {
-    icon: ActivityIcon,
-    title: "Six monitor types",
-    body: "HTTP, HTTPS, TCP, ICMP, DNS and SSL-expiry checks — one control plane instead of five tools.",
-    wide: true,
-  },
-  {
-    icon: BellIcon,
-    title: "Alerts that reach a human",
-    body: "Slack, email, webhooks and Telegram, with de-duplication — so one outage isn't fifty pings.",
-  },
-  {
-    icon: LockIcon,
-    title: "Multi-tenant by design",
-    body: "Every query is scoped to an org. Teams share an instance without sharing data.",
-  },
-  {
-    icon: GaugeIcon,
-    title: "Latency you can act on",
-    body: "p50/p95 response times per endpoint, not just a binary up/down flag.",
-  },
-  {
-    icon: AlertTriangleIcon,
-    title: "AI incident summaries",
-    body: "Every alert arrives with a plain-English explanation of what likely broke, and where to look first.",
-    wide: true,
-  },
-];
+  { icon: ActivityIcon, key: "feature1", wide: true },
+  { icon: BellIcon, key: "feature2", wide: false },
+  { icon: LockIcon, key: "feature3", wide: false },
+  { icon: GaugeIcon, key: "feature4", wide: false },
+  { icon: AlertTriangleIcon, key: "feature5", wide: true },
+] as const;
 
 function Features() {
+  const t = useTranslations("marketing");
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.06);
 
@@ -100,9 +83,9 @@ function Features() {
     <section id="features" className="scroll-mt-24 py-28">
       <div className="mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16">
         <SectionHead
-          eyebrow="Everything, one place"
-          title="Replace the five tools you're duct-taping together"
-          blurb="Beacon Pulse is one control plane for uptime, latency, certificates and alerting — self-hosted, so the data never leaves your infrastructure."
+          eyebrow={t("featuresEyebrow")}
+          title={t("featuresTitle")}
+          blurb={t("featuresBlurb", { brand: BRAND_NAME })}
         />
 
         <motion.ul
@@ -116,7 +99,7 @@ function Features() {
             const Icon = f.icon;
             return (
               <motion.li
-                key={f.title}
+                key={f.key}
                 variants={reveal}
                 className={f.wide ? "sm:col-span-2 lg:col-span-2" : ""}
               >
@@ -126,10 +109,10 @@ function Features() {
                       <Icon className="h-6 w-6" />
                     </span>
                     <h3 className="mt-5 text-xl font-semibold text-slate-900 dark:text-white">
-                      {f.title}
+                      {t(`${f.key}Title`)}
                     </h3>
                     <p className="mt-2.5 text-lg leading-relaxed text-slate-600 dark:text-slate-300">
-                      {f.body}
+                      {t(`${f.key}Body`)}
                     </p>
                   </div>
                 </GlowCard>
@@ -143,24 +126,13 @@ function Features() {
 }
 
 const STEPS = [
-  {
-    icon: FolderIcon,
-    title: "Group by project",
-    body: "Create a project per app or team. Every monitor lives in one, so dashboards and status pages stay organised as you grow.",
-  },
-  {
-    icon: ActivityIcon,
-    title: "Add your endpoints",
-    body: "Point Beacon Pulse at a URL, host or cluster. It starts probing on your interval within seconds — no agent to install.",
-  },
-  {
-    icon: ChartLineIcon,
-    title: "Publish a status page",
-    body: "Flip one switch to share a public page grouped by project. Customers see what's up; they never see your internals.",
-  },
-];
+  { icon: FolderIcon, key: "step1" },
+  { icon: ActivityIcon, key: "step2" },
+  { icon: ChartLineIcon, key: "step3" },
+] as const;
 
 function HowItWorks() {
+  const t = useTranslations("marketing");
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.08);
 
@@ -168,9 +140,9 @@ function HowItWorks() {
     <section id="how" className="scroll-mt-24 border-y border-slate-900/5 bg-slate-50/60 py-28 dark:border-white/5 dark:bg-white/[0.02]">
       <div className="mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16">
         <SectionHead
-          eyebrow="How it works"
-          title="Live in about three minutes"
-          blurb="No agents, no sidecars, no YAML archaeology."
+          eyebrow={t("howEyebrow")}
+          title={t("howTitle")}
+          blurb={t("howBlurb")}
         />
 
         <motion.ol
@@ -183,7 +155,7 @@ function HowItWorks() {
           {STEPS.map((s, i) => {
             const Icon = s.icon;
             return (
-              <motion.li key={s.title} variants={reveal} className="relative">
+              <motion.li key={s.key} variants={reveal} className="relative">
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-base font-semibold tabular-nums text-slate-900 dark:border-white/15 dark:bg-slate-900 dark:text-white">
                     {i + 1}
@@ -191,9 +163,11 @@ function HowItWorks() {
                   <Icon className="h-5 w-5 text-blue-700 dark:text-blue-400" />
                 </div>
                 <h3 className="mt-5 text-xl font-semibold text-slate-900 dark:text-white">
-                  {s.title}
+                  {t(`${s.key}Title`)}
                 </h3>
-                <p className="mt-2.5 text-lg leading-relaxed text-slate-600 dark:text-slate-300">{s.body}</p>
+                <p className="mt-2.5 text-lg leading-relaxed text-slate-600 dark:text-slate-300">
+                  {s.key === "step2" ? t(`${s.key}Body`, { brand: BRAND_NAME }) : t(`${s.key}Body`)}
+                </p>
               </motion.li>
             );
           })}
@@ -205,6 +179,7 @@ function HowItWorks() {
 
 /** A miniature of the real public status page, grouped by project. */
 function StatusPreview() {
+  const t = useTranslations("marketing");
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.05);
 
@@ -234,9 +209,9 @@ function StatusPreview() {
     <section id="status" className="scroll-mt-24 py-28">
       <div className="mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16">
         <SectionHead
-          eyebrow="Status pages"
-          title="A page your customers can trust"
-          blurb="Group domains by project, publish on your own domain, and keep targets, IPs and internals private — only names and status are ever exposed."
+          eyebrow={t("statusEyebrow")}
+          title={t("statusTitle")}
+          blurb={t("statusBlurb")}
         />
 
         <motion.div
@@ -256,10 +231,10 @@ function StatusPreview() {
               </span>
               <div>
                 <p className="font-semibold text-slate-900 dark:text-white">
-                  All systems operational
+                  {t("statusAllOperational")}
                 </p>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Updated moments ago
+                  {t("statusUpdated")}
                 </p>
               </div>
             </div>
@@ -270,7 +245,7 @@ function StatusPreview() {
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium text-slate-900 dark:text-white">{g.name}</h3>
                     <span className="font-mono text-sm text-slate-500 dark:text-slate-400">
-                      {g.up}/{g.total} up
+                      {t("statusUp", { up: g.up, total: g.total })}
                     </span>
                   </div>
                   <ul className="mt-3 space-y-2">
@@ -293,7 +268,7 @@ function StatusPreview() {
                             aria-hidden
                             className={`h-1.5 w-1.5 rounded-full ${h.up ? "bg-emerald-600" : "bg-red-600"}`}
                           />
-                          {h.up ? "Operational" : "Down"}
+                          {h.up ? t("statusOperational") : t("statusDown")}
                         </span>
                       </li>
                     ))}
@@ -308,7 +283,7 @@ function StatusPreview() {
             className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400"
           >
             <LockIcon className="h-4 w-4" />
-            Targets, IPs and check config are never exposed publicly.
+            {t("statusPrivacyNote")}
           </motion.p>
         </motion.div>
       </div>
@@ -317,6 +292,7 @@ function StatusPreview() {
 }
 
 function FinalCTA() {
+  const t = useTranslations("marketing");
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants();
 
@@ -337,17 +313,17 @@ function FinalCTA() {
           variants={reveal}
           className="text-balance text-5xl font-semibold tracking-tight text-slate-900 xl:text-6xl dark:text-white"
         >
-          Stop finding out from your customers.
+          {t("ctaTitle")}
         </motion.h2>
         <motion.p variants={reveal} className="mt-5 text-xl text-slate-600 dark:text-slate-300">
-          Spin up Beacon Pulse, add your first domain, and get alerted before anyone opens a ticket.
+          {t("ctaBlurb", { brand: BRAND_NAME })}
         </motion.p>
         <motion.div variants={reveal} className="mt-9 flex flex-wrap justify-center gap-3">
           <Link
             href="/register"
             className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-8 py-4 text-lg font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
           >
-            Create your free account
+            {t("ctaButton")}
             <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
           </Link>
         </motion.div>
@@ -356,7 +332,7 @@ function FinalCTA() {
           className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400"
         >
           <ClockIcon className="h-4 w-4" />
-          Free to start — no credit card.
+          {t("ctaFinePrint")}
         </motion.p>
       </motion.div>
     </section>
@@ -364,14 +340,16 @@ function FinalCTA() {
 }
 
 function Footer() {
+  const t = useTranslations("nav");
+  const tm = useTranslations("marketing");
   return (
     <footer className="border-t border-slate-900/10 py-12 dark:border-white/10">
       <div className="mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
         <div className="flex items-center gap-2.5">
           <BeaconMark className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          <span className="font-semibold text-slate-900 dark:text-white">Beacon Pulse</span>
+          <span className="font-semibold text-slate-900 dark:text-white">{BRAND_NAME}</span>
           <span className="text-sm text-slate-500 dark:text-slate-400">
-            — infrastructure monitoring
+            — {tm("footerTagline")}
           </span>
         </div>
         <nav aria-label="Footer" className="flex items-center gap-5 text-sm">
@@ -379,25 +357,25 @@ function Footer() {
             href="#features"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
-            Features
+            {t("features")}
           </a>
           <a
             href="#status"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
-            Status pages
+            {t("statusPages")}
           </a>
           <Link
             href="/docs"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
-            Docs
+            {t("docs")}
           </Link>
           <Link
             href="/login"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
-            Sign in
+            {t("signIn")}
           </Link>
         </nav>
       </div>

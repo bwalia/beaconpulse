@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -187,6 +188,7 @@ function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () =>
 }
 
 export default function MonitorsPage() {
+  const t = useTranslations("pages.monitors");
   const [page, setPage] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -232,8 +234,8 @@ export default function MonitorsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Monitors"
-        subtitle="Websites, APIs, ports and certificates — probed by Prometheus + Blackbox."
+        title={t("title")}
+        subtitle={t("subtitle")}
         actions={
           <>
             {usage && (
@@ -313,7 +315,7 @@ export default function MonitorsPage() {
       ) : total === 0 ? (
         <EmptyState
           icon={filtering ? <SearchIcon className="h-5 w-5" /> : <ActivityIcon className="h-5 w-5" />}
-          title={filtering ? "No matching monitors" : "No monitors yet"}
+          title={filtering ? t("emptyFiltered") : t("empty")}
           action={
             filtering ? (
               <Button
