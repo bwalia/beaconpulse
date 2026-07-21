@@ -38,6 +38,7 @@ const NAV: Group[] = [
     items: [
       { href: "/docs/authentication", label: "Authentication" },
       { href: "/docs/api", label: "API reference" },
+      { href: "/docs/console", label: "API console" },
       { href: "/docs/automation", label: "CI & automation" },
     ],
   },
