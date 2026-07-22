@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "features": "기능",
+    "howItWorks": "작동 방식",
+    "statusPages": "상태 페이지",
+    "docs": "문서",
+    "signIn": "로그인",
+    "getStarted": "시작하기",
+    "dashboard": "대시보드"
+  },
+  "sidebar": {
+    "dashboard": "대시보드",
+    "monitors": "모니터",
+    "alerts": "알림",
+    "explore": "탐색",
+    "projects": "프로젝트",
+    "statusPage": "상태 페이지",
+    "notifications": "알림",
+    "maintenance": "점검",
+    "billing": "결제",
+    "apiKeys": "API 키",
+    "system": "시스템",
+    "signOut": "로그아웃"
+  },
+  "auth": {
+    "welcomeBack": "다시 오신 것을 환영합니다",
+    "startFree": "무료로 모니터링 시작",
+    "signInSubtitle": "{brand} 대시보드에 로그인하세요.",
+    "registerSubtitle": "신용카드가 필요 없습니다. 1분 이내에 첫 도메인을 추가하세요.",
+    "signInTab": "로그인",
+    "createAccountTab": "계정 만들기",
+    "email": "이메일",
+    "password": "비밀번호",
+    "organizationName": "조직 이름",
+    "yourName": "이름",
+    "signInButton": "로그인",
+    "createAccountButton": "계정 만들기",
+    "newTo": "{brand}가 처음이신가요?",
+    "alreadyHaveAccount": "이미 계정이 있으신가요?",
+    "createOne": "계정 만들기",
+    "signInLink": "로그인",
+    "showPassword": "비밀번호 표시",
+    "hidePassword": "비밀번호 숨기기"
+  },
+  "common": {
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "create": "만들기",
+    "close": "닫기",
+    "edit": "편집",
+    "loading": "로딩 중…",
+    "search": "검색",
+    "add": "추가",
+    "done": "완료",
+    "copy": "복사",
+    "copied": "복사됨",
+    "next": "다음",
+    "previous": "이전",
+    "language": "언어"
+  },
+  "theme": {
+    "light": "라이트",
+    "dark": "다크",
+    "system": "시스템",
+    "label": "색상 테마"
+  },
+  "marketing": {
+    "skipToContent": "본문으로 건너뛰기",
+    "badge": "셀프 호스팅 & 멀티테넌트",
+    "headlineLine1": "장애를 파악하세요",
+    "headlineLine2": "고객보다 먼저.",
+    "heroBlurb": "{brand}는 엔드포인트, 인증서, DNS를 30초마다 감시하고, 문제가 생기는 즉시 적임자에게 알립니다. 데이터를 직접 소유하고, 어디서든 실행하며, 고객에게 진짜 신뢰할 수 있는 상태 페이지를 제공하세요.",
+    "ctaStartFree": "무료로 모니터링 시작",
+    "ctaSeeStatus": "상태 페이지 보기",
+    "statUptime": "가동 시간 추적",
+    "statInterval": "점검 주기",
+    "statTypes": "모니터 유형",
+    "liveNow": "실시간",
+    "liveInterval": "30s 주기",
+    "liveDown": "다운",
+    "liveSummary": "4개 중 3개 정상 — 12s 전 알림 전송",
+    "featuresEyebrow": "모든 것을 한곳에",
+    "featuresTitle": "임시방편으로 엮어 쓰던 다섯 가지 도구를 하나로",
+    "featuresBlurb": "{brand}는 가동 시간, 지연 시간, 인증서, 알림을 위한 단일 컨트롤 플레인입니다. 셀프 호스팅이라 데이터가 인프라를 벗어나지 않습니다.",
+    "feature1Title": "여섯 가지 모니터 유형",
+    "feature1Body": "HTTP, HTTPS, TCP, ICMP, DNS, SSL 만료 점검 — 다섯 가지 도구 대신 하나의 컨트롤 플레인으로.",
+    "feature2Title": "사람에게 닿는 알림",
+    "feature2Body": "Slack, 이메일, 웹훅, Telegram을 지원하고 중복을 제거 — 한 번의 장애가 쉰 번의 알림이 되지 않도록.",
+    "feature3Title": "설계부터 멀티테넌트",
+    "feature3Body": "모든 쿼리는 조직 단위로 제한됩니다. 팀은 데이터를 공유하지 않고도 하나의 인스턴스를 함께 사용합니다.",
+    "feature4Title": "대응에 쓸 수 있는 지연 시간",
+    "feature4Body": "단순한 정상 / 다운 플래그가 아니라, 엔드포인트별 p50/p95 응답 시간을 제공합니다.",
+    "feature5Title": "AI 인시던트 요약",
+    "feature5Body": "모든 알림에는 무엇이 문제였을 가능성이 큰지, 어디부터 살펴봐야 하는지를 쉬운 말로 설명한 내용이 함께 제공됩니다.",
+    "howEyebrow": "작동 방식",
+    "howTitle": "약 3분이면 시작",
+    "howBlurb": "에이전트도, 사이드카도, YAML 삽질도 필요 없습니다.",
+    "step1Title": "프로젝트별 그룹화",
+    "step1Body": "앱이나 팀마다 프로젝트를 만드세요. 모든 모니터는 하나의 프로젝트에 속하므로, 규모가 커져도 대시보드와 상태 페이지가 깔끔하게 정리됩니다.",
+    "step2Title": "엔드포인트 추가",
+    "step2Body": "{brand}에 URL, 호스트, 클러스터를 지정하세요. 설치할 에이전트 없이, 설정한 주기로 몇 초 만에 점검을 시작합니다.",
+    "step3Title": "상태 페이지 게시",
+    "step3Body": "스위치 하나로 프로젝트별로 묶인 공개 페이지를 공유하세요. 고객에게는 가동 상태만 보이고, 내부 구성은 절대 노출되지 않습니다.",
+    "statusEyebrow": "상태 페이지",
+    "statusTitle": "고객이 신뢰할 수 있는 페이지",
+    "statusBlurb": "도메인을 프로젝트별로 묶고, 자체 도메인으로 게시하며, 대상, IP, 내부 정보는 비공개로 유지하세요 — 외부에는 이름과 상태만 노출됩니다.",
+    "statusAllOperational": "모든 시스템 정상",
+    "statusUpdated": "방금 업데이트됨",
+    "statusUp": "{up}/{total} 정상",
+    "statusOperational": "정상",
+    "statusDown": "다운",
+    "statusPrivacyNote": "대상, IP, 점검 설정은 외부에 공개되지 않습니다.",
+    "ctaTitle": "고객에게서 장애 소식을 듣는 일은 이제 그만.",
+    "ctaBlurb": "{brand}를 띄우고 첫 도메인을 추가하면, 누군가 티켓을 열기 전에 알림을 받습니다.",
+    "ctaButton": "무료 계정 만들기",
+    "ctaFinePrint": "무료로 시작 — 신용카드 불필요.",
+    "footerTagline": "인프라 모니터링"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "가용성",
+      "availabilitySubtitle": "정상 모니터 비율 · SLO {pct}%",
+      "responseTime": "응답 시간",
+      "responseTimeSubtitle": "전체 모니터 평균, {window}"
+    },
+    "monitors": {
+      "title": "모니터",
+      "subtitle": "웹사이트, API, 포트, 인증서 — Prometheus + Blackbox로 점검.",
+      "empty": "아직 모니터가 없습니다",
+      "emptyFiltered": "일치하는 모니터가 없습니다"
+    },
+    "alerts": {
+      "title": "알림",
+      "subtitle": "내 조직에서 현재 발생 중인 알림만 표시합니다.",
+      "empty": "이상 없음",
+      "emptyFiltered": "일치하는 알림이 없습니다"
+    },
+    "explore": {
+      "title": "탐색",
+      "subtitle": "내 메트릭에 대해 PromQL을 실행하세요. 모든 쿼리는 자동으로 내 조직으로 제한됩니다.",
+      "empty": "일치하는 시리즈가 없습니다"
+    },
+    "projects": {
+      "title": "프로젝트",
+      "subtitle": "모니터를 앱이나 팀별로 묶으세요.",
+      "empty": "아직 프로젝트가 없습니다",
+      "emptyFiltered": "일치하는 프로젝트가 없습니다"
+    },
+    "statusPage": {
+      "title": "상태 페이지",
+      "subtitle": "고객이 신뢰할 수 있는 공개 페이지를 게시하세요. 허락하기 전까지는 아무것도 노출되지 않습니다."
+    },
+    "notifications": {
+      "title": "알림 채널",
+      "subtitle": "문제가 생기는 즉시 알림을 받으세요 — Slack, 이메일, 웹훅, Telegram으로.",
+      "empty": "아직 채널이 없습니다",
+      "emptyFiltered": "일치하는 채널이 없습니다"
+    },
+    "maintenance": {
+      "title": "유지보수 기간",
+      "subtitle": "배포나 예정된 다운타임이 있나요? 오탐을 막을 수 있도록 {brand}에 미리 알려두세요.",
+      "empty": "유지보수 기간이 없습니다"
+    },
+    "billing": {
+      "title": "요금제 및 결제",
+      "subtitle": "시간 단위 종량제로 쓰거나 월간 구독을 이용하세요. 선택은 자유입니다."
+    },
+    "apiKeys": {
+      "title": "API 키",
+      "subtitle": "스크립트, 파이프라인, 자체 도구에서 모니터를 관리하세요.",
+      "empty": "아직 API 키가 없습니다"
+    },
+    "system": {
+      "title": "시스템",
+      "subtitle": "기반 모니터링 엔진에 대한 운영자 접근 권한."
+    }
+  }
+}

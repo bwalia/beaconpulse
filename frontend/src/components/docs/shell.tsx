@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { BeaconMark } from "@/components/icons";
 import { ThemeToggle } from "@/lib/theme";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { brand } from "@/brand";
 
 /**
@@ -122,6 +123,7 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
             >
               Dashboard
             </Link>
+            <LanguageSwitcher className="hidden sm:inline-flex" />
             <ThemeToggle />
             <button
               type="button"

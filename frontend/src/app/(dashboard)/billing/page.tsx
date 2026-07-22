@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
@@ -52,6 +53,7 @@ export default function BillingPage() {
 }
 
 function BillingContent() {
+  const t = useTranslations("pages.billing");
   const { data, isLoading } = useBilling();
   const { data: usage } = useUsage();
   const { user } = useAuth();
@@ -74,10 +76,7 @@ function BillingContent() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Plans & billing"
-        subtitle="Pay as you go by the hour, or subscribe monthly. It's your call."
-      />
+      <PageHeader title={t("title")} subtitle={t("subtitle")} />
 
       {notice && (
         <div

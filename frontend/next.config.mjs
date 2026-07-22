@@ -1,3 +1,9 @@
+import createNextIntlPlugin from "next-intl/plugin";
+
+// Points next-intl at the request config that resolves the locale (from a cookie) and
+// loads its messages. Wrapping the export is all the plugin needs.
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -17,4 +23,4 @@ const nextConfig = {
   reactCompiler: true,
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

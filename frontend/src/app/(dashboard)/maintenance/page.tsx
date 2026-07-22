@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { brand } from "@/brand";
 
 import {
@@ -104,6 +105,7 @@ function HowItWorks() {
 }
 
 export default function MaintenancePage() {
+  const t = useTranslations("pages.maintenance");
   const [page, setPage] = useState(0);
   const { data, isLoading, isPlaceholderData } = useMaintenanceWindows({
     page,
@@ -118,8 +120,8 @@ export default function MaintenancePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Maintenance windows"
-        subtitle={`Planning a deploy or known downtime? Tell ${brand.name} in advance so it doesn’t cry wolf.`}
+        title={t("title")}
+        subtitle={t("subtitle", { brand: brand.name })}
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
@@ -154,7 +156,7 @@ export default function MaintenancePage() {
       ) : !windows.length ? (
         <EmptyState
           icon={<WrenchIcon className="h-5 w-5" />}
-          title="No maintenance windows"
+          title={t("empty")}
           action={
             <Button onClick={() => setShowForm(true)}>
               <PlusIcon className="h-4 w-4" />

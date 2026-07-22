@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "features": "Funktionen",
+    "howItWorks": "So funktioniert’s",
+    "statusPages": "Statusseiten",
+    "docs": "Dokumentation",
+    "signIn": "Anmelden",
+    "getStarted": "Loslegen",
+    "dashboard": "Dashboard"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "monitors": "Monitore",
+    "alerts": "Warnungen",
+    "explore": "Erkunden",
+    "projects": "Projekte",
+    "statusPage": "Statusseite",
+    "notifications": "Benachrichtigungen",
+    "maintenance": "Wartung",
+    "billing": "Abrechnung",
+    "apiKeys": "API-Schlüssel",
+    "system": "System",
+    "signOut": "Abmelden"
+  },
+  "auth": {
+    "welcomeBack": "Willkommen zurück",
+    "startFree": "Kostenlos mit dem Monitoring starten",
+    "signInSubtitle": "Melden Sie sich in Ihrem {brand}-Dashboard an.",
+    "registerSubtitle": "Keine Kreditkarte. Fügen Sie Ihre erste Domain in unter einer Minute hinzu.",
+    "signInTab": "Anmelden",
+    "createAccountTab": "Konto erstellen",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "organizationName": "Name der Organisation",
+    "yourName": "Ihr Name",
+    "signInButton": "Anmelden",
+    "createAccountButton": "Konto erstellen",
+    "newTo": "Neu bei {brand}?",
+    "alreadyHaveAccount": "Sie haben bereits ein Konto?",
+    "createOne": "Konto erstellen",
+    "signInLink": "Anmelden",
+    "showPassword": "Passwort anzeigen",
+    "hidePassword": "Passwort ausblenden"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "create": "Erstellen",
+    "close": "Schließen",
+    "edit": "Bearbeiten",
+    "loading": "Wird geladen…",
+    "search": "Suchen",
+    "add": "Hinzufügen",
+    "done": "Fertig",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "next": "Weiter",
+    "previous": "Zurück",
+    "language": "Sprache"
+  },
+  "theme": {
+    "light": "Hell",
+    "dark": "Dunkel",
+    "system": "System",
+    "label": "Farbthema"
+  },
+  "marketing": {
+    "skipToContent": "Zum Inhalt springen",
+    "badge": "Self-hosted & mandantenfähig",
+    "headlineLine1": "Wissen, dass etwas ausfällt,",
+    "headlineLine2": "bevor Ihre Kunden es merken.",
+    "heroBlurb": "{brand} überwacht Ihre Endpunkte, Zertifikate und DNS alle 30 Sekunden – und benachrichtigt die richtige Person, sobald etwas ausfällt. Behalten Sie Ihre Daten, betreiben Sie es überall und bieten Sie Kunden eine Statusseite, der sie wirklich vertrauen.",
+    "ctaStartFree": "Monitoring kostenlos starten",
+    "ctaSeeStatus": "Statusseite ansehen",
+    "statUptime": "Verfügbarkeit erfasst",
+    "statInterval": "Prüfintervall",
+    "statTypes": "Monitortypen",
+    "liveNow": "Live",
+    "liveInterval": "30s-Intervall",
+    "liveDown": "ausgefallen",
+    "liveSummary": "3 von 4 betriebsbereit – Alarm vor 12s gesendet",
+    "featuresEyebrow": "Alles an einem Ort",
+    "featuresTitle": "Ersetzen Sie die fünf Tools, die Sie notdürftig zusammenkleben",
+    "featuresBlurb": "{brand} ist eine zentrale Steuerungsebene für Verfügbarkeit, Latenz, Zertifikate und Alarmierung – self-hosted, sodass Ihre Daten Ihre Infrastruktur nie verlassen.",
+    "feature1Title": "Sechs Monitortypen",
+    "feature1Body": "HTTP-, HTTPS-, TCP-, ICMP-, DNS- und SSL-Ablauf-Prüfungen – eine Steuerungsebene statt fünf Tools.",
+    "feature2Title": "Alarme, die einen Menschen erreichen",
+    "feature2Body": "Slack, E-Mail, Webhooks und Telegram, mit Deduplizierung – damit ein Ausfall nicht fünfzig Benachrichtigungen auslöst.",
+    "feature3Title": "Mandantenfähig von Grund auf",
+    "feature3Body": "Jede Abfrage ist auf eine Organisation beschränkt. Teams teilen sich eine Instanz, ohne Daten zu teilen.",
+    "feature4Title": "Latenz, mit der Sie handeln können",
+    "feature4Body": "p50/p95-Antwortzeiten pro Endpunkt – nicht nur ein binäres Up/Down-Flag.",
+    "feature5Title": "KI-Vorfallszusammenfassungen",
+    "feature5Body": "Jeder Alarm kommt mit einer verständlichen Erklärung, was wahrscheinlich kaputtgegangen ist und wo Sie zuerst nachsehen sollten.",
+    "howEyebrow": "So funktioniert's",
+    "howTitle": "In etwa drei Minuten einsatzbereit",
+    "howBlurb": "Keine Agenten, keine Sidecars, keine YAML-Archäologie.",
+    "step1Title": "Nach Projekt gruppieren",
+    "step1Body": "Erstellen Sie ein Projekt pro App oder Team. Jeder Monitor gehört zu einem – so bleiben Dashboards und Statusseiten organisiert, während Sie wachsen.",
+    "step2Title": "Endpunkte hinzufügen",
+    "step2Body": "Richten Sie {brand} auf eine URL, einen Host oder ein Cluster. Es beginnt innerhalb von Sekunden mit dem Prüfen in Ihrem Intervall – kein Agent zu installieren.",
+    "step3Title": "Statusseite veröffentlichen",
+    "step3Body": "Legen Sie einen Schalter um, um eine öffentliche, nach Projekt gruppierte Seite zu teilen. Kunden sehen, was läuft; Ihre Interna sehen sie nie.",
+    "statusEyebrow": "Statusseiten",
+    "statusTitle": "Eine Seite, der Ihre Kunden vertrauen können",
+    "statusBlurb": "Gruppieren Sie Domains nach Projekt, veröffentlichen Sie auf Ihrer eigenen Domain und halten Sie Ziele, IPs und Interna privat – nur Namen und Status werden je angezeigt.",
+    "statusAllOperational": "Alle Systeme betriebsbereit",
+    "statusUpdated": "Vor wenigen Augenblicken aktualisiert",
+    "statusUp": "{up}/{total} online",
+    "statusOperational": "Betriebsbereit",
+    "statusDown": "Ausgefallen",
+    "statusPrivacyNote": "Ziele, IPs und Prüfkonfiguration werden nie öffentlich angezeigt.",
+    "ctaTitle": "Erfahren Sie es nicht mehr von Ihren Kunden.",
+    "ctaBlurb": "Starten Sie {brand}, fügen Sie Ihre erste Domain hinzu und werden Sie alarmiert, bevor jemand ein Ticket öffnet.",
+    "ctaButton": "Kostenloses Konto erstellen",
+    "ctaFinePrint": "Kostenlos starten – keine Kreditkarte.",
+    "footerTagline": "Infrastruktur-Monitoring"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "Verfügbarkeit",
+      "availabilitySubtitle": "Anteil bestandener Monitore · SLO {pct}%",
+      "responseTime": "Antwortzeit",
+      "responseTimeSubtitle": "Durchschnitt über alle Monitore, {window}"
+    },
+    "monitors": {
+      "title": "Monitore",
+      "subtitle": "Websites, APIs, Ports und Zertifikate – geprüft von Prometheus + Blackbox.",
+      "empty": "Noch keine Monitore",
+      "emptyFiltered": "Keine passenden Monitore"
+    },
+    "alerts": {
+      "title": "Alarme",
+      "subtitle": "Aktuell ausgelöste Alarme – nur für Ihre Organisation.",
+      "empty": "Alles in Ordnung",
+      "emptyFiltered": "Keine passenden Alarme"
+    },
+    "explore": {
+      "title": "Erkunden",
+      "subtitle": "Führen Sie PromQL auf Ihren eigenen Metriken aus. Jede Abfrage wird automatisch auf Ihre Organisation beschränkt.",
+      "empty": "Keine Serien gefunden"
+    },
+    "projects": {
+      "title": "Projekte",
+      "subtitle": "Gruppieren Sie Ihre Monitore nach Anwendung oder Team.",
+      "empty": "Noch keine Projekte",
+      "emptyFiltered": "Keine passenden Projekte"
+    },
+    "statusPage": {
+      "title": "Statusseite",
+      "subtitle": "Veröffentlichen Sie eine öffentliche Seite, der Ihre Kunden vertrauen. Nichts wird angezeigt, bevor Sie es freigeben."
+    },
+    "notifications": {
+      "title": "Benachrichtigungen",
+      "subtitle": "Werden Sie benachrichtigt, sobald etwas ausfällt – über Slack, E-Mail, einen Webhook oder Telegram.",
+      "empty": "Noch keine Kanäle",
+      "emptyFiltered": "Keine passenden Kanäle"
+    },
+    "maintenance": {
+      "title": "Wartungsfenster",
+      "subtitle": "Planen Sie ein Deployment oder eine bekannte Ausfallzeit? Sagen Sie es {brand} vorab, damit es keinen Fehlalarm auslöst.",
+      "empty": "Keine Wartungsfenster"
+    },
+    "billing": {
+      "title": "Tarife & Abrechnung",
+      "subtitle": "Zahlen Sie stundenweise nach Verbrauch oder abonnieren Sie monatlich. Sie entscheiden."
+    },
+    "apiKeys": {
+      "title": "API-Schlüssel",
+      "subtitle": "Verwalten Sie Monitore aus einem Skript, einer Pipeline oder Ihrem eigenen Tooling.",
+      "empty": "Noch keine API-Schlüssel"
+    },
+    "system": {
+      "title": "System",
+      "subtitle": "Betreiberzugriff auf die zugrunde liegenden Monitoring-Engines."
+    }
+  }
+}

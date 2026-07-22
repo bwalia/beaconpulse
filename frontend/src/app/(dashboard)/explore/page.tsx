@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { useId, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -63,6 +64,7 @@ interface Submitted {
 }
 
 export default function ExplorePage() {
+  const t = useTranslations("pages.explore");
   const [expr, setExpr] = useState("probe_success");
   const [mode, setMode] = useState<Mode>("range");
   const [hours, setHours] = useState<number>(1);
@@ -131,10 +133,7 @@ export default function ExplorePage() {
 
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
-      <PageHeader
-        title="Explore"
-        subtitle="Run PromQL against your own metrics. Every query is automatically scoped to your organization."
-      />
+      <PageHeader title={t("title")} subtitle={t("subtitle")} />
 
       {/* ---- Query bar ---- */}
       <motion.div variants={reveal}>
@@ -346,7 +345,7 @@ export default function ExplorePage() {
       {!error && !running && data && data.result.length === 0 && (
         <motion.div variants={reveal}>
           <Card className="p-5">
-            <EmptyState icon={<ChartLineIcon className="h-8 w-8" />} title="No series matched">
+            <EmptyState icon={<ChartLineIcon className="h-8 w-8" />} title={t("empty")}>
               The query is valid but returned nothing. Check the metric name, or widen the
               time range.
             </EmptyState>

@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "features": "Funciones",
+    "howItWorks": "Cómo funciona",
+    "statusPages": "Páginas de estado",
+    "docs": "Documentación",
+    "signIn": "Iniciar sesión",
+    "getStarted": "Comenzar",
+    "dashboard": "Panel"
+  },
+  "sidebar": {
+    "dashboard": "Panel",
+    "monitors": "Monitores",
+    "alerts": "Alertas",
+    "explore": "Explorar",
+    "projects": "Proyectos",
+    "statusPage": "Página de estado",
+    "notifications": "Notificaciones",
+    "maintenance": "Mantenimiento",
+    "billing": "Facturación",
+    "apiKeys": "Claves API",
+    "system": "Sistema",
+    "signOut": "Cerrar sesión"
+  },
+  "auth": {
+    "welcomeBack": "Bienvenido de nuevo",
+    "startFree": "Empieza a monitorizar gratis",
+    "signInSubtitle": "Inicia sesión en tu panel de {brand}.",
+    "registerSubtitle": "Sin tarjeta de crédito. Añade tu primer dominio en menos de un minuto.",
+    "signInTab": "Iniciar sesión",
+    "createAccountTab": "Crear cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "organizationName": "Nombre de la organización",
+    "yourName": "Tu nombre",
+    "signInButton": "Iniciar sesión",
+    "createAccountButton": "Crear cuenta",
+    "newTo": "¿Nuevo en {brand}?",
+    "alreadyHaveAccount": "¿Ya tienes una cuenta?",
+    "createOne": "Crear una cuenta",
+    "signInLink": "Iniciar sesión",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "create": "Crear",
+    "close": "Cerrar",
+    "edit": "Editar",
+    "loading": "Cargando…",
+    "search": "Buscar",
+    "add": "Añadir",
+    "done": "Hecho",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "language": "Idioma"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema",
+    "label": "Tema de color"
+  },
+  "marketing": {
+    "skipToContent": "Saltar al contenido",
+    "badge": "Autoalojado y multiinquilino",
+    "headlineLine1": "Entérate de la caída",
+    "headlineLine2": "antes que ellos.",
+    "heroBlurb": "{brand} vigila tus endpoints, certificados y DNS cada 30 segundos y avisa a la persona indicada en cuanto algo falla. Controla tus datos, ejecútalo donde quieras y ofrece a tus clientes una página de estado en la que confíen de verdad.",
+    "ctaStartFree": "Empieza a monitorizar gratis",
+    "ctaSeeStatus": "Ver una página de estado",
+    "statUptime": "Disponibilidad registrada",
+    "statInterval": "Intervalo de comprobación",
+    "statTypes": "Tipos de monitor",
+    "liveNow": "En vivo",
+    "liveInterval": "Intervalo de 30s",
+    "liveDown": "caído",
+    "liveSummary": "3 de 4 operativos — alerta enviada hace 12s",
+    "featuresEyebrow": "Todo en un solo lugar",
+    "featuresTitle": "Reemplaza las cinco herramientas que has apañado con parches",
+    "featuresBlurb": "{brand} es un solo plano de control para disponibilidad, latencia, certificados y alertas — autoalojado, para que los datos nunca salgan de tu infraestructura.",
+    "feature1Title": "Seis tipos de monitor",
+    "feature1Body": "Comprobaciones de HTTP, HTTPS, TCP, ICMP, DNS y caducidad de SSL — un solo plano de control en lugar de cinco herramientas.",
+    "feature2Title": "Alertas que llegan a una persona",
+    "feature2Body": "Slack, correo, webhooks y Telegram, con deduplicación — para que una caída no sean cincuenta avisos.",
+    "feature3Title": "Multiinquilino por diseño",
+    "feature3Body": "Cada consulta se limita a una organización. Los equipos comparten una instancia sin compartir datos.",
+    "feature4Title": "Latencia sobre la que actuar",
+    "feature4Body": "Tiempos de respuesta p50/p95 por endpoint, no solo un indicador binario de activo/caído.",
+    "feature5Title": "Resúmenes de incidentes con IA",
+    "feature5Body": "Cada alerta llega con una explicación en lenguaje claro de qué es lo que probablemente ha fallado y por dónde empezar a mirar.",
+    "howEyebrow": "Cómo funciona",
+    "howTitle": "En marcha en unos tres minutos",
+    "howBlurb": "Sin agentes, sin sidecars, sin arqueología de YAML.",
+    "step1Title": "Agrupa por proyecto",
+    "step1Body": "Crea un proyecto por aplicación o equipo. Cada monitor pertenece a uno, así los paneles y las páginas de estado se mantienen organizados a medida que creces.",
+    "step2Title": "Añade tus endpoints",
+    "step2Body": "Apunta {brand} a una URL, un host o un clúster. Empieza a sondear según tu intervalo en segundos — sin ningún agente que instalar.",
+    "step3Title": "Publica una página de estado",
+    "step3Body": "Activa un interruptor para compartir una página pública agrupada por proyecto. Los clientes ven qué funciona; nunca ven lo que hay por dentro.",
+    "statusEyebrow": "Páginas de estado",
+    "statusTitle": "Una página en la que tus clientes pueden confiar",
+    "statusBlurb": "Agrupa dominios por proyecto, publica en tu propio dominio y mantén privados los objetivos, las IP y el interior — solo se muestran nombres y estado.",
+    "statusAllOperational": "Todos los sistemas operativos",
+    "statusUpdated": "Actualizado hace un momento",
+    "statusUp": "{up}/{total} activos",
+    "statusOperational": "Operativo",
+    "statusDown": "Caído",
+    "statusPrivacyNote": "Los objetivos, las IP y la configuración de comprobación nunca se exponen públicamente.",
+    "ctaTitle": "Deja de enterarte por tus clientes.",
+    "ctaBlurb": "Pon en marcha {brand}, añade tu primer dominio y recibe alertas antes de que alguien abra un ticket.",
+    "ctaButton": "Crea tu cuenta gratis",
+    "ctaFinePrint": "Gratis para empezar — sin tarjeta de crédito.",
+    "footerTagline": "monitorización de infraestructura"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "Disponibilidad",
+      "availabilitySubtitle": "Proporción de monitores en buen estado · SLO {pct}%",
+      "responseTime": "Tiempo de respuesta",
+      "responseTimeSubtitle": "Promedio de todos los monitores, {window}"
+    },
+    "monitors": {
+      "title": "Monitores",
+      "subtitle": "Sitios web, API, puertos y certificados — sondeados por Prometheus + Blackbox.",
+      "empty": "Aún no hay monitores",
+      "emptyFiltered": "No hay monitores que coincidan"
+    },
+    "alerts": {
+      "title": "Alertas",
+      "subtitle": "Alertas activas solo de tu organización.",
+      "empty": "Todo en orden",
+      "emptyFiltered": "No hay alertas que coincidan"
+    },
+    "explore": {
+      "title": "Explorar",
+      "subtitle": "Ejecuta PromQL sobre tus propias métricas. Cada consulta se limita automáticamente a tu organización.",
+      "empty": "Ninguna serie coincide"
+    },
+    "projects": {
+      "title": "Proyectos",
+      "subtitle": "Agrupa tus monitores por aplicación o equipo.",
+      "empty": "Aún no hay proyectos",
+      "emptyFiltered": "No hay proyectos que coincidan"
+    },
+    "statusPage": {
+      "title": "Página de estado",
+      "subtitle": "Publica una página pública en la que tus clientes puedan confiar. Nada se expone hasta que tú lo decidas."
+    },
+    "notifications": {
+      "title": "Notificaciones",
+      "subtitle": "Recibe una alerta en cuanto algo se caiga — por Slack, correo, un webhook o Telegram.",
+      "empty": "Aún no hay canales",
+      "emptyFiltered": "No hay canales que coincidan"
+    },
+    "maintenance": {
+      "title": "Ventanas de mantenimiento",
+      "subtitle": "¿Planeas un despliegue o una parada prevista? Avisa a {brand} con antelación para que no dé falsas alarmas.",
+      "empty": "No hay ventanas de mantenimiento"
+    },
+    "billing": {
+      "title": "Planes y facturación",
+      "subtitle": "Paga por horas según tu uso o suscríbete mensualmente. Tú decides."
+    },
+    "apiKeys": {
+      "title": "Claves de API",
+      "subtitle": "Gestiona monitores desde un script, un pipeline o tus propias herramientas.",
+      "empty": "Aún no hay claves de API"
+    },
+    "system": {
+      "title": "Sistema",
+      "subtitle": "Acceso de operador a los motores de monitorización subyacentes."
+    }
+  }
+}

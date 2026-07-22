@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -37,6 +38,7 @@ const ENV_ACCENT: Record<string, string> = {
 };
 
 export default function ProjectsPage() {
+  const t = useTranslations("pages.projects");
   const [page, setPage] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -75,8 +77,8 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Projects"
-        subtitle="Group your monitors by application or team."
+        title={t("title")}
+        subtitle={t("subtitle")}
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
@@ -118,7 +120,7 @@ export default function ProjectsPage() {
       ) : total === 0 ? (
         <EmptyState
           icon={filtering ? <SearchIcon className="h-5 w-5" /> : <FolderIcon className="h-5 w-5" />}
-          title={filtering ? "No matching projects" : "No projects yet"}
+          title={filtering ? t("emptyFiltered") : t("empty")}
           action={
             filtering ? (
               <Button

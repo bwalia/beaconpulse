@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { brand } from "@/brand";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 
 import {
   useChannels,
@@ -30,6 +31,7 @@ import {
 type Notice = { kind: "ok" | "err"; text: string } | null;
 
 export default function NotificationsPage() {
+  const t = useTranslations("pages.notifications");
   const [page, setPage] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -61,8 +63,8 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Notifications"
-        subtitle="Get alerted the moment something goes down — on Slack, email, a webhook or Telegram."
+        title={t("title")}
+        subtitle={t("subtitle")}
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
@@ -104,7 +106,7 @@ export default function NotificationsPage() {
       ) : total === 0 ? (
         <EmptyState
           icon={filtering ? <SearchIcon className="h-5 w-5" /> : <BellIcon className="h-5 w-5" />}
-          title={filtering ? "No matching channels" : "No channels yet"}
+          title={filtering ? t("emptyFiltered") : t("empty")}
           action={
             filtering ? (
               <Button variant="secondary" onClick={() => setSearchInput("")}>

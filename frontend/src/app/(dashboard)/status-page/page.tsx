@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -33,6 +34,7 @@ const DOMAINS_PAGE_SIZE = 10;
  * "publish everything" switch.
  */
 export default function StatusPageSettings() {
+  const t = useTranslations("pages.statusPage");
   const { data: settings, isLoading } = useStatusPageSettings();
   const update = useUpdateStatusPageSettings();
   const setPublic = useSetMonitorPublic();
@@ -71,7 +73,7 @@ export default function StatusPageSettings() {
   if (isLoading || !settings) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Status page" subtitle="Publish a public page your customers can trust." />
+        <PageHeader title={t("title")} subtitle={t("subtitle")} />
         <Skeleton className="h-40 w-full" />
       </div>
     );
@@ -90,10 +92,7 @@ export default function StatusPageSettings() {
 
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
-      <PageHeader
-        title="Status page"
-        subtitle="Publish a public page your customers can trust. Nothing is exposed until you say so."
-      />
+      <PageHeader title={t("title")} subtitle={t("subtitle")} />
 
       {/* ---- Publish switch ---- */}
       <motion.div variants={reveal}>

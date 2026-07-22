@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "features": "Functies",
+    "howItWorks": "Hoe het werkt",
+    "statusPages": "Statuspagina’s",
+    "docs": "Documentatie",
+    "signIn": "Inloggen",
+    "getStarted": "Aan de slag",
+    "dashboard": "Dashboard"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "monitors": "Monitors",
+    "alerts": "Meldingen",
+    "explore": "Verkennen",
+    "projects": "Projecten",
+    "statusPage": "Statuspagina",
+    "notifications": "Notificaties",
+    "maintenance": "Onderhoud",
+    "billing": "Facturering",
+    "apiKeys": "API-sleutels",
+    "system": "Systeem",
+    "signOut": "Uitloggen"
+  },
+  "auth": {
+    "welcomeBack": "Welkom terug",
+    "startFree": "Begin gratis met monitoren",
+    "signInSubtitle": "Log in op je {brand}-dashboard.",
+    "registerSubtitle": "Geen creditcard. Voeg je eerste domein in minder dan een minuut toe.",
+    "signInTab": "Inloggen",
+    "createAccountTab": "Account aanmaken",
+    "email": "E-mail",
+    "password": "Wachtwoord",
+    "organizationName": "Naam van de organisatie",
+    "yourName": "Je naam",
+    "signInButton": "Inloggen",
+    "createAccountButton": "Account aanmaken",
+    "newTo": "Nieuw bij {brand}?",
+    "alreadyHaveAccount": "Heb je al een account?",
+    "createOne": "Een account aanmaken",
+    "signInLink": "Inloggen",
+    "showPassword": "Wachtwoord tonen",
+    "hidePassword": "Wachtwoord verbergen"
+  },
+  "common": {
+    "save": "Opslaan",
+    "cancel": "Annuleren",
+    "delete": "Verwijderen",
+    "create": "Aanmaken",
+    "close": "Sluiten",
+    "edit": "Bewerken",
+    "loading": "Laden…",
+    "search": "Zoeken",
+    "add": "Toevoegen",
+    "done": "Klaar",
+    "copy": "Kopiëren",
+    "copied": "Gekopieerd",
+    "next": "Volgende",
+    "previous": "Vorige",
+    "language": "Taal"
+  },
+  "theme": {
+    "light": "Licht",
+    "dark": "Donker",
+    "system": "Systeem",
+    "label": "Kleurthema"
+  },
+  "marketing": {
+    "skipToContent": "Naar inhoud gaan",
+    "badge": "Self-hosted & multi-tenant",
+    "headlineLine1": "Weet dat het down is,",
+    "headlineLine2": "voordat je klanten het merken.",
+    "heroBlurb": "{brand} controleert je endpoints, certificaten en DNS elke 30 seconden – en waarschuwt meteen de juiste persoon zodra er iets misgaat. Houd je data in eigen hand, draai het overal en geef klanten een statuspagina die ze echt vertrouwen.",
+    "ctaStartFree": "Gratis monitoring starten",
+    "ctaSeeStatus": "Bekijk een statuspagina",
+    "statUptime": "Uptime bijgehouden",
+    "statInterval": "Controle-interval",
+    "statTypes": "Monitortypes",
+    "liveNow": "Live",
+    "liveInterval": "30s-interval",
+    "liveDown": "down",
+    "liveSummary": "3 van 4 operationeel – melding 12s geleden verstuurd",
+    "featuresEyebrow": "Alles op één plek",
+    "featuresTitle": "Vervang de vijf tools die je met plakband bij elkaar houdt",
+    "featuresBlurb": "{brand} is één control plane voor uptime, latency, certificaten en alerting – self-hosted, zodat je data je infrastructuur nooit verlaat.",
+    "feature1Title": "Zes monitortypes",
+    "feature1Body": "HTTP-, HTTPS-, TCP-, ICMP-, DNS- en SSL-vervalcontroles – één control plane in plaats van vijf tools.",
+    "feature2Title": "Meldingen die een mens bereiken",
+    "feature2Body": "Slack, e-mail, webhooks en Telegram, met deduplicatie – zodat één storing geen vijftig meldingen wordt.",
+    "feature3Title": "Multi-tenant van nature",
+    "feature3Body": "Elke query is beperkt tot één organisatie. Teams delen een instantie zonder data te delen.",
+    "feature4Title": "Latency waarop je kunt handelen",
+    "feature4Body": "p50/p95-responstijden per endpoint, niet zomaar een binaire up/down-vlag.",
+    "feature5Title": "AI-incidentsamenvattingen",
+    "feature5Body": "Elke melding komt met een begrijpelijke uitleg van wat er waarschijnlijk misging en waar je als eerste moet kijken.",
+    "howEyebrow": "Hoe het werkt",
+    "howTitle": "Live in ongeveer drie minuten",
+    "howBlurb": "Geen agents, geen sidecars, geen YAML-archeologie.",
+    "step1Title": "Groepeer per project",
+    "step1Body": "Maak een project per app of team. Elke monitor hoort bij één project, zodat dashboards en statuspagina's overzichtelijk blijven naarmate je groeit.",
+    "step2Title": "Voeg je endpoints toe",
+    "step2Body": "Richt {brand} op een URL, host of cluster. Binnen enkele seconden begint het te controleren op jouw interval – geen agent te installeren.",
+    "step3Title": "Publiceer een statuspagina",
+    "step3Body": "Zet één schakelaar om en deel een openbare pagina, gegroepeerd per project. Klanten zien wat er speelt; je interne zaken zien ze nooit.",
+    "statusEyebrow": "Statuspagina's",
+    "statusTitle": "Een pagina die je klanten kunnen vertrouwen",
+    "statusBlurb": "Groepeer domeinen per project, publiceer op je eigen domein en houd targets, IP's en interne zaken privé – alleen namen en status worden ooit getoond.",
+    "statusAllOperational": "Alle systemen operationeel",
+    "statusUpdated": "Zojuist bijgewerkt",
+    "statusUp": "{up}/{total} online",
+    "statusOperational": "Operationeel",
+    "statusDown": "Down",
+    "statusPrivacyNote": "Targets, IP's en controle-configuratie worden nooit openbaar getoond.",
+    "ctaTitle": "Kom er niet meer via je klanten achter.",
+    "ctaBlurb": "Start {brand}, voeg je eerste domein toe en word gewaarschuwd voordat iemand een ticket opent.",
+    "ctaButton": "Maak je gratis account aan",
+    "ctaFinePrint": "Gratis te starten – geen creditcard.",
+    "footerTagline": "infrastructuurmonitoring"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "Beschikbaarheid",
+      "availabilitySubtitle": "Aandeel geslaagde monitors · SLO {pct}%",
+      "responseTime": "Responstijd",
+      "responseTimeSubtitle": "Gemiddelde over alle monitors, {window}"
+    },
+    "monitors": {
+      "title": "Monitors",
+      "subtitle": "Websites, API's, poorten en certificaten – gecontroleerd door Prometheus + Blackbox.",
+      "empty": "Nog geen monitors",
+      "emptyFiltered": "Geen overeenkomende monitors"
+    },
+    "alerts": {
+      "title": "Meldingen",
+      "subtitle": "Momenteel actieve meldingen, alleen voor jouw organisatie.",
+      "empty": "Alles in orde",
+      "emptyFiltered": "Geen overeenkomende meldingen"
+    },
+    "explore": {
+      "title": "Verkennen",
+      "subtitle": "Voer PromQL uit op je eigen metrics. Elke query wordt automatisch beperkt tot jouw organisatie.",
+      "empty": "Geen series gevonden"
+    },
+    "projects": {
+      "title": "Projecten",
+      "subtitle": "Groepeer je monitors per applicatie of team.",
+      "empty": "Nog geen projecten",
+      "emptyFiltered": "Geen overeenkomende projecten"
+    },
+    "statusPage": {
+      "title": "Statuspagina",
+      "subtitle": "Publiceer een openbare pagina die je klanten kunnen vertrouwen. Niets wordt getoond tot jij dat zegt."
+    },
+    "notifications": {
+      "title": "Notificaties",
+      "subtitle": "Word gewaarschuwd zodra er iets uitvalt – via Slack, e-mail, een webhook of Telegram.",
+      "empty": "Nog geen kanalen",
+      "emptyFiltered": "Geen overeenkomende kanalen"
+    },
+    "maintenance": {
+      "title": "Onderhoudsvensters",
+      "subtitle": "Plan je een deploy of bekende downtime? Laat het {brand} vooraf weten, zodat het geen vals alarm slaat.",
+      "empty": "Geen onderhoudsvensters"
+    },
+    "billing": {
+      "title": "Abonnementen & facturering",
+      "subtitle": "Betaal per uur naar gebruik of neem een maandabonnement. Jij bepaalt."
+    },
+    "apiKeys": {
+      "title": "API-sleutels",
+      "subtitle": "Beheer monitors vanuit een script, een pipeline of je eigen tooling.",
+      "empty": "Nog geen API-sleutels"
+    },
+    "system": {
+      "title": "Systeem",
+      "subtitle": "Operatortoegang tot de onderliggende monitoring-engines."
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 
 import { useActiveAlerts } from "@/lib/hooks";
 import { Card, EmptyState, PageHeader, Skeleton } from "@/components/ui";
@@ -24,6 +25,7 @@ function sinceLabel(since: string | undefined, now: number): string {
 }
 
 export default function AlertsPage() {
+  const t = useTranslations("pages.alerts");
   const [page, setPage] = useState(0);
   const [severity, setSeverity] = useState("");
 
@@ -50,8 +52,8 @@ export default function AlertsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Alerts"
-        subtitle="Currently-firing alerts for your organization only."
+        title={t("title")}
+        subtitle={t("subtitle")}
         actions={
           total > 0 ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-800 dark:bg-red-950/60 dark:text-red-300">
@@ -92,7 +94,7 @@ export default function AlertsPage() {
               <CheckCircleIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             )
           }
-          title={severity ? "No matching alerts" : "All clear"}
+          title={severity ? t("emptyFiltered") : t("empty")}
           action={
             severity ? (
               <button

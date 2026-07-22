@@ -8,6 +8,8 @@ import { Button } from "@/components/ui";
 import { BuildFooter } from "@/components/build-footer";
 import { ConfirmProvider } from "@/components/confirm";
 import { ThemeToggle } from "@/lib/theme";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useTranslations } from "next-intl";
 import { brand } from "@/brand";
 import {
   ActivityIcon,
@@ -24,30 +26,31 @@ import {
   WrenchIcon,
 } from "@/components/icons";
 
-type NavItem = { href: string; label: string; Icon: (p: { className?: string }) => React.ReactElement };
+type NavItem = { href: string; key: string; Icon: (p: { className?: string }) => React.ReactElement };
 
 const baseNav: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", Icon: DashboardIcon },
-  { href: "/monitors", label: "Monitors", Icon: ActivityIcon },
-  { href: "/alerts", label: "Alerts", Icon: AlertTriangleIcon },
-  { href: "/explore", label: "Explore", Icon: SearchIcon },
-  { href: "/projects", label: "Projects", Icon: FolderIcon },
-  { href: "/status-page", label: "Status page", Icon: GlobeIcon },
-  { href: "/notifications", label: "Notifications", Icon: BellIcon },
-  { href: "/maintenance", label: "Maintenance", Icon: WrenchIcon },
-  { href: "/billing", label: "Billing", Icon: CreditCardIcon },
+  { href: "/dashboard", key: "dashboard", Icon: DashboardIcon },
+  { href: "/monitors", key: "monitors", Icon: ActivityIcon },
+  { href: "/alerts", key: "alerts", Icon: AlertTriangleIcon },
+  { href: "/explore", key: "explore", Icon: SearchIcon },
+  { href: "/projects", key: "projects", Icon: FolderIcon },
+  { href: "/status-page", key: "statusPage", Icon: GlobeIcon },
+  { href: "/notifications", key: "notifications", Icon: BellIcon },
+  { href: "/maintenance", key: "maintenance", Icon: WrenchIcon },
+  { href: "/billing", key: "billing", Icon: CreditCardIcon },
 ];
 // The System page exposes the raw (global) Prometheus/Alertmanager tools and is
 // therefore restricted to operators.
 const adminNav: NavItem[] = [
-  { href: "/api-keys", label: "API keys", Icon: LockIcon },
-  { href: "/system", label: "System", Icon: SettingsIcon },
+  { href: "/api-keys", key: "apiKeys", Icon: LockIcon },
+  { href: "/system", key: "system", Icon: SettingsIcon },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const t = useTranslations("sidebar");
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -89,7 +92,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-brand-600 dark:bg-brand-400" aria-hidden />
                 )}
                 <item.Icon className="h-5 w-5 shrink-0" />
-                {item.label}
+                {t(item.key)}
               </Link>
             );
           })}
@@ -103,9 +106,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <span className="capitalize">{user.role}</span>
           </div>
           <div className="flex shrink-0 items-center gap-3">
+            <LanguageSwitcher />
             <ThemeToggle />
             <Button variant="ghost" size="sm" onClick={logout}>
-              Sign out
+              {t("signOut")}
             </Button>
           </div>
         </header>

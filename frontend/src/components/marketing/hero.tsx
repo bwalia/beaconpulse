@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useInView, useReducedMotion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -49,6 +50,7 @@ function CountUp({ to, decimals = 0, suffix = "" }: { to: number; decimals?: num
 /** The mock status card. Deliberately the product's real visual language. */
 function LiveCard() {
   const reduce = useReducedMotion();
+  const t = useTranslations("marketing");
   const rows = [
     { name: "api.acme.com", ms: 142, up: true },
     { name: "app.acme.com", ms: 88, up: true },
@@ -69,9 +71,9 @@ function LiveCard() {
               )}
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-600" />
             </span>
-            <span className="text-base font-medium text-slate-700 dark:text-slate-200">Live</span>
+            <span className="text-base font-medium text-slate-700 dark:text-slate-200">{t("liveNow")}</span>
           </div>
-          <span className="font-mono text-sm text-slate-500 dark:text-slate-400">30s interval</span>
+          <span className="font-mono text-sm text-slate-500 dark:text-slate-400">{t("liveInterval")}</span>
         </div>
 
         <ul className="space-y-2">
@@ -98,7 +100,7 @@ function LiveCard() {
                   r.up ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"
                 }`}
               >
-                {r.up ? `${r.ms}ms` : "down"}
+                {r.up ? `${r.ms}ms` : t("liveDown")}
               </span>
             </motion.li>
           ))}
@@ -106,7 +108,7 @@ function LiveCard() {
 
         <div className="mt-4 flex items-center gap-2 border-t border-slate-900/10 pt-5 text-base text-slate-600 dark:border-white/10 dark:text-slate-300">
           <CheckCircleIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span>3 of 4 operational — alert sent 12s ago</span>
+          <span>{t("liveSummary")}</span>
         </div>
       </div>
     </TiltCard>
@@ -114,6 +116,7 @@ function LiveCard() {
 }
 
 export function Hero() {
+  const t = useTranslations("marketing");
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.07);
 
@@ -136,7 +139,7 @@ export function Hero() {
           <motion.div variants={reveal}>
             <span className="inline-flex items-center gap-2 rounded-full border border-slate-900/10 bg-white/60 px-3 py-1.5 text-base font-medium text-slate-700 backdrop-blur dark:border-white/15 dark:bg-white/5 dark:text-slate-200">
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-              Self-hosted &amp; multi-tenant
+              {t("badge")}
             </span>
           </motion.div>
 
@@ -144,10 +147,10 @@ export function Hero() {
             variants={reveal}
             className="mt-7 text-balance text-6xl font-semibold leading-[1.03] tracking-tight text-slate-900 sm:text-7xl xl:text-[5.25rem] dark:text-white"
           >
-            Know it&apos;s down
+            {t("headlineLine1")}
             <br />
             <span className="bg-gradient-to-r from-brand-600 to-emerald-600 bg-clip-text text-transparent dark:from-brand-400 dark:to-emerald-400">
-              before they do.
+              {t("headlineLine2")}
             </span>
           </motion.h1>
 
@@ -155,9 +158,7 @@ export function Hero() {
             variants={reveal}
             className="mt-7 max-w-2xl text-xl leading-relaxed text-slate-600 xl:text-2xl dark:text-slate-300"
           >
-            {brand.name} watches your endpoints, certificates and DNS every 30 seconds — then
-            tells the right person the moment something breaks. Own your data, run it
-            anywhere, and give customers a status page they actually trust.
+            {t("heroBlurb", { brand: brand.name })}
           </motion.p>
 
           <motion.div variants={reveal} className="mt-9 flex flex-wrap items-center gap-3">
@@ -165,14 +166,14 @@ export function Hero() {
               href="/register"
               className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-7 py-4 text-lg font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
             >
-              Start monitoring free
+              {t("ctaStartFree")}
               <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
             </Link>
             <a
               href="#status"
               className="inline-flex items-center gap-2 rounded-xl border border-slate-900/15 bg-white/60 px-7 py-4 text-lg font-medium text-slate-800 backdrop-blur transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
             >
-              See a status page
+              {t("ctaSeeStatus")}
             </a>
           </motion.div>
 
@@ -181,9 +182,9 @@ export function Hero() {
             className="mt-14 grid max-w-xl grid-cols-3 gap-8 border-t border-slate-900/10 pt-9 dark:border-white/10"
           >
             {[
-              { v: <CountUp to={99.99} decimals={2} suffix="%" />, l: "Uptime tracked" },
-              { v: <CountUp to={30} suffix="s" />, l: "Check interval" },
-              { v: <CountUp to={6} />, l: "Monitor types" },
+              { v: <CountUp to={99.99} decimals={2} suffix="%" />, l: t("statUptime") },
+              { v: <CountUp to={30} suffix="s" />, l: t("statInterval") },
+              { v: <CountUp to={6} />, l: t("statTypes") },
             ].map((s, i) => (
               <div key={i}>
                 <dt className="sr-only">{s.l}</dt>

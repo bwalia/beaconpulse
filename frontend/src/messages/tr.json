@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "features": "Özellikler",
+    "howItWorks": "Nasıl çalışır",
+    "statusPages": "Durum sayfaları",
+    "docs": "Belgeler",
+    "signIn": "Giriş yap",
+    "getStarted": "Başla",
+    "dashboard": "Panel"
+  },
+  "sidebar": {
+    "dashboard": "Panel",
+    "monitors": "İzleyiciler",
+    "alerts": "Uyarılar",
+    "explore": "Keşfet",
+    "projects": "Projeler",
+    "statusPage": "Durum sayfası",
+    "notifications": "Bildirimler",
+    "maintenance": "Bakım",
+    "billing": "Faturalandırma",
+    "apiKeys": "API anahtarları",
+    "system": "Sistem",
+    "signOut": "Çıkış yap"
+  },
+  "auth": {
+    "welcomeBack": "Tekrar hoş geldiniz",
+    "startFree": "Ücretsiz izlemeye başlayın",
+    "signInSubtitle": "{brand} panelinize giriş yapın.",
+    "registerSubtitle": "Kredi kartı yok. İlk alan adınızı bir dakikadan kısa sürede ekleyin.",
+    "signInTab": "Giriş yap",
+    "createAccountTab": "Hesap oluştur",
+    "email": "E-posta",
+    "password": "Parola",
+    "organizationName": "Kuruluş adı",
+    "yourName": "Adınız",
+    "signInButton": "Giriş yap",
+    "createAccountButton": "Hesap oluştur",
+    "newTo": "{brand} ile yeni misiniz?",
+    "alreadyHaveAccount": "Zaten bir hesabınız var mı?",
+    "createOne": "Hesap oluştur",
+    "signInLink": "Giriş yap",
+    "showPassword": "Parolayı göster",
+    "hidePassword": "Parolayı gizle"
+  },
+  "common": {
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "delete": "Sil",
+    "create": "Oluştur",
+    "close": "Kapat",
+    "edit": "Düzenle",
+    "loading": "Yükleniyor…",
+    "search": "Ara",
+    "add": "Ekle",
+    "done": "Tamam",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı",
+    "next": "İleri",
+    "previous": "Geri",
+    "language": "Dil"
+  },
+  "theme": {
+    "light": "Açık",
+    "dark": "Koyu",
+    "system": "Sistem",
+    "label": "Renk teması"
+  },
+  "marketing": {
+    "skipToContent": "İçeriğe geç",
+    "badge": "Kendi sunucunuzda ve çok kiracılı",
+    "headlineLine1": "Çöktüğünü bilin",
+    "headlineLine2": "onlar fark etmeden.",
+    "heroBlurb": "{brand} uç noktalarınızı, sertifikalarınızı ve DNS'i her 30 saniyede bir izler — bir şey bozulduğu anda doğru kişiye haber verir. Verilerinize siz sahip olun, her yerde çalıştırın ve müşterilerinize gerçekten güvendikleri bir durum sayfası sunun.",
+    "ctaStartFree": "Ücretsiz izlemeye başlayın",
+    "ctaSeeStatus": "Bir durum sayfası görün",
+    "statUptime": "İzlenen çalışma süresi",
+    "statInterval": "Kontrol aralığı",
+    "statTypes": "İzleme türleri",
+    "liveNow": "Canlı",
+    "liveInterval": "30s aralık",
+    "liveDown": "kapalı",
+    "liveSummary": "4'ten 3'ü çalışıyor — uyarı 12s önce gönderildi",
+    "featuresEyebrow": "Her şey tek yerde",
+    "featuresTitle": "Zar zor bir arada tuttuğunuz beş aracın yerini alın",
+    "featuresBlurb": "{brand}, çalışma süresi, gecikme, sertifikalar ve uyarılar için tek bir kontrol düzlemidir — kendi sunucunuzda çalışır, böylece veriler altyapınızdan hiç çıkmaz.",
+    "feature1Title": "Altı izleme türü",
+    "feature1Body": "HTTP, HTTPS, TCP, ICMP, DNS ve SSL süre dolumu kontrolleri — beş araç yerine tek bir kontrol düzlemi.",
+    "feature2Title": "Bir insana ulaşan uyarılar",
+    "feature2Body": "Slack, e-posta, webhook'lar ve Telegram — yinelenenleri ayıklayarak, böylece tek bir kesinti elli bildirime dönüşmez.",
+    "feature3Title": "Tasarımı gereği çok kiracılı",
+    "feature3Body": "Her sorgu bir organizasyonla sınırlıdır. Ekipler veriyi paylaşmadan aynı örneği paylaşır.",
+    "feature4Title": "Harekete geçebileceğiniz gecikme",
+    "feature4Body": "Yalnızca ikili açık/kapalı göstergesi değil, uç nokta başına p50/p95 yanıt süreleri.",
+    "feature5Title": "AI olay özetleri",
+    "feature5Body": "Her uyarı, neyin bozulmuş olabileceğini ve önce nereye bakılacağını anlaşılır bir dille açıklayarak gelir.",
+    "howEyebrow": "Nasıl çalışır",
+    "howTitle": "Yaklaşık üç dakikada yayında",
+    "howBlurb": "Ajan yok, sidecar yok, YAML arkeolojisi yok.",
+    "step1Title": "Projeye göre gruplayın",
+    "step1Body": "Her uygulama veya ekip için bir proje oluşturun. Her izleme bir projeye ait olur, böylece büyüdükçe panolar ve durum sayfaları düzenli kalır.",
+    "step2Title": "Uç noktalarınızı ekleyin",
+    "step2Body": "{brand}'i bir URL'ye, ana makineye veya kümeye yönlendirin. Saniyeler içinde belirlediğiniz aralıkla yoklamaya başlar — kurulacak bir ajan yok.",
+    "step3Title": "Bir durum sayfası yayınlayın",
+    "step3Body": "Tek bir anahtarı çevirerek projeye göre gruplanmış herkese açık bir sayfa paylaşın. Müşteriler neyin çalıştığını görür; iç yapınızı asla görmez.",
+    "statusEyebrow": "Durum sayfaları",
+    "statusTitle": "Müşterilerinizin güvenebileceği bir sayfa",
+    "statusBlurb": "Alan adlarını projeye göre gruplayın, kendi alan adınızda yayınlayın ve hedefleri, IP'leri ve iç yapıyı gizli tutun — yalnızca adlar ve durum görünür olur.",
+    "statusAllOperational": "Tüm sistemler çalışıyor",
+    "statusUpdated": "Az önce güncellendi",
+    "statusUp": "{up}/{total} çalışıyor",
+    "statusOperational": "Çalışıyor",
+    "statusDown": "Kapalı",
+    "statusPrivacyNote": "Hedefler, IP'ler ve kontrol yapılandırması hiçbir zaman herkese açık olmaz.",
+    "ctaTitle": "Sorunları müşterilerinizden öğrenmeyi bırakın.",
+    "ctaBlurb": "{brand}'i başlatın, ilk alan adınızı ekleyin ve herkes bir talep açmadan önce uyarı alın.",
+    "ctaButton": "Ücretsiz hesabınızı oluşturun",
+    "ctaFinePrint": "Başlaması ücretsiz — kredi kartı yok.",
+    "footerTagline": "altyapı izleme"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "Kullanılabilirlik",
+      "availabilitySubtitle": "Geçen izlemelerin oranı · SLO {pct}%",
+      "responseTime": "Yanıt süresi",
+      "responseTimeSubtitle": "Tüm izlemelerin ortalaması, {window}"
+    },
+    "monitors": {
+      "title": "İzlemeler",
+      "subtitle": "Web siteleri, API'ler, portlar ve sertifikalar — Prometheus + Blackbox ile yoklanır.",
+      "empty": "Henüz izleme yok",
+      "emptyFiltered": "Eşleşen izleme yok"
+    },
+    "alerts": {
+      "title": "Uyarılar",
+      "subtitle": "Yalnızca organizasyonunuz için şu anda etkin olan uyarılar.",
+      "empty": "Her şey yolunda",
+      "emptyFiltered": "Eşleşen uyarı yok"
+    },
+    "explore": {
+      "title": "Keşfet",
+      "subtitle": "Kendi metriklerinizde PromQL çalıştırın. Her sorgu otomatik olarak organizasyonunuzla sınırlanır.",
+      "empty": "Eşleşen seri yok"
+    },
+    "projects": {
+      "title": "Projeler",
+      "subtitle": "İzlemelerinizi uygulamaya veya ekibe göre gruplayın.",
+      "empty": "Henüz proje yok",
+      "emptyFiltered": "Eşleşen proje yok"
+    },
+    "statusPage": {
+      "title": "Durum sayfası",
+      "subtitle": "Müşterilerinizin güvenebileceği herkese açık bir sayfa yayınlayın. Siz izin vermeden hiçbir şey görünmez."
+    },
+    "notifications": {
+      "title": "Bildirimler",
+      "subtitle": "Bir şey çöktüğü anda uyarı alın — Slack, e-posta, webhook veya Telegram üzerinden.",
+      "empty": "Henüz kanal yok",
+      "emptyFiltered": "Eşleşen kanal yok"
+    },
+    "maintenance": {
+      "title": "Bakım pencereleri",
+      "subtitle": "Bir dağıtım veya bilinen bir kesinti mi planlıyorsunuz? Yanlış alarm vermemesi için {brand}'i önceden bilgilendirin.",
+      "empty": "Bakım penceresi yok"
+    },
+    "billing": {
+      "title": "Planlar ve faturalandırma",
+      "subtitle": "Saatlik kullandıkça ödeyin veya aylık abone olun. Karar sizin."
+    },
+    "apiKeys": {
+      "title": "API anahtarları",
+      "subtitle": "İzlemeleri bir betikten, bir işlem hattından veya kendi araçlarınızdan yönetin.",
+      "empty": "Henüz API anahtarı yok"
+    },
+    "system": {
+      "title": "Sistem",
+      "subtitle": "Temel izleme motorlarına operatör erişimi."
+    }
+  }
+}

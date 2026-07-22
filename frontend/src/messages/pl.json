@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "features": "Funkcje",
+    "howItWorks": "Jak to działa",
+    "statusPages": "Strony statusu",
+    "docs": "Dokumentacja",
+    "signIn": "Zaloguj się",
+    "getStarted": "Rozpocznij",
+    "dashboard": "Panel"
+  },
+  "sidebar": {
+    "dashboard": "Panel",
+    "monitors": "Monitory",
+    "alerts": "Alerty",
+    "explore": "Eksploruj",
+    "projects": "Projekty",
+    "statusPage": "Strona statusu",
+    "notifications": "Powiadomienia",
+    "maintenance": "Konserwacja",
+    "billing": "Rozliczenia",
+    "apiKeys": "Klucze API",
+    "system": "System",
+    "signOut": "Wyloguj się"
+  },
+  "auth": {
+    "welcomeBack": "Witaj ponownie",
+    "startFree": "Zacznij monitorować za darmo",
+    "signInSubtitle": "Zaloguj się do panelu {brand}.",
+    "registerSubtitle": "Bez karty kredytowej. Dodaj pierwszą domenę w niecałą minutę.",
+    "signInTab": "Zaloguj się",
+    "createAccountTab": "Utwórz konto",
+    "email": "E-mail",
+    "password": "Hasło",
+    "organizationName": "Nazwa organizacji",
+    "yourName": "Twoje imię",
+    "signInButton": "Zaloguj się",
+    "createAccountButton": "Utwórz konto",
+    "newTo": "Nowy w {brand}?",
+    "alreadyHaveAccount": "Masz już konto?",
+    "createOne": "Utwórz konto",
+    "signInLink": "Zaloguj się",
+    "showPassword": "Pokaż hasło",
+    "hidePassword": "Ukryj hasło"
+  },
+  "common": {
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "delete": "Usuń",
+    "create": "Utwórz",
+    "close": "Zamknij",
+    "edit": "Edytuj",
+    "loading": "Ładowanie…",
+    "search": "Szukaj",
+    "add": "Dodaj",
+    "done": "Gotowe",
+    "copy": "Kopiuj",
+    "copied": "Skopiowano",
+    "next": "Dalej",
+    "previous": "Wstecz",
+    "language": "Język"
+  },
+  "theme": {
+    "light": "Jasny",
+    "dark": "Ciemny",
+    "system": "Systemowy",
+    "label": "Motyw kolorów"
+  },
+  "marketing": {
+    "skipToContent": "Przejdź do treści",
+    "badge": "Self-hosted i wielodostępny",
+    "headlineLine1": "Wiedz, że nie działa",
+    "headlineLine2": "zanim oni to zauważą.",
+    "heroBlurb": "{brand} sprawdza Twoje endpointy, certyfikaty i DNS co 30 sekund — i powiadamia właściwą osobę w chwili, gdy coś przestaje działać. Zachowaj kontrolę nad danymi, uruchom go gdziekolwiek i daj klientom stronę statusu, której naprawdę ufają.",
+    "ctaStartFree": "Zacznij monitorować za darmo",
+    "ctaSeeStatus": "Zobacz stronę statusu",
+    "statUptime": "Śledzony uptime",
+    "statInterval": "Interwał sprawdzania",
+    "statTypes": "Typy monitorów",
+    "liveNow": "Na żywo",
+    "liveInterval": "Interwał 30s",
+    "liveDown": "nie działa",
+    "liveSummary": "3 z 4 działają — alert wysłany 12s temu",
+    "featuresEyebrow": "Wszystko w jednym miejscu",
+    "featuresTitle": "Zastąp pięć narzędzi, które sklejasz taśmą",
+    "featuresBlurb": "{brand} to jeden panel kontrolny do uptime'u, opóźnień, certyfikatów i alertów — self-hosted, więc dane nigdy nie opuszczają Twojej infrastruktury.",
+    "feature1Title": "Sześć typów monitorów",
+    "feature1Body": "Sprawdzanie HTTP, HTTPS, TCP, ICMP, DNS i wygasania SSL — jeden panel kontrolny zamiast pięciu narzędzi.",
+    "feature2Title": "Alerty, które docierają do człowieka",
+    "feature2Body": "Slack, e-mail, webhooki i Telegram, z deduplikacją — żeby jedna awaria nie oznaczała pięćdziesięciu powiadomień.",
+    "feature3Title": "Wielodostępny z założenia",
+    "feature3Body": "Każde zapytanie jest ograniczone do organizacji. Zespoły współdzielą instancję, nie współdzieląc danych.",
+    "feature4Title": "Opóźnienia, na które możesz zareagować",
+    "feature4Body": "Czasy odpowiedzi p50/p95 dla każdego endpointu, a nie tylko binarna flaga działa/nie działa.",
+    "feature5Title": "Podsumowania incydentów od AI",
+    "feature5Body": "Każdy alert zawiera zrozumiałe wyjaśnienie, co prawdopodobnie się zepsuło i gdzie szukać najpierw.",
+    "howEyebrow": "Jak to działa",
+    "howTitle": "Gotowe w około trzy minuty",
+    "howBlurb": "Bez agentów, bez sidecarów, bez archeologii YAML.",
+    "step1Title": "Grupuj według projektu",
+    "step1Body": "Utwórz projekt dla każdej aplikacji lub zespołu. Każdy monitor należy do jednego, więc pulpity i strony statusu pozostają uporządkowane w miarę rozwoju.",
+    "step2Title": "Dodaj swoje endpointy",
+    "step2Body": "Wskaż {brand} adres URL, host lub klaster. Zacznie sondować w Twoim interwale w kilka sekund — bez instalowania agenta.",
+    "step3Title": "Opublikuj stronę statusu",
+    "step3Body": "Przełącz jeden przełącznik, aby udostępnić publiczną stronę pogrupowaną według projektu. Klienci widzą, co działa; nigdy nie widzą Twoich wewnętrznych szczegółów.",
+    "statusEyebrow": "Strony statusu",
+    "statusTitle": "Strona, której Twoi klienci mogą zaufać",
+    "statusBlurb": "Grupuj domeny według projektu, publikuj we własnej domenie i zachowaj prywatność celów, adresów IP i szczegółów wewnętrznych — publicznie widoczne są tylko nazwy i status.",
+    "statusAllOperational": "Wszystkie systemy działają",
+    "statusUpdated": "Zaktualizowano przed chwilą",
+    "statusUp": "{up}/{total} działa",
+    "statusOperational": "Działa",
+    "statusDown": "Nie działa",
+    "statusPrivacyNote": "Cele, adresy IP i konfiguracja sprawdzania nigdy nie są ujawniane publicznie.",
+    "ctaTitle": "Przestań dowiadywać się od klientów.",
+    "ctaBlurb": "Uruchom {brand}, dodaj pierwszą domenę i otrzymuj alerty, zanim ktokolwiek zgłosi problem.",
+    "ctaButton": "Załóż darmowe konto",
+    "ctaFinePrint": "Darmowy start — bez karty kredytowej.",
+    "footerTagline": "monitorowanie infrastruktury"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "Dostępność",
+      "availabilitySubtitle": "Odsetek działających monitorów · SLO {pct}%",
+      "responseTime": "Czas odpowiedzi",
+      "responseTimeSubtitle": "Średnia ze wszystkich monitorów, {window}"
+    },
+    "monitors": {
+      "title": "Monitory",
+      "subtitle": "Witryny, API, porty i certyfikaty — sondowane przez Prometheus + Blackbox.",
+      "empty": "Brak monitorów",
+      "emptyFiltered": "Brak pasujących monitorów"
+    },
+    "alerts": {
+      "title": "Alerty",
+      "subtitle": "Aktualnie aktywne alerty tylko dla Twojej organizacji.",
+      "empty": "Wszystko w porządku",
+      "emptyFiltered": "Brak pasujących alertów"
+    },
+    "explore": {
+      "title": "Eksploruj",
+      "subtitle": "Uruchamiaj PromQL na własnych metrykach. Każde zapytanie jest automatycznie ograniczone do Twojej organizacji.",
+      "empty": "Brak pasujących serii"
+    },
+    "projects": {
+      "title": "Projekty",
+      "subtitle": "Grupuj monitory według aplikacji lub zespołu.",
+      "empty": "Brak projektów",
+      "emptyFiltered": "Brak pasujących projektów"
+    },
+    "statusPage": {
+      "title": "Strona statusu",
+      "subtitle": "Opublikuj publiczną stronę, której Twoi klienci mogą zaufać. Nic nie jest ujawniane, dopóki nie zdecydujesz."
+    },
+    "notifications": {
+      "title": "Powiadomienia",
+      "subtitle": "Otrzymuj alerty w chwili, gdy coś przestaje działać — na Slacku, e-mailu, webhooku lub Telegramie.",
+      "empty": "Brak kanałów",
+      "emptyFiltered": "Brak pasujących kanałów"
+    },
+    "maintenance": {
+      "title": "Okna konserwacji",
+      "subtitle": "Planujesz wdrożenie lub znaną przerwę? Uprzedź {brand} z wyprzedzeniem, aby nie wszczynał fałszywego alarmu.",
+      "empty": "Brak okien konserwacji"
+    },
+    "billing": {
+      "title": "Plany i rozliczenia",
+      "subtitle": "Płać za godziny użycia lub wykup miesięczną subskrypcję. Wybór należy do Ciebie."
+    },
+    "apiKeys": {
+      "title": "Klucze API",
+      "subtitle": "Zarządzaj monitorami ze skryptu, potoku lub własnych narzędzi.",
+      "empty": "Brak kluczy API"
+    },
+    "system": {
+      "title": "System",
+      "subtitle": "Dostęp operatora do podstawowych silników monitorowania."
+    }
+  }
+}

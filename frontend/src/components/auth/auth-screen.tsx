@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { forwardRef, useEffect, useId, useState, type InputHTMLAttributes } from "react";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
+import { useTranslations } from "next-intl";
 import { z } from "zod";
 
 import {
@@ -22,6 +23,7 @@ import { ApiRequestError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { DUR, EASE_OUT, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { ThemeToggle } from "@/lib/theme";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { brand } from "@/brand";
 
 const loginSchema = z.object({
@@ -78,6 +80,7 @@ function PasswordInput({
   autoComplete: "current-password" | "new-password";
   placeholder: string;
 } & InputHTMLAttributes<HTMLInputElement>) {
+  const t = useTranslations("auth");
   const [shown, setShown] = useState(false);
   return (
     <div className="relative">
@@ -96,7 +99,7 @@ function PasswordInput({
       <button
         type="button"
         onClick={() => setShown((v) => !v)}
-        aria-label={shown ? "Hide password" : "Show password"}
+        aria-label={shown ? t("hidePassword") : t("showPassword")}
         className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-400 dark:hover:text-white"
       >
         {shown ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
@@ -126,6 +129,7 @@ function ServerError({ message }: { message: string | null }) {
 }
 
 function LoginForm() {
+  const t = useTranslations("auth");
   const { login } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -152,20 +156,21 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       <ServerError message={serverError} />
-      <Field label="Email" error={errors.email?.message}>
+      <Field label={t("email")} error={errors.email?.message}>
         <TextInput type="email" inputMode="email" autoComplete="email" placeholder="you@company.com" {...register("email")} />
       </Field>
-      <Field label="Password" error={errors.password?.message}>
+      <Field label={t("password")} error={errors.password?.message}>
         <PasswordInput register={register("password")} autoComplete="current-password" placeholder="Your password" />
       </Field>
       <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting}>
-        {isSubmitting ? "Signing in…" : "Sign in"}
+        {isSubmitting ? "…" : t("signInButton")}
       </Button>
     </form>
   );
 }
 
 function RegisterForm() {
+  const t = useTranslations("auth");
   const { register: registerAccount } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -190,20 +195,20 @@ function RegisterForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       <ServerError message={serverError} />
-      <Field label="Organization name" error={errors.org_name?.message} hint="Your team or company. You can rename it later.">
+      <Field label={t("organizationName")} error={errors.org_name?.message} hint="Your team or company. You can rename it later.">
         <TextInput autoComplete="organization" placeholder="Acme Inc." {...register("org_name")} />
       </Field>
-      <Field label="Your name" error={errors.name?.message}>
+      <Field label={t("yourName")} error={errors.name?.message}>
         <TextInput autoComplete="name" placeholder="Jane Doe" {...register("name")} />
       </Field>
-      <Field label="Email" error={errors.email?.message}>
+      <Field label={t("email")} error={errors.email?.message}>
         <TextInput type="email" inputMode="email" autoComplete="email" placeholder="you@company.com" {...register("email")} />
       </Field>
-      <Field label="Password" error={errors.password?.message} hint="At least 8 characters.">
+      <Field label={t("password")} error={errors.password?.message} hint="At least 8 characters.">
         <PasswordInput register={register("password")} autoComplete="new-password" placeholder="Create a password" />
       </Field>
       <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting}>
-        {isSubmitting ? "Creating your account…" : "Create account"}
+        {isSubmitting ? "…" : t("createAccountButton")}
       </Button>
     </form>
   );
@@ -229,6 +234,7 @@ const SELLING_POINTS = [
  * interaction is unchanged; only the entry point is now static.
  */
 export function AuthScreen({ initialMode }: { initialMode: Mode }) {
+  const t = useTranslations("auth");
   const [mode, setMode] = useState<Mode>(initialMode);
   const groupId = useId();
 
@@ -294,7 +300,8 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
 
       {/* ---- Form panel ---- */}
       <main className="relative flex items-center justify-center bg-white px-6 py-12 dark:bg-slate-950">
-        <div className="absolute right-6 top-6">
+        <div className="absolute right-6 top-6 flex items-center gap-2">
+          <LanguageSwitcher />
           <ThemeToggle />
         </div>
 
@@ -313,12 +320,12 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           </Link>
 
           <h2 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-white">
-            {mode === "login" ? "Welcome back" : "Start monitoring free"}
+            {mode === "login" ? t("welcomeBack") : t("startFree")}
           </h2>
           <p className="mt-2.5 text-lg text-slate-600 dark:text-slate-300">
             {mode === "login"
-              ? `Sign in to your ${brand.name} dashboard.`
-              : "No credit card. Add your first domain in under a minute."}
+              ? t("signInSubtitle", { brand: brand.name })
+              : t("registerSubtitle")}
           </p>
 
           {/* Mode switch. aria-pressed carries the state — styling alone would not. */}
@@ -349,7 +356,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
                     className="absolute inset-0 rounded-lg bg-white shadow-sm dark:bg-slate-800"
                   />
                 )}
-                <span className="relative">{m === "login" ? "Sign in" : "Create account"}</span>
+                <span className="relative">{m === "login" ? t("signInTab") : t("createAccountTab")}</span>
               </button>
             ))}
           </div>
@@ -370,13 +377,13 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           </div>
 
           <p className="mt-8 text-center text-base text-slate-600 dark:text-slate-400">
-            {mode === "login" ? `New to ${brand.name}?` : "Already have an account?"}{" "}
+            {mode === "login" ? t("newTo", { brand: brand.name }) : t("alreadyHaveAccount")}{" "}
             <button
               type="button"
               onClick={() => setMode(mode === "login" ? "register" : "login")}
               className="group inline-flex items-center gap-1 rounded font-medium text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:text-brand-400"
             >
-              {mode === "login" ? "Create an account" : "Sign in"}
+              {mode === "login" ? t("createOne") : t("signInLink")}
               <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
             </button>
           </p>

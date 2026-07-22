@@ -1,0 +1,179 @@
+{
+  "nav": {
+    "features": "Recursos",
+    "howItWorks": "Como funciona",
+    "statusPages": "Páginas de status",
+    "docs": "Documentação",
+    "signIn": "Entrar",
+    "getStarted": "Começar",
+    "dashboard": "Painel"
+  },
+  "sidebar": {
+    "dashboard": "Painel",
+    "monitors": "Monitores",
+    "alerts": "Alertas",
+    "explore": "Explorar",
+    "projects": "Projetos",
+    "statusPage": "Página de status",
+    "notifications": "Notificações",
+    "maintenance": "Manutenção",
+    "billing": "Faturamento",
+    "apiKeys": "Chaves de API",
+    "system": "Sistema",
+    "signOut": "Sair"
+  },
+  "auth": {
+    "welcomeBack": "Bem-vindo de volta",
+    "startFree": "Comece a monitorar gratuitamente",
+    "signInSubtitle": "Entre no seu painel do {brand}.",
+    "registerSubtitle": "Sem cartão de crédito. Adicione seu primeiro domínio em menos de um minuto.",
+    "signInTab": "Entrar",
+    "createAccountTab": "Criar conta",
+    "email": "E-mail",
+    "password": "Senha",
+    "organizationName": "Nome da organização",
+    "yourName": "Seu nome",
+    "signInButton": "Entrar",
+    "createAccountButton": "Criar conta",
+    "newTo": "Novo no {brand}?",
+    "alreadyHaveAccount": "Já tem uma conta?",
+    "createOne": "Criar uma conta",
+    "signInLink": "Entrar",
+    "showPassword": "Mostrar senha",
+    "hidePassword": "Ocultar senha"
+  },
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "create": "Criar",
+    "close": "Fechar",
+    "edit": "Editar",
+    "loading": "Carregando…",
+    "search": "Pesquisar",
+    "add": "Adicionar",
+    "done": "Concluído",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "next": "Próximo",
+    "previous": "Anterior",
+    "language": "Idioma"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Escuro",
+    "system": "Sistema",
+    "label": "Tema de cor"
+  },
+  "marketing": {
+    "skipToContent": "Pular para o conteúdo",
+    "badge": "Auto-hospedado e multi-inquilino",
+    "headlineLine1": "Saiba que caiu",
+    "headlineLine2": "antes deles.",
+    "heroBlurb": "O {brand} monitora seus endpoints, certificados e DNS a cada 30 segundos e avisa a pessoa certa no momento em que algo quebra. Tenha o controle dos seus dados, execute onde quiser e ofereça aos clientes uma página de status em que eles realmente confiam.",
+    "ctaStartFree": "Comece a monitorar de graça",
+    "ctaSeeStatus": "Ver uma página de status",
+    "statUptime": "Disponibilidade monitorada",
+    "statInterval": "Intervalo de verificação",
+    "statTypes": "Tipos de monitor",
+    "liveNow": "Ao vivo",
+    "liveInterval": "Intervalo de 30s",
+    "liveDown": "fora do ar",
+    "liveSummary": "3 de 4 operacionais — alerta enviado há 12s",
+    "featuresEyebrow": "Tudo em um só lugar",
+    "featuresTitle": "Substitua as cinco ferramentas que você emenda com fita adesiva",
+    "featuresBlurb": "O {brand} é um único plano de controle para disponibilidade, latência, certificados e alertas — auto-hospedado, para que os dados nunca saiam da sua infraestrutura.",
+    "feature1Title": "Seis tipos de monitor",
+    "feature1Body": "Verificações de HTTP, HTTPS, TCP, ICMP, DNS e expiração de SSL — um só plano de controle no lugar de cinco ferramentas.",
+    "feature2Title": "Alertas que chegam a uma pessoa",
+    "feature2Body": "Slack, e-mail, webhooks e Telegram, com deduplicação — para que uma queda não vire cinquenta notificações.",
+    "feature3Title": "Multi-inquilino por design",
+    "feature3Body": "Cada consulta fica restrita a uma organização. As equipes compartilham uma instância sem compartilhar dados.",
+    "feature4Title": "Latência sobre a qual você pode agir",
+    "feature4Body": "Tempos de resposta p50/p95 por endpoint, não apenas um indicador binário de ativo/fora do ar.",
+    "feature5Title": "Resumos de incidentes com IA",
+    "feature5Body": "Cada alerta chega com uma explicação em linguagem clara do que provavelmente falhou e por onde começar a olhar.",
+    "howEyebrow": "Como funciona",
+    "howTitle": "No ar em cerca de três minutos",
+    "howBlurb": "Sem agentes, sem sidecars, sem arqueologia de YAML.",
+    "step1Title": "Agrupe por projeto",
+    "step1Body": "Crie um projeto por aplicação ou equipe. Cada monitor pertence a um deles, para que os painéis e as páginas de status fiquem organizados conforme você cresce.",
+    "step2Title": "Adicione seus endpoints",
+    "step2Body": "Aponte o {brand} para uma URL, host ou cluster. Ele começa a sondar no seu intervalo em segundos — sem nenhum agente para instalar.",
+    "step3Title": "Publique uma página de status",
+    "step3Body": "Acione um botão para compartilhar uma página pública agrupada por projeto. Os clientes veem o que está funcionando; nunca veem os bastidores.",
+    "statusEyebrow": "Páginas de status",
+    "statusTitle": "Uma página em que seus clientes podem confiar",
+    "statusBlurb": "Agrupe domínios por projeto, publique no seu próprio domínio e mantenha privados os alvos, os IPs e os bastidores — só nomes e status ficam visíveis.",
+    "statusAllOperational": "Todos os sistemas operacionais",
+    "statusUpdated": "Atualizado há instantes",
+    "statusUp": "{up}/{total} ativos",
+    "statusOperational": "Operacional",
+    "statusDown": "Fora do ar",
+    "statusPrivacyNote": "Os alvos, os IPs e a configuração de verificação nunca são expostos publicamente.",
+    "ctaTitle": "Pare de descobrir pelos seus clientes.",
+    "ctaBlurb": "Coloque o {brand} no ar, adicione seu primeiro domínio e seja alertado antes que alguém abra um chamado.",
+    "ctaButton": "Crie sua conta gratuita",
+    "ctaFinePrint": "Gratuito para começar — sem cartão de crédito.",
+    "footerTagline": "monitoramento de infraestrutura"
+  },
+  "pages": {
+    "dashboard": {
+      "availability": "Disponibilidade",
+      "availabilitySubtitle": "Proporção de monitores aprovados · SLO {pct}%",
+      "responseTime": "Tempo de resposta",
+      "responseTimeSubtitle": "Média de todos os monitores, {window}"
+    },
+    "monitors": {
+      "title": "Monitores",
+      "subtitle": "Sites, APIs, portas e certificados — sondados por Prometheus + Blackbox.",
+      "empty": "Ainda não há monitores",
+      "emptyFiltered": "Nenhum monitor corresponde"
+    },
+    "alerts": {
+      "title": "Alertas",
+      "subtitle": "Alertas ativos, apenas da sua organização.",
+      "empty": "Tudo certo",
+      "emptyFiltered": "Nenhum alerta corresponde"
+    },
+    "explore": {
+      "title": "Explorar",
+      "subtitle": "Execute PromQL nas suas próprias métricas. Cada consulta é automaticamente restrita à sua organização.",
+      "empty": "Nenhuma série corresponde"
+    },
+    "projects": {
+      "title": "Projetos",
+      "subtitle": "Agrupe seus monitores por aplicação ou equipe.",
+      "empty": "Ainda não há projetos",
+      "emptyFiltered": "Nenhum projeto corresponde"
+    },
+    "statusPage": {
+      "title": "Página de status",
+      "subtitle": "Publique uma página pública em que seus clientes podem confiar. Nada fica exposto até você decidir."
+    },
+    "notifications": {
+      "title": "Notificações",
+      "subtitle": "Seja alertado no momento em que algo cair — no Slack, e-mail, um webhook ou Telegram.",
+      "empty": "Ainda não há canais",
+      "emptyFiltered": "Nenhum canal corresponde"
+    },
+    "maintenance": {
+      "title": "Janelas de manutenção",
+      "subtitle": "Planejando uma implantação ou uma parada prevista? Avise o {brand} com antecedência para que ele não dê alarme falso.",
+      "empty": "Nenhuma janela de manutenção"
+    },
+    "billing": {
+      "title": "Planos e cobrança",
+      "subtitle": "Pague por hora conforme o uso ou assine mensalmente. A escolha é sua."
+    },
+    "apiKeys": {
+      "title": "Chaves de API",
+      "subtitle": "Gerencie monitores a partir de um script, um pipeline ou suas próprias ferramentas.",
+      "empty": "Ainda não há chaves de API"
+    },
+    "system": {
+      "title": "Sistema",
+      "subtitle": "Acesso de operador aos mecanismos de monitoramento subjacentes."
+    }
+  }
+}

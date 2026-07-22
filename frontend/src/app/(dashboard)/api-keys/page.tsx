@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -179,6 +180,7 @@ function CreateForm({ onCreated, onCancel }: { onCreated: (c: ApiKeyCreated) => 
 }
 
 export default function ApiKeysPage() {
+  const t = useTranslations("pages.apiKeys");
   const { user } = useAuth();
   const { data, isLoading } = useApiKeys();
   const revoke = useRevokeApiKey();
@@ -196,8 +198,8 @@ export default function ApiKeysPage() {
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
       <PageHeader
-        title="API keys"
-        subtitle="Manage monitors from a script, a pipeline, or your own tooling."
+        title={t("title")}
+        subtitle={t("subtitle")}
         actions={
           canManage && !showForm && !created ? (
             <Button onClick={() => setShowForm(true)}>
@@ -231,7 +233,7 @@ export default function ApiKeysPage() {
       ) : keys.length === 0 && !showForm ? (
         <EmptyState
           icon={<LockIcon className="h-5 w-5" />}
-          title="No API keys yet"
+          title={t("empty")}
           action={
             canManage ? <Button onClick={() => setShowForm(true)}>Create your first key</Button> : undefined
           }
