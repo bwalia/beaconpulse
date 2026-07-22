@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, H2, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
   title: "Introduction",
-  description: "What Beacon Pulse does, and how to find your way around these docs.",
+  description: `What ${brand.name} does, and how to find your way around these docs.`,
 };
 
 const PATHS = [
@@ -43,10 +44,10 @@ export default function DocsHome() {
         Documentation
       </p>
       <h1 className="mt-2 text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-        Beacon Pulse
+        {brand.name}
       </h1>
       <p className="mt-4 text-lg leading-relaxed text-slate-600 dark:text-slate-300">
-        Beacon Pulse watches the things your customers depend on — websites, APIs, TLS
+        {brand.name} watches the things your customers depend on — websites, APIs, TLS
         certificates, DNS, TCP services and scheduled jobs — and tells you when one of
         them stops working, before they do.
       </p>
@@ -70,12 +71,12 @@ export default function DocsHome() {
 
       <H2 id="how-it-works">How it works</H2>
       <p>
-        You tell Beacon what to watch. It probes each target on a schedule from its own
+        You tell {brand.shortName} what to watch. It probes each target on a schedule from its own
         infrastructure — not from your servers, which is the point: a check that runs
         inside the thing it is checking goes quiet at exactly the moment it matters.
       </p>
       <p>
-        When a probe fails often enough to mean something, Beacon raises an alert and
+        When a probe fails often enough to mean something, {brand.shortName} raises an alert and
         sends it wherever you asked — Telegram, Slack, email, or your own webhook. If you
         publish a status page, your customers see the same truth without having to ask.
       </p>

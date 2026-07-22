@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Fields, H2, H3, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
   title: "Monitor types",
-  description: "Every kind of check Beacon Pulse can run, and when to reach for each.",
+  description: `Every kind of check ${brand.name} can run, and when to reach for each.`,
 };
 
 export default function Monitors() {
@@ -82,7 +83,7 @@ export default function Monitors() {
         a nightly backup, or a queue worker: things whose failure is silence.
       </p>
       <p>A heartbeat has no target. You get a URL; call it on success.</p>
-      <Code lang="bash">{`0 2 * * *  /path/to/backup.sh && curl -fsS https://beaconpulse.net/api/v1/ping/<token>`}</Code>
+      <Code lang="bash">{`0 2 * * *  /path/to/backup.sh && curl -fsS https://${brand.apiHost}/api/v1/ping/<token>`}</Code>
       <Note>
         <p>
           Note the <C>&amp;&amp;</C>. The ping must only fire if the job actually

@@ -3,6 +3,7 @@
 // never an oracle for which orgs exist.
 
 import Link from "next/link";
+import { brand } from "@/brand";
 
 const CRT: React.CSSProperties = {
   backgroundImage: [
@@ -21,7 +22,7 @@ export default function StatusNotFound() {
       <div className="relative w-full max-w-lg border border-slate-700/70 bg-[#0b0d13] p-6 shadow-[0_0_40px_-12px_rgba(255,90,30,0.25)]">
         <p className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-orange-400">
           <span aria-hidden className="inline-block h-3 w-3 rotate-45 border border-orange-400" />
-          BEACONPULSE // STATUS
+          {brand.name.replace(/\s+/g, "").toUpperCase()}{" // STATUS"}
         </p>
         <p className="mt-5 text-lg text-red-400">
           <span className="text-slate-600">&gt;</span> ERROR 404 — NO STATUS PAGE AT THIS ADDRESS
@@ -33,7 +34,7 @@ export default function StatusNotFound() {
           href="/"
           className="mt-6 inline-block text-xs uppercase tracking-[0.25em] text-slate-500 underline-offset-4 hover:text-orange-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
         >
-          ▮ RETURN TO BEACON PULSE
+          ▮ RETURN TO {brand.name.toUpperCase()}
         </Link>
       </div>
     </div>

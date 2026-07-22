@@ -24,6 +24,7 @@ import { useAuth } from "@/lib/auth";
 import { DUR, EASE_OUT, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { ThemeToggle } from "@/lib/theme";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { brand } from "@/brand";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -42,7 +43,7 @@ type RegisterValues = z.infer<typeof registerSchema>;
 type Mode = "login" | "register";
 
 const inputBase =
-  "w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-lg text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50 aria-[invalid=true]:border-red-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
+  "w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-lg text-slate-900 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 disabled:opacity-50 aria-[invalid=true]:border-red-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500";
 
 /**
  * Shared input. 44px+ tall (touch target) and 16px+ text (no iOS auto-zoom).
@@ -99,7 +100,7 @@ function PasswordInput({
         type="button"
         onClick={() => setShown((v) => !v)}
         aria-label={shown ? t("hidePassword") : t("showPassword")}
-        className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-400 dark:hover:text-white"
+        className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-400 dark:hover:text-white"
       >
         {shown ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
       </button>
@@ -258,15 +259,15 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -left-32 top-1/3 h-[460px] w-[460px] rounded-full bg-blue-500/20 blur-3xl"
+          className="pointer-events-none absolute -left-32 top-1/3 h-[460px] w-[460px] rounded-full bg-brand-500/20 blur-3xl"
         />
 
         <Link
           href="/"
-          className="relative inline-flex items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          className="relative inline-flex items-center gap-3 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
         >
-          <BeaconMark className="h-9 w-9 text-blue-400" />
-          <span className="text-2xl font-semibold tracking-tight">Beacon Pulse</span>
+          <BeaconMark className="h-9 w-9 text-brand-400" />
+          <span className="text-2xl font-semibold tracking-tight">{brand.name}</span>
         </Link>
 
         <motion.div initial="hidden" animate="show" variants={stagger} className="relative max-w-xl">
@@ -276,7 +277,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           >
             Know it&apos;s down
             <br />
-            <span className="bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-brand-400 to-emerald-400 bg-clip-text text-transparent">
               before they do.
             </span>
           </motion.h1>
@@ -312,9 +313,9 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
         >
           {/* Brand shows on mobile, where the aside is hidden. */}
           <Link href="/" className="mb-8 inline-flex items-center gap-2.5 lg:hidden">
-            <BeaconMark className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+            <BeaconMark className="h-8 w-8 text-brand-600 dark:text-brand-400" />
             <span className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">
-              Beacon Pulse
+              {brand.name}
             </span>
           </Link>
 
@@ -323,7 +324,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           </h2>
           <p className="mt-2.5 text-lg text-slate-600 dark:text-slate-300">
             {mode === "login"
-              ? t("signInSubtitle", { brand: "Beacon Pulse" })
+              ? t("signInSubtitle", { brand: brand.name })
               : t("registerSubtitle")}
           </p>
 
@@ -340,7 +341,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
                 type="button"
                 onClick={() => setMode(m)}
                 aria-pressed={mode === m}
-                className={`relative flex-1 rounded-lg px-4 py-2.5 text-base font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none ${
+                className={`relative flex-1 rounded-lg px-4 py-2.5 text-base font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none ${
                   mode === m
                     ? "text-slate-900 dark:text-white"
                     : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
@@ -376,11 +377,11 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           </div>
 
           <p className="mt-8 text-center text-base text-slate-600 dark:text-slate-400">
-            {mode === "login" ? t("newTo", { brand: "Beacon Pulse" }) : t("alreadyHaveAccount")}{" "}
+            {mode === "login" ? t("newTo", { brand: brand.name }) : t("alreadyHaveAccount")}{" "}
             <button
               type="button"
               onClick={() => setMode(mode === "login" ? "register" : "login")}
-              className="group inline-flex items-center gap-1 rounded font-medium text-blue-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-blue-400"
+              className="group inline-flex items-center gap-1 rounded font-medium text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:text-brand-400"
             >
               {mode === "login" ? t("createOne") : t("signInLink")}
               <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />

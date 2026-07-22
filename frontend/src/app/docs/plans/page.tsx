@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Fields, H2, Note } from "@/components/docs/parts";
@@ -73,10 +74,10 @@ $5 → 25 monitor-hours
 
       <H2 id="check">Check from the API</H2>
       <Code lang="bash">{`
-curl -s https://beaconpulse.net/api/v1/billing \\
+curl -s https://${brand.apiHost}/api/v1/billing \\
   -H "Authorization: Bearer $BEACON_API_KEY" | jq
 
-curl -s https://beaconpulse.net/api/v1/monitors/usage \\
+curl -s https://${brand.apiHost}/api/v1/monitors/usage \\
   -H "Authorization: Bearer $BEACON_API_KEY" | jq
 `}</Code>
     </article>

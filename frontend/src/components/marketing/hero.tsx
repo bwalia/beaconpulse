@@ -6,9 +6,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { ArrowRightIcon, CheckCircleIcon } from "@/components/icons";
-import { BRAND_NAME } from "@/lib/brand";
 import { DUR, EASE_OUT, IN_VIEW, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { Spotlight, TiltCard } from "./pointer";
+import { brand } from "@/brand";
 
 /**
  * Counts up to `to` when scrolled into view.
@@ -131,7 +131,7 @@ export function Hero() {
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-blue-500/10 blur-3xl dark:bg-blue-500/15"
+        className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-brand-500/10 blur-3xl dark:bg-brand-500/15"
       />
 
       <div className="relative mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16 grid items-center gap-16 lg:grid-cols-2 xl:gap-24">
@@ -149,7 +149,7 @@ export function Hero() {
           >
             {t("headlineLine1")}
             <br />
-            <span className="bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-emerald-400">
+            <span className="bg-gradient-to-r from-brand-600 to-emerald-600 bg-clip-text text-transparent dark:from-brand-400 dark:to-emerald-400">
               {t("headlineLine2")}
             </span>
           </motion.h1>
@@ -158,20 +158,20 @@ export function Hero() {
             variants={reveal}
             className="mt-7 max-w-2xl text-xl leading-relaxed text-slate-600 xl:text-2xl dark:text-slate-300"
           >
-            {t("heroBlurb", { brand: BRAND_NAME })}
+            {t("heroBlurb", { brand: brand.name })}
           </motion.p>
 
           <motion.div variants={reveal} className="mt-9 flex flex-wrap items-center gap-3">
             <Link
               href="/register"
-              className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-7 py-4 text-lg font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
+              className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-7 py-4 text-lg font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
             >
               {t("ctaStartFree")}
               <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
             </Link>
             <a
               href="#status"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-900/15 bg-white/60 px-7 py-4 text-lg font-medium text-slate-800 backdrop-blur transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-900/15 bg-white/60 px-7 py-4 text-lg font-medium text-slate-800 backdrop-blur transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
             >
               {t("ctaSeeStatus")}
             </a>

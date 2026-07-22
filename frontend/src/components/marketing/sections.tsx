@@ -18,9 +18,9 @@ import {
   GaugeIcon,
   LockIcon,
 } from "@/components/icons";
-import { BRAND_NAME } from "@/lib/brand";
 import { IN_VIEW, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { GlowCard } from "./pointer";
+import { brand } from "@/brand";
 
 /** Section heading with a reveal. Shared so every section has one rhythm. */
 function SectionHead({
@@ -44,7 +44,7 @@ function SectionHead({
     >
       <motion.p
         variants={reveal}
-        className="text-base font-semibold uppercase tracking-widest text-blue-700 dark:text-blue-400"
+        className="text-base font-semibold uppercase tracking-widest text-brand-700 dark:text-brand-400"
       >
         {eyebrow}
       </motion.p>
@@ -85,7 +85,7 @@ function Features() {
         <SectionHead
           eyebrow={t("featuresEyebrow")}
           title={t("featuresTitle")}
-          blurb={t("featuresBlurb", { brand: BRAND_NAME })}
+          blurb={t("featuresBlurb", { brand: brand.name })}
         />
 
         <motion.ul
@@ -105,7 +105,7 @@ function Features() {
               >
                 <GlowCard className="h-full rounded-2xl border border-slate-900/10 bg-white/60 p-6 backdrop-blur-xl transition-transform duration-200 hover:-translate-y-1 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.04]">
                   <div className="relative">
-                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600/10 text-blue-700 dark:bg-blue-400/10 dark:text-blue-400">
+                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600/10 text-brand-700 dark:bg-brand-400/10 dark:text-brand-400">
                       <Icon className="h-6 w-6" />
                     </span>
                     <h3 className="mt-5 text-xl font-semibold text-slate-900 dark:text-white">
@@ -160,13 +160,13 @@ function HowItWorks() {
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white text-base font-semibold tabular-nums text-slate-900 dark:border-white/15 dark:bg-slate-900 dark:text-white">
                     {i + 1}
                   </span>
-                  <Icon className="h-5 w-5 text-blue-700 dark:text-blue-400" />
+                  <Icon className="h-5 w-5 text-brand-700 dark:text-brand-400" />
                 </div>
                 <h3 className="mt-5 text-xl font-semibold text-slate-900 dark:text-white">
                   {t(`${s.key}Title`)}
                 </h3>
                 <p className="mt-2.5 text-lg leading-relaxed text-slate-600 dark:text-slate-300">
-                  {s.key === "step2" ? t(`${s.key}Body`, { brand: BRAND_NAME }) : t(`${s.key}Body`)}
+                  {s.key === "step2" ? t(`${s.key}Body`, { brand: brand.name }) : t(`${s.key}Body`)}
                 </p>
               </motion.li>
             );
@@ -300,7 +300,7 @@ function FinalCTA() {
     <section className="relative overflow-hidden py-28">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-1/2 -z-10 h-[420px] -translate-y-1/2 bg-gradient-to-r from-blue-500/10 via-emerald-500/10 to-blue-500/10 blur-3xl"
+        className="pointer-events-none absolute inset-x-0 top-1/2 -z-10 h-[420px] -translate-y-1/2 bg-gradient-to-r from-brand-500/10 via-emerald-500/10 to-brand-500/10 blur-3xl"
       />
       <motion.div
         initial="hidden"
@@ -316,12 +316,12 @@ function FinalCTA() {
           {t("ctaTitle")}
         </motion.h2>
         <motion.p variants={reveal} className="mt-5 text-xl text-slate-600 dark:text-slate-300">
-          {t("ctaBlurb", { brand: BRAND_NAME })}
+          {t("ctaBlurb", { brand: brand.name })}
         </motion.p>
         <motion.div variants={reveal} className="mt-9 flex flex-wrap justify-center gap-3">
           <Link
             href="/register"
-            className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-8 py-4 text-lg font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
+            className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-8 py-4 text-lg font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
           >
             {t("ctaButton")}
             <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
@@ -346,8 +346,8 @@ function Footer() {
     <footer className="border-t border-slate-900/10 py-12 dark:border-white/10">
       <div className="mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
         <div className="flex items-center gap-2.5">
-          <BeaconMark className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          <span className="font-semibold text-slate-900 dark:text-white">{BRAND_NAME}</span>
+          <BeaconMark className="h-6 w-6 text-brand-600 dark:text-brand-400" />
+          <span className="font-semibold text-slate-900 dark:text-white">{brand.name}</span>
           <span className="text-sm text-slate-500 dark:text-slate-400">
             — {tm("footerTagline")}
           </span>
@@ -355,25 +355,25 @@ function Footer() {
         <nav aria-label="Footer" className="flex items-center gap-5 text-sm">
           <a
             href="#features"
-            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
             {t("features")}
           </a>
           <a
             href="#status"
-            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
             {t("statusPages")}
           </a>
           <Link
             href="/docs"
-            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
             {t("docs")}
           </Link>
           <Link
             href="/login"
-            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
             {t("signIn")}
           </Link>

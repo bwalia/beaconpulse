@@ -7,6 +7,7 @@ import { useState } from "react";
 import { BeaconMark } from "@/components/icons";
 import { ThemeToggle } from "@/lib/theme";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { brand } from "@/brand";
 
 /**
  * The documentation frame: a persistent table of contents, and the page beside it.
@@ -75,7 +76,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                     aria-current={active ? "page" : undefined}
                     className={`block rounded-lg px-3 py-1.5 text-sm transition-colors motion-reduce:transition-none ${
                       active
-                        ? "bg-blue-50 font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+                        ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-950/50 dark:text-brand-300"
                         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
                     }`}
                   >
@@ -107,10 +108,10 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex w-full max-w-[1400px] items-center gap-4 px-4 py-3.5 sm:px-6 lg:px-8">
           <Link
             href="/"
-            className="flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+            className="flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
           >
-            <BeaconMark className="h-7 w-7 text-blue-600 dark:text-blue-400" />
-            <span className="whitespace-nowrap font-semibold tracking-tight">Beacon Pulse</span>
+            <BeaconMark className="h-7 w-7 text-brand-600 dark:text-brand-400" />
+            <span className="whitespace-nowrap font-semibold tracking-tight">{brand.name}</span>
           </Link>
           <span className="hidden text-sm text-slate-400 dark:text-slate-600 sm:inline">/</span>
           <span className="hidden text-sm text-slate-600 dark:text-slate-300 sm:inline">Docs</span>
@@ -118,7 +119,7 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
           <div className="ml-auto flex items-center gap-2">
             <Link
               href="/dashboard"
-              className="hidden rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white sm:block"
+              className="hidden rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white sm:block"
             >
               Dashboard
             </Link>
@@ -129,7 +130,7 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
               onClick={() => setMenuOpen((v) => !v)}
               aria-expanded={menuOpen}
               aria-label="Toggle documentation menu"
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:text-slate-200 lg:hidden"
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:border-slate-700 dark:text-slate-200 lg:hidden"
             >
               {menuOpen ? "Close" : "Contents"}
             </button>

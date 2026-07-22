@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Endpoint, Fields, H2, H3, Note } from "@/components/docs/parts";
@@ -50,14 +51,14 @@ export default function Authentication() {
 
       <H2 id="use">Use it</H2>
       <Code lang="bash" title="Your first authenticated request">{`
-curl -s https://beaconpulse.net/api/v1/monitors \\
+curl -s https://${brand.apiHost}/api/v1/monitors \\
   -H "Authorization: Bearer bp_xxxxxxxxxxxxxxxxxxxxxxxx"
 `}</Code>
       <p>Store it as an environment variable rather than pasting it into scripts:</p>
       <Code lang="bash">{`
 export BEACON_API_KEY="bp_xxxxxxxxxxxxxxxxxxxxxxxx"
 
-curl -s https://beaconpulse.net/api/v1/monitors \\
+curl -s https://${brand.apiHost}/api/v1/monitors \\
   -H "Authorization: Bearer $BEACON_API_KEY" | jq
 `}</Code>
       <p>

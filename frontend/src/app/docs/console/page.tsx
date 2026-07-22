@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { ApiConsole } from "@/components/docs/api-console";
@@ -6,7 +7,7 @@ import { H2, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
   title: "API console",
-  description: "Call the live Beacon Pulse API from your browser — paste a key and send a request.",
+  description: `Call the live ${brand.name} API from your browser — paste a key and send a request.`,
 };
 
 export default function ConsolePage() {

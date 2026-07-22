@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { brand } from "@/brand";
 
 import { Hero } from "@/components/marketing/hero";
 import { MarketingNav } from "@/components/marketing/nav";
@@ -18,11 +19,11 @@ import {
 // behaviour and keeps the page shareable by people who are already customers.
 
 export const metadata: Metadata = {
-  title: "Beacon Pulse — Know it's down before your customers do",
+  title: `${brand.name} — Know it's down before your customers do`,
   description:
     "Self-hosted, multi-tenant infrastructure monitoring. Watch endpoints, certificates and DNS every 30 seconds, alert the right person, and publish a status page your customers trust.",
   openGraph: {
-    title: "Beacon Pulse — Infrastructure monitoring you own",
+    title: `${brand.name} — Infrastructure monitoring you own`,
     description:
       "Uptime, latency, SSL and DNS monitoring with alerting and public status pages. Self-hosted and multi-tenant.",
     type: "website",

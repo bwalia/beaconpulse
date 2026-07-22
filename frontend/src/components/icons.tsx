@@ -2,6 +2,8 @@
 // currentColor. Paths are from the Lucide set. Never use emoji as an icon — they
 // are font-dependent, can't be themed, and don't scale with the type system.
 
+import { brand } from "@/brand";
+
 type IconProps = { className?: string };
 
 function Icon({ className, children }: IconProps & { children: React.ReactNode }) {
@@ -26,16 +28,12 @@ function Icon({ className, children }: IconProps & { children: React.ReactNode }
  * Beacon Pulse's mark — a broadcast signal (the outer arcs) carrying a heartbeat
  * pulse (the centre): a beacon, transmitting a pulse. Reads as uptime/monitoring.
  */
+// The brand mark. Delegates to the active brand (src/brand) so every place that shows
+// the logo — nav, sidebar, auth, docs, status page — rebrands from one config, and the
+// eight existing importers need no change. Kept named BeaconMark for exactly that
+// reason; it renders whatever the current brand is, Beacon or otherwise.
 export function BeaconMark({ className }: IconProps) {
-  return (
-    <Icon className={className}>
-      {/* broadcast arcs */}
-      <path d="M4.6 18.6a9 9 0 0 1 0-13.2" />
-      <path d="M19.4 5.4a9 9 0 0 1 0 13.2" />
-      {/* heartbeat pulse */}
-      <path d="M7.3 12h1.9l1.3-4 2.4 8 1.3-4h1.9" />
-    </Icon>
-  );
+  return <brand.Mark className={className} />;
 }
 
 export function DashboardIcon({ className }: IconProps) {
