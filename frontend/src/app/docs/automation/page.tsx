@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Fields, H2, H3, Note } from "@/components/docs/parts";
@@ -73,7 +74,7 @@ on:
     paths: ['monitors.json']
 
 env:
-  BEACON_URL: https://beaconpulse.net
+  BEACON_URL: https://${brand.apiHost}
 
 jobs:
   sync:

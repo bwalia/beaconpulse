@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { brand } from "@/brand";
 import { motion } from "framer-motion";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -157,7 +158,7 @@ function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () =>
           </h3>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             Call this URL from your job on success. If no ping arrives within the interval plus
-            grace period, Beacon Pulse alerts you. You can find it again on this monitor later.
+            grace period, {brand.name} alerts you. You can find it again on this monitor later.
           </p>
 
           <div className="mt-3 flex items-center gap-2">
@@ -335,7 +336,7 @@ export default function MonitorsPage() {
         >
           {filtering
             ? "No monitors match your search or filter. Try a different term."
-            : "Add your first website, API or port and Beacon Pulse starts probing it within seconds."}
+            : `Add your first website, API or port and ${brand.name} starts probing it within seconds`}
         </EmptyState>
       ) : (
         <>
@@ -898,7 +899,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
               </Select>
             </Field>
             <div className="sm:col-span-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
-              A heartbeat has no URL to probe. Instead, Beacon Pulse gives you a ping URL to
+              A heartbeat has no URL to probe. Instead, {brand.name} gives you a ping URL to
               call from your cron/job on success — if no ping arrives within the interval
               plus grace period, you&apos;re alerted. You&apos;ll get the URL after saving.
             </div>

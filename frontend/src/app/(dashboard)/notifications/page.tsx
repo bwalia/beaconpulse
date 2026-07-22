@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { brand } from "@/brand";
 import { motion } from "framer-motion";
 
 import {
@@ -119,7 +120,7 @@ export default function NotificationsPage() {
         >
           {filtering
             ? "No notification channels match your search."
-            : "Connect Slack, email, a webhook or Telegram and Beacon Pulse will alert you the moment a monitor goes down — enriched with AI triage when enabled."}
+            : `Connect Slack, email, a webhook or Telegram and ${brand.name} will alert you the moment a monitor goes down — enriched with AI triage when enabled.`}
         </EmptyState>
       ) : (
         <>

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Endpoint, Fields, H2, H3, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
   title: "API reference",
-  description: "Every Beacon Pulse endpoint, with fields and examples.",
+  description: `Every ${brand.name} endpoint, with fields and examples.`,
 };
 
 export default function ApiReference() {
@@ -15,7 +16,7 @@ export default function ApiReference() {
         API reference
       </h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        Base URL <C>https://beaconpulse.net</C>. Everything is under <C>/api/v1</C>, takes
+        Base URL <C>{`https://${brand.apiHost}`}</C>. Everything is under <C>/api/v1</C>, takes
         and returns JSON, and needs an{" "}
         <Link href="/docs/authentication">API key</Link>.
       </p>
@@ -98,7 +99,7 @@ export default function ApiReference() {
 
       <H3>Create a monitor</H3>
       <Code lang="bash">{`
-curl -X POST https://beaconpulse.net/api/v1/monitors \\
+curl -X POST https://${brand.apiHost}/api/v1/monitors \\
   -H "Authorization: Bearer $BEACON_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -154,7 +155,7 @@ curl -X POST https://beaconpulse.net/api/v1/monitors \\
         </Endpoint>
       </div>
       <Code lang="bash" title="What is broken right now?">{`
-curl -s "https://beaconpulse.net/api/v1/alerts" \\
+curl -s "https://${brand.apiHost}/api/v1/alerts" \\
   -H "Authorization: Bearer $BEACON_API_KEY" \\
   | jq -r '.data[] | "\\(.severity)\\t\\(.monitor_name)\\t\\(.target)"'
 `}</Code>
