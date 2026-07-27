@@ -76,7 +76,7 @@ export default function DashboardPage() {
   // monitor. A project that is on fire is the first heading you see.
   const projectNames = new Map((projects?.data ?? []).map((p) => [p.id, p.name]));
   const shown = triaged.slice(0, DASHBOARD_MONITOR_CAP);
-  const grouped = groupByProject(shown, projectNames);
+  const grouped = groupByProject(shown, projectNames, t("ungrouped"));
 
   const uptimeSeries = overview?.uptime_series ?? [];
   const responseSeries = overview?.response_series ?? [];
@@ -87,9 +87,9 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            A live overview of your monitored infrastructure.
+            {t("subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -109,17 +109,17 @@ export default function DashboardPage() {
           carry status, and each is labelled in words — never colour alone. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
-          label="Up right now"
+          label={t("statUpRightNow")}
           value={`${up}/${enabled.length}`}
-          sub={downMonitors.length ? `${downMonitors.length} down` : "all healthy"}
+          sub={downMonitors.length ? t("nDown", { n: downMonitors.length }) : t("allHealthy")}
           tone={downMonitors.length ? "critical" : "good"}
           series={uptimeSeries}
           seriesColor={VIZ.good}
         />
         <StatTile
-          label="Avg uptime"
+          label={t("avgUptime")}
           value={overview ? `${overview.uptime_percent}%` : "—"}
-          sub={`${win} · all monitors`}
+          sub={t("allMonitorsWindow", { window: win })}
           tone={uptimeTone(overview?.uptime_percent)}
           series={uptimeSeries}
           seriesColor={VIZ.good}
@@ -130,9 +130,9 @@ export default function DashboardPage() {
           loading={loadingOverview}
         />
         <StatTile
-          label="Avg response"
+          label={t("avgResponse")}
           value={overview ? `${Math.round(overview.avg_response_ms)}ms` : "—"}
-          sub={`${win} · all monitors`}
+          sub={t("allMonitorsWindow", { window: win })}
           series={responseSeries}
           seriesColor={VIZ.blue}
           delta={delta(responseSeries)}
@@ -142,9 +142,9 @@ export default function DashboardPage() {
           loading={loadingOverview}
         />
         <StatTile
-          label="Active alerts"
+          label={t("activeAlerts")}
           value={activeAlertCount}
-          sub={activeAlertCount ? "needs attention" : "none firing"}
+          sub={activeAlertCount ? t("needsAttention") : t("noneFiring")}
           tone={activeAlertCount ? "critical" : "good"}
         />
       </div>
@@ -172,25 +172,29 @@ export default function DashboardPage() {
       <section>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Monitors</h2>
+            <h2 className="text-lg font-semibold">{t("monitorsHeading")}</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {win.charAt(0).toUpperCase() + win.slice(1)}, worst first. Each tick is a{" "}
-              {slotDuration(hours, SLOT_COUNT)} window.
+              {t("monitorsDescription", {
+                window: win.charAt(0).toUpperCase() + win.slice(1),
+                slot: slotDuration(hours, SLOT_COUNT),
+              })}
             </p>
           </div>
           <div className="flex items-center gap-4">
             <StripLegend />
-            <NavLink href="/monitors">Manage</NavLink>
+            <NavLink href="/monitors">{t("manage")}</NavLink>
           </div>
         </div>
 
         {list.length === 0 ? (
           <EmptyCard>
-            No monitors yet.{" "}
-            <Link href="/monitors" className="font-medium text-brand-700 underline dark:text-brand-400">
-              Add your first
-            </Link>
-            .
+            {t.rich("noMonitorsCta", {
+              link: (chunks) => (
+                <Link href="/monitors" className="font-medium text-brand-700 underline dark:text-brand-400">
+                  {chunks}
+                </Link>
+              ),
+            })}
           </EmptyCard>
         ) : (
           <>
@@ -206,7 +210,7 @@ export default function DashboardPage() {
                     <span aria-hidden className="h-px min-w-4 flex-1 bg-slate-200 dark:bg-slate-800" />
                     {g.down > 0 && (
                       <span className="text-xs font-semibold text-red-700 dark:text-red-400">
-                        {g.down} down
+                        {t("nDown", { n: g.down })}
                       </span>
                     )}
                   </div>
@@ -224,7 +228,7 @@ export default function DashboardPage() {
                   href="/monitors"
                   className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:bg-brand-900/20"
                 >
-                  View all {list.length} monitors
+                  {t("viewAllMonitors", { count: list.length })}
                   <ArrowRightIcon className="h-4 w-4" />
                 </Link>
               </div>
@@ -236,16 +240,19 @@ export default function DashboardPage() {
       {/* Active alerts */}
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Active alerts</h2>
-          <NavLink href="/alerts">View all</NavLink>
+          <h2 className="text-lg font-semibold">{t("activeAlerts")}</h2>
+          <NavLink href="/alerts">{t("viewAll")}</NavLink>
         </div>
         {activeAlertCount === 0 ? (
           <EmptyCard>
-            <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
-              <CheckCircleIcon className="h-4 w-4" />
-              All clear
-            </span>{" "}
-            — nothing firing for your organization.
+            {t.rich("allClearMessage", {
+              clear: (chunks) => (
+                <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
+                  <CheckCircleIcon className="h-4 w-4" />
+                  {chunks}
+                </span>
+              ),
+            })}
           </EmptyCard>
         ) : (
           <ul className="grid gap-2">
@@ -281,12 +288,12 @@ const TONE_COLOR: Record<Tone, string> = {
   neutral: VIZ.noData,
 };
 
-const STATUS_LABEL: Record<string, { text: string; tone: Tone }> = {
-  up: { text: "Up", tone: "good" },
-  down: { text: "Down", tone: "critical" },
-  degraded: { text: "Degraded", tone: "warning" },
-  paused: { text: "Paused", tone: "neutral" },
-  unknown: { text: "Unknown", tone: "neutral" },
+const STATUS_META: Record<string, { key: string; tone: Tone }> = {
+  up: { key: "statusUp", tone: "good" },
+  down: { key: "statusDown", tone: "critical" },
+  degraded: { key: "statusDegraded", tone: "warning" },
+  paused: { key: "statusPaused", tone: "neutral" },
+  unknown: { key: "statusUnknown", tone: "neutral" },
 };
 
 const TRIAGE_ORDER: Record<string, number> = { down: 0, degraded: 1, unknown: 2, up: 3, paused: 4 };
@@ -305,7 +312,7 @@ interface MonitorGroup {
 // is already sorted worst-first, so each bucket inherits that order, and the buckets
 // themselves come back ordered by their sickest member. Grouping must not cost this
 // page its one job — surfacing an outage without being scrolled.
-function groupByProject(monitors: Monitor[], names: Map<string, string>): MonitorGroup[] {
+function groupByProject(monitors: Monitor[], names: Map<string, string>, ungroupedLabel: string): MonitorGroup[] {
   const byProject = new Map<string, Monitor[]>();
   for (const m of monitors) {
     const bucket = byProject.get(m.project_id);
@@ -317,7 +324,7 @@ function groupByProject(monitors: Monitor[], names: Map<string, string>): Monito
       id,
       // A project the list hasn't loaded (or that was deleted out from under a
       // monitor) still gets a heading rather than an empty one.
-      name: names.get(id) ?? "Ungrouped",
+      name: names.get(id) ?? ungroupedLabel,
       monitors: ms,
       down: ms.filter((m) => statusOf(m) === "down").length,
     }))
@@ -349,10 +356,11 @@ function RangeSwitcher({
   onChange: (h: RangeHours) => void;
   busy?: boolean;
 }) {
+  const t = useTranslations("pages.dashboard");
   return (
     <div
       role="group"
-      aria-label="Time range"
+      aria-label={t("timeRange")}
       aria-busy={busy}
       className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
@@ -379,6 +387,7 @@ function RangeSwitcher({
 }
 
 function LivePill() {
+  const t = useTranslations("pages.dashboard");
   return (
     <span className="inline-flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
       <span className="relative flex h-2 w-2">
@@ -388,7 +397,7 @@ function LivePill() {
         />
         <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: VIZ.good }} />
       </span>
-      Live
+      {t("live")}
     </span>
   );
 }
@@ -410,6 +419,7 @@ function StatusHero({
   downNames: string[];
   alertCount: number;
 }) {
+  const t = useTranslations("pages.dashboard");
   const down = downNames.length;
   const tone: Tone = down > 0 ? "critical" : alertCount > 0 ? "warning" : "good";
 
@@ -422,23 +432,27 @@ function StatusHero({
 
   const headline =
     down > 0
-      ? `${down} of ${total} monitors ${down === 1 ? "is" : "are"} down`
+      ? t("monitorsDownHeadline", { down, total })
       : alertCount > 0
-        ? `${alertCount} alert${alertCount === 1 ? "" : "s"} firing`
-        : "All systems operational";
+        ? t("alertsFiringHeadline", { count: alertCount })
+        : t("allSystemsOperational");
 
   const detail =
     down > 0
-      ? `${downNames.slice(0, 2).join(", ")}${down > 2 ? ` and ${down - 2} more` : ""} failing checks` +
-        (alertCount ? ` · ${alertCount} alert${alertCount === 1 ? "" : "s"} firing` : "")
+      ? t("failingChecks", {
+          names:
+            down > 2
+              ? t("namesAndMore", { names: downNames.slice(0, 2).join(", "), count: down - 2 })
+              : downNames.slice(0, 2).join(", "),
+        }) + (alertCount ? t("alertsFiringSuffix", { count: alertCount }) : "")
       : alertCount > 0
-        ? "All monitors are passing, but alerts are still active."
-        : `${up} monitor${up === 1 ? "" : "s"} passing · no alerts firing`;
+        ? t("allPassingButAlerts")
+        : t("monitorsPassingNoAlerts", { count: up });
 
   return (
     <section
       className={`relative overflow-hidden rounded-2xl bg-gradient-to-r p-5 ring-1 sm:p-6 ${skin}`}
-      aria-label="Overall system health"
+      aria-label={t("systemHealthAria")}
     >
       <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: TONE_COLOR[tone] }} aria-hidden />
       <div className="flex flex-wrap items-center gap-4 pl-2">
@@ -453,8 +467,8 @@ function StatusHero({
           <p className="mt-0.5 truncate text-sm text-slate-600 dark:text-slate-300">{detail}</p>
         </div>
         <dl className="flex shrink-0 gap-6 pr-1">
-          <HeroStat label="Passing" value={`${up}/${total}`} />
-          <HeroStat label="Alerts" value={alertCount} />
+          <HeroStat label={t("passing")} value={`${up}/${total}`} />
+          <HeroStat label={t("alerts")} value={alertCount} />
         </dl>
       </div>
     </section>
@@ -504,6 +518,7 @@ function DeltaChip({
   window: string;
   higherIsBetter: boolean;
 }) {
+  const t = useTranslations("pages.dashboard");
   const rounded = unit === "ms" ? Math.round(value) : round1(value);
   if (rounded === 0) return null;
   const rising = rounded > 0;
@@ -516,7 +531,12 @@ function DeltaChip({
           ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
           : "bg-red-50 text-red-800 dark:bg-red-950/60 dark:text-red-300"
       }`}
-      title={`${rising ? "Up" : "Down"} ${Math.abs(rounded)}${unit} vs ${win} ago`}
+      title={t("deltaChipTitle", {
+        direction: rising ? t("statusUp") : t("statusDown"),
+        value: Math.abs(rounded),
+        unit,
+        window: win,
+      })}
     >
       <Arrow className="h-3 w-3" />
       {rising ? "+" : "−"}
@@ -623,11 +643,12 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 }
 
 function StatusPill({ status }: { status: string }) {
-  const { text, tone } = STATUS_LABEL[status] ?? STATUS_LABEL.unknown;
+  const t = useTranslations("pages.dashboard");
+  const { key, tone } = STATUS_META[status] ?? STATUS_META.unknown;
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: TONE_COLOR[tone] }} aria-hidden />
-      <span className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{text}</span>
+      <span className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{t(key)}</span>
     </span>
   );
 }
@@ -673,21 +694,22 @@ function toSlots(points: MetricPoint[]): Slot[] {
 }
 
 function StripLegend() {
+  const t = useTranslations("pages.dashboard");
   const items: [SlotState, string][] = [
-    ["up", "Up"],
-    ["down", "Down"],
-    ["none", "No data"],
+    ["up", "statusUp"],
+    ["down", "statusDown"],
+    ["none", "noData"],
   ];
   return (
     <ul className="flex items-center gap-3">
-      {items.map(([state, label]) => (
+      {items.map(([state, labelKey]) => (
         <li key={state} className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
           <span
             className="h-2.5 w-2.5 rounded-[2px]"
             style={{ background: slotFill(state), opacity: state === "none" ? 0.35 : 1 }}
             aria-hidden
           />
-          {label}
+          {t(labelKey)}
         </li>
       ))}
     </ul>
@@ -703,12 +725,20 @@ function UptimeStrip({
   uptimePct: number | null;
   winShort: string;
 }) {
+  const t = useTranslations("pages.dashboard");
   const slots = toSlots(points);
   const passed = points.filter((p) => p.v === 1).length;
   const failed = points.length - passed;
   const summary = points.length
-    ? `${winShort} history: ${passed} of ${points.length} checks passed (${uptimePct ?? 0}% uptime), ${failed} failed. ${SLOT_COUNT - points.length} windows have no data.`
-    : `${winShort} history: no data collected yet.`;
+    ? t("stripSummary", {
+        winShort,
+        passed,
+        total: points.length,
+        pct: uptimePct ?? 0,
+        failed,
+        noDataWindows: SLOT_COUNT - points.length,
+      })
+    : t("stripSummaryNoData", { winShort });
 
   return (
     <div className="flex h-8 gap-[2px]" role="img" aria-label={summary}>
@@ -719,8 +749,11 @@ function UptimeStrip({
           style={{ background: slotFill(slot.state), opacity: slot.state === "none" ? 0.35 : 1 }}
           title={
             slot.t
-              ? `${fullStamp(slot.t)} · ${slot.state === "up" ? "operational" : "down"}`
-              : "no data for this window"
+              ? t("slotTitle", {
+                  stamp: fullStamp(slot.t),
+                  state: slot.state === "up" ? t("operational") : t("stateDown"),
+                })
+              : t("noDataWindow")
           }
         />
       ))}
@@ -737,6 +770,7 @@ function MonitorRow({
   hist?: MonitorUptime;
   winShort: string;
 }) {
+  const t = useTranslations("pages.dashboard");
   const status = statusOf(monitor);
   const diagnose = useDiagnoseControl(monitor.id);
   const pts = hist?.points ?? [];
@@ -767,13 +801,13 @@ function MonitorRow({
             <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
               {uptimePct != null ? `${uptimePct}%` : "—"}
             </p>
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">uptime {winShort}</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("uptimeWindow", { window: winShort })}</p>
           </div>
           <div>
             <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
               {respMs ? `${Math.round(respMs)}ms` : "—"}
             </p>
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">avg resp</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("avgResp")}</p>
           </div>
         </div>
       </div>
@@ -781,8 +815,8 @@ function MonitorRow({
       <div className="mt-3">
         <UptimeStrip points={pts} uptimePct={uptimePct} winShort={winShort} />
         <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span>{winShort} ago</span>
-          <span>now</span>
+          <span>{t("windowAgo", { window: winShort })}</span>
+          <span>{t("now")}</span>
         </div>
       </div>
 
@@ -830,18 +864,19 @@ const toRows = (points: MetricPoint[], hours: number) =>
 const tipLabel = (_: unknown, items: TipItem[]) => items?.[0]?.payload?.full ?? "";
 
 function ChartState({ loading, failed, empty }: { loading?: boolean; failed?: boolean; empty?: boolean }) {
+  const t = useTranslations("pages.dashboard");
   if (loading)
     return <div className="rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" style={{ height: CHART_HEIGHT }} />;
   if (failed)
     return (
       <div className="flex items-center justify-center text-xs text-red-700 dark:text-red-300" style={{ height: CHART_HEIGHT }}>
-        Couldn’t load metrics. They’ll retry automatically.
+        {t("chartLoadError")}
       </div>
     );
   if (empty)
     return (
       <div className="flex items-center justify-center text-xs text-slate-500 dark:text-slate-400" style={{ height: CHART_HEIGHT }}>
-        Collecting data…
+        {t("collectingData")}
       </div>
     );
   return null;
@@ -859,6 +894,7 @@ function AvailabilityChart({
   failed?: boolean;
 }) {
   const theme = useChartTheme();
+  const t = useTranslations("pages.dashboard");
   if (loading || failed || data.length < 2)
     return <ChartState loading={loading} failed={failed} empty={data.length < 2} />;
 
@@ -868,7 +904,7 @@ function AvailabilityChart({
   return (
     <div
       role="img"
-      aria-label={`Availability over the ${windowLabel(hours)}, currently ${last.v}% of monitors passing. Target is ${SLO_PERCENT}%.`}
+      aria-label={t("availabilityChartAria", { window: windowLabel(hours), pct: last.v, slo: SLO_PERCENT })}
     >
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <AreaChart data={rows} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
@@ -885,13 +921,13 @@ function AvailabilityChart({
             y={SLO_PERCENT}
             stroke={theme.axis}
             strokeDasharray="4 4"
-            label={{ value: `SLO ${SLO_PERCENT}%`, position: "insideTopRight", fill: theme.axis, fontSize: 11 }}
+            label={{ value: t("sloLabel", { pct: SLO_PERCENT }), position: "insideTopRight", fill: theme.axis, fontSize: 11 }}
           />
           <Tooltip
             contentStyle={tooltipStyle(theme)}
             cursor={{ stroke: theme.axis, strokeDasharray: "3 3" }}
             labelFormatter={tipLabel}
-            formatter={(v: number) => [`${v}%`, "Availability"]}
+            formatter={(v: number) => [`${v}%`, t("availability")]}
           />
           <Area type="monotone" dataKey="v" stroke={VIZ.good} strokeWidth={2} fill="url(#upFill)" isAnimationActive={false} />
           {/* 2px surface ring so the anchor reads on top of the fill. */}
@@ -914,6 +950,7 @@ function ResponseChart({
   failed?: boolean;
 }) {
   const theme = useChartTheme();
+  const t = useTranslations("pages.dashboard");
   if (loading || failed || data.length < 2)
     return <ChartState loading={loading} failed={failed} empty={data.length < 2} />;
 
@@ -924,7 +961,7 @@ function ResponseChart({
   return (
     <div
       role="img"
-      aria-label={`Average response time over the ${windowLabel(hours)}, currently ${last.v} milliseconds, window average ${mean} milliseconds.`}
+      aria-label={t("responseChartAria", { window: windowLabel(hours), current: last.v, mean })}
     >
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <LineChart data={rows} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
@@ -935,13 +972,13 @@ function ResponseChart({
             y={mean}
             stroke={theme.axis}
             strokeDasharray="4 4"
-            label={{ value: `avg ${mean}ms`, position: "insideTopRight", fill: theme.axis, fontSize: 11 }}
+            label={{ value: t("avgLabel", { mean }), position: "insideTopRight", fill: theme.axis, fontSize: 11 }}
           />
           <Tooltip
             contentStyle={tooltipStyle(theme)}
             cursor={{ stroke: theme.axis, strokeDasharray: "3 3" }}
             labelFormatter={tipLabel}
-            formatter={(v: number) => [`${v}ms`, "Response"]}
+            formatter={(v: number) => [`${v}ms`, t("response")]}
           />
           <Line type="monotone" dataKey="v" stroke={VIZ.blue} strokeWidth={2} dot={false} isAnimationActive={false} />
           <ReferenceDot x={last.label} y={last.v} r={3.5} fill={VIZ.blue} stroke={theme.tooltipBg} strokeWidth={2} isFront />

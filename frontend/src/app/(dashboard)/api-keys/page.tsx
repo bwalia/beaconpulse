@@ -25,30 +25,10 @@ import type { ApiKey, ApiKeyCreated } from "@/lib/types";
  * the first time.
  */
 
-function ago(iso: string | undefined, now: number | null): string {
-  if (!iso) return "never";
-  if (now === null) return "";
-  const s = Math.max(0, Math.floor((now - Date.parse(iso)) / 1000));
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 48) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
-function state(k: ApiKey, now: number | null): { label: string; className: string } | null {
-  if (k.revoked_at) {
-    return { label: "Revoked", className: "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400" };
-  }
-  if (k.expires_at && now !== null && Date.parse(k.expires_at) < now) {
-    return { label: "Expired", className: "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300" };
-  }
-  return null;
-}
-
 /** The secret, shown once. */
 function SecretPanel({ created, onDone }: { created: ApiKeyCreated; onDone: () => void }) {
+  const t = useTranslations("pages.apiKeys");
+  const c = useTranslations("common");
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -67,12 +47,10 @@ function SecretPanel({ created, onDone }: { created: ApiKeyCreated; onDone: () =
         <CheckCircleIcon className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-slate-900 dark:text-white">
-            “{created.key.name}” is ready
+            {t("secretReady", { name: created.key.name })}
           </h3>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Copy it now and store it somewhere safe. We only keep a hash, so this is the
-            one and only time it can be shown — if it is lost, revoke this key and create
-            another.
+            {t("secretWarning")}
           </p>
 
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -80,25 +58,28 @@ function SecretPanel({ created, onDone }: { created: ApiKeyCreated; onDone: () =
               readOnly
               value={created.secret}
               onFocus={(e) => e.currentTarget.select()}
-              aria-label="Your new API key"
+              aria-label={t("secretAriaLabel")}
               className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
             <Button variant="secondary" onClick={copy} className="shrink-0">
-              {copied ? "Copied" : "Copy"}
+              {copied ? c("copied") : c("copy")}
             </Button>
           </div>
 
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            In GitHub: <span className="font-mono">Settings → Secrets and variables → Actions</span>, as{" "}
-            <span className="font-mono">BEACON_API_KEY</span>. See{" "}
-            <Link href="/docs/automation" className="text-brand-700 hover:underline dark:text-brand-400">
-              the automation guide
-            </Link>{" "}
-            for a ready-made workflow.
+            {t.rich("githubHint", {
+              mono: (chunks) => <span className="font-mono">{chunks}</span>,
+              code: (chunks) => <span className="font-mono">{chunks}</span>,
+              link: (chunks) => (
+                <Link href="/docs/automation" className="text-brand-700 hover:underline dark:text-brand-400">
+                  {chunks}
+                </Link>
+              ),
+            })}
           </p>
 
           <div className="mt-4">
-            <Button onClick={onDone}>Done — I have saved it</Button>
+            <Button onClick={onDone}>{t("doneSaved")}</Button>
           </div>
         </div>
       </div>
@@ -107,6 +88,8 @@ function SecretPanel({ created, onDone }: { created: ApiKeyCreated; onDone: () =
 }
 
 function CreateForm({ onCreated, onCancel }: { onCreated: (c: ApiKeyCreated) => void; onCancel: () => void }) {
+  const t = useTranslations("pages.apiKeys");
+  const c = useTranslations("common");
   const create = useCreateApiKey();
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
@@ -124,38 +107,38 @@ function CreateForm({ onCreated, onCancel }: { onCreated: (c: ApiKeyCreated) => 
       });
       onCreated(created);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Could not create the key");
+      setError(err instanceof ApiRequestError ? err.message : t("createFailed"));
     }
   };
 
   return (
     <Card className="p-5">
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Name" hint="Name it after whatever will use it, so you know what you are revoking later.">
+        <Field label={t("nameLabel")} hint={t("nameHint")}>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="github-actions"
+            placeholder={t("namePlaceholder")}
             autoFocus
             required
           />
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Access" hint="Give it the least it needs. A key can never have more access than you.">
+          <Field label={t("accessLabel")} hint={t("accessHint")}>
             <Select value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="">Same as mine</option>
-              <option value="member">Member — read and write monitors</option>
-              <option value="viewer">Viewer — read only</option>
+              <option value="">{t("roleOptionInherit")}</option>
+              <option value="member">{t("roleOptionMember")}</option>
+              <option value="viewer">{t("roleOptionViewer")}</option>
             </Select>
           </Field>
 
-          <Field label="Expires after" hint="Optional. A key with an end date is one you cannot forget about.">
+          <Field label={t("expiresLabel")} hint={t("expiresHint")}>
             <Select value={expiresInDays} onChange={(e) => setExpiresInDays(e.target.value)}>
-              <option value="">Never</option>
-              <option value="30">30 days</option>
-              <option value="90">90 days</option>
-              <option value="365">1 year</option>
+              <option value="">{t("expiresNever")}</option>
+              <option value="30">{t("expires30")}</option>
+              <option value="90">{t("expires90")}</option>
+              <option value="365">{t("expires365")}</option>
             </Select>
           </Field>
         </div>
@@ -168,10 +151,10 @@ function CreateForm({ onCreated, onCancel }: { onCreated: (c: ApiKeyCreated) => 
 
         <div className="flex gap-2">
           <Button type="submit" disabled={create.isPending || !name.trim()}>
-            {create.isPending ? "Creating…" : "Create key"}
+            {create.isPending ? t("creating") : t("createKey")}
           </Button>
           <Button type="button" variant="secondary" onClick={onCancel}>
-            Cancel
+            {c("cancel")}
           </Button>
         </div>
       </form>
@@ -195,6 +178,38 @@ export default function ApiKeysPage() {
   const canManage = user?.role === "owner" || user?.role === "admin";
   const keys = data?.data ?? [];
 
+  const ago = (iso: string | undefined, now: number | null): string => {
+    if (!iso) return t("agoNever");
+    if (now === null) return "";
+    const s = Math.max(0, Math.floor((now - Date.parse(iso)) / 1000));
+    if (s < 60) return t("agoJustNow");
+    const m = Math.floor(s / 60);
+    if (m < 60) return t("agoMinutes", { count: m });
+    const h = Math.floor(m / 60);
+    if (h < 48) return t("agoHours", { count: h });
+    return t("agoDays", { count: Math.floor(h / 24) });
+  };
+
+  const state = (k: ApiKey, now: number | null): { label: string; className: string } | null => {
+    if (k.revoked_at) {
+      return { label: t("statusRevoked"), className: "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400" };
+    }
+    if (k.expires_at && now !== null && Date.parse(k.expires_at) < now) {
+      return { label: t("statusExpired"), className: "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300" };
+    }
+    return null;
+  };
+
+  const roleLabel = (r: string): string => {
+    const keyMap: Record<string, string> = {
+      owner: "roleOwner",
+      admin: "roleAdmin",
+      member: "roleMember",
+      viewer: "roleViewer",
+    };
+    return keyMap[r] ? t(keyMap[r]) : r;
+  };
+
   return (
     <motion.div initial="hidden" animate="show" variants={stagger} className="space-y-6">
       <PageHeader
@@ -204,7 +219,7 @@ export default function ApiKeysPage() {
           canManage && !showForm && !created ? (
             <Button onClick={() => setShowForm(true)}>
               <PlusIcon className="h-4 w-4" />
-              Create key
+              {t("createKey")}
             </Button>
           ) : null
         }
@@ -235,11 +250,10 @@ export default function ApiKeysPage() {
           icon={<LockIcon className="h-5 w-5" />}
           title={t("empty")}
           action={
-            canManage ? <Button onClick={() => setShowForm(true)}>Create your first key</Button> : undefined
+            canManage ? <Button onClick={() => setShowForm(true)}>{t("createFirstKey")}</Button> : undefined
           }
         >
-          A key lets a script or a CI pipeline manage your monitors. Commit the domains you
-          watch alongside the code that serves them, and keep the two in step.
+          {t("emptyBody")}
         </EmptyState>
       ) : (
         <motion.div variants={reveal}>
@@ -247,10 +261,10 @@ export default function ApiKeysPage() {
             <table className="w-full text-left">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
                 <tr>
-                  <th className="px-4 py-3 font-semibold">Name</th>
-                  <th className="px-4 py-3 font-semibold">Key</th>
-                  <th className="px-4 py-3 font-semibold">Access</th>
-                  <th className="px-4 py-3 font-semibold">Last used</th>
+                  <th className="px-4 py-3 font-semibold">{t("colName")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("colKey")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("colAccess")}</th>
+                  <th className="px-4 py-3 font-semibold">{t("colLastUsed")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -276,7 +290,7 @@ export default function ApiKeysPage() {
                         {k.prefix}…
                       </td>
                       <td className="px-4 py-3.5 text-sm capitalize text-slate-600 dark:text-slate-300">
-                        {k.role}
+                        {roleLabel(k.role)}
                       </td>
                       <td className="px-4 py-3.5 text-sm text-slate-600 dark:text-slate-300">
                         {/* Coarse on purpose: this answers "is anything still using
@@ -294,9 +308,9 @@ export default function ApiKeysPage() {
                               onClick={async () => {
                                 if (
                                   await confirm({
-                                    title: `Revoke “${k.name}”?`,
-                                    body: "Anything using this key stops working immediately. This cannot be undone — you would need to create a new key and update whatever uses it.",
-                                    confirmLabel: "Revoke key",
+                                    title: t("revokeConfirmTitle", { name: k.name }),
+                                    body: t("revokeConfirmBody"),
+                                    confirmLabel: t("revokeConfirmLabel"),
                                     danger: true,
                                   })
                                 ) {
@@ -305,7 +319,7 @@ export default function ApiKeysPage() {
                               }}
                             >
                               <XIcon className="h-3.5 w-3.5" />
-                              Revoke
+                              {t("revoke")}
                             </Button>
                           </div>
                         )}
@@ -321,7 +335,7 @@ export default function ApiKeysPage() {
 
       {!canManage && (
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Only owners and admins can create or revoke API keys.
+          {t("ownerAdminOnly")}
         </p>
       )}
     </motion.div>

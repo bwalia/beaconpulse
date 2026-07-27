@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { brand } from "@/brand";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
@@ -39,30 +39,34 @@ import type { MetricPoint, Monitor } from "@/lib/types";
 
 const PAGE_SIZE = 20;
 
-const schema = z.object({
-  project_id: z.string().uuid("Select a project"),
-  name: z.string().min(1, "Name is required"),
-  type: z.enum(["http", "https", "ssl", "tcp", "icmp", "dns", "heartbeat"]),
-  // Optional at the schema level; required-unless-heartbeat is enforced by the
-  // refine() at the bottom of the object, because a heartbeat has no target.
-  target: z.string().optional(),
-  interval_seconds: z.coerce.number().int().min(10).max(86400),
-  grace_seconds: z.coerce.number().int().min(0).max(86400).optional(),
-  // Advanced (all optional)
-  valid_status_codes: z.string().optional(),
-  body_keyword: z.string().optional(),
-  follow_redirects: z.boolean().optional(),
-  skip_tls_verify: z.boolean().optional(),
-  response_time_warning_ms: z.coerce.number().int().min(0).optional(),
-  ssl_expiry_warning_days: z.coerce.number().int().min(0).max(825).optional(),
-  headers: z.string().optional(),
-  dns_query_type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA"]).optional(),
-  alert_sensitivity: z.enum(["immediate", "balanced", "relaxed"]).optional(),
-}).refine((v) => v.type === "heartbeat" || (v.target ?? "").trim().length > 0, {
-  message: "Target is required",
-  path: ["target"],
-});
-type Values = z.infer<typeof schema>;
+// Built via a factory so validation messages come from next-intl (a module-scope
+// schema would freeze the messages in English before the translator exists).
+function makeSchema(t: (key: string) => string) {
+  return z.object({
+    project_id: z.string().uuid(t("selectProject")),
+    name: z.string().min(1, t("nameRequired")),
+    type: z.enum(["http", "https", "ssl", "tcp", "icmp", "dns", "heartbeat"]),
+    // Optional at the schema level; required-unless-heartbeat is enforced by the
+    // refine() at the bottom of the object, because a heartbeat has no target.
+    target: z.string().optional(),
+    interval_seconds: z.coerce.number().int().min(10).max(86400),
+    grace_seconds: z.coerce.number().int().min(0).max(86400).optional(),
+    // Advanced (all optional)
+    valid_status_codes: z.string().optional(),
+    body_keyword: z.string().optional(),
+    follow_redirects: z.boolean().optional(),
+    skip_tls_verify: z.boolean().optional(),
+    response_time_warning_ms: z.coerce.number().int().min(0).optional(),
+    ssl_expiry_warning_days: z.coerce.number().int().min(0).max(825).optional(),
+    headers: z.string().optional(),
+    dns_query_type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA"]).optional(),
+    alert_sensitivity: z.enum(["immediate", "balanced", "relaxed"]).optional(),
+  }).refine((v) => v.type === "heartbeat" || (v.target ?? "").trim().length > 0, {
+    message: t("targetRequired"),
+    path: ["target"],
+  });
+}
+type Values = z.infer<ReturnType<typeof makeSchema>>;
 
 // AdvancedFields is the shared shape of the advanced settings inputs, used by
 // both the create and edit forms.
@@ -79,10 +83,11 @@ type AdvancedFields = {
 };
 
 // SENSITIVITY_OPTIONS controls how long a monitor must be down before it alerts.
+// Labels are resolved via t() at the render site (see the `key`).
 const SENSITIVITY_OPTIONS = [
-  { v: "immediate", label: "Immediate — alert on the first failed check" },
-  { v: "balanced", label: "Balanced — sustained failure (recommended)" },
-  { v: "relaxed", label: "Relaxed — only prolonged outages (~5 min)" },
+  { v: "immediate", key: "sensitivityImmediate" },
+  { v: "balanced", key: "sensitivityBalanced" },
+  { v: "relaxed", key: "sensitivityRelaxed" },
 ];
 
 // buildSettings turns the advanced form fields into the API's settings object,
@@ -131,6 +136,8 @@ const targetHints: Record<string, string> = {
 // carries the token (the credential), so we surface it prominently once and give a
 // ready-to-paste cron example, rather than burying it in the monitor row.
 function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () => void }) {
+  const t = useTranslations("pages.monitors");
+  const c = useTranslations("common");
   const [copied, setCopied] = useState(false);
   // ping_url is returned relative; compose the absolute URL from the current origin
   // so it never hard-codes a gateway host.
@@ -155,11 +162,10 @@ function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () =>
         <CheckCircleIcon className="mt-0.5 h-7 w-7 shrink-0 text-emerald-600 dark:text-emerald-400" />
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold text-slate-900 dark:text-white">
-            “{monitor.name}” is ready
+            {t("heartbeatReadyTitle", { name: monitor.name })}
           </h3>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Call this URL from your job on success. If no ping arrives within the interval plus
-            grace period, {brand.name} alerts you. You can find it again on this monitor later.
+            {t("heartbeatReadyBody", { brand: brand.name })}
           </p>
 
           <div className="mt-3 flex items-center gap-2">
@@ -170,17 +176,17 @@ function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () =>
               className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             />
             <Button variant="secondary" onClick={copy}>
-              {copied ? "Copied" : "Copy"}
+              {copied ? c("copied") : c("copy")}
             </Button>
           </div>
 
-          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Example crontab:</p>
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{t("heartbeatExampleCrontab")}</p>
           <pre className="mt-1 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
             {`0 2 * * *  /path/to/backup.sh && curl -fsS ${url}`}
           </pre>
 
           <div className="mt-4">
-            <Button onClick={onDone}>Done</Button>
+            <Button onClick={onDone}>{c("done")}</Button>
           </div>
         </div>
       </div>
@@ -190,6 +196,7 @@ function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () =>
 
 export default function MonitorsPage() {
   const t = useTranslations("pages.monitors");
+  const c = useTranslations("common");
   const [page, setPage] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -246,13 +253,13 @@ export default function MonitorsPage() {
                     {usage.plan}
                   </span>
                   <span className="tabular-nums">
-                    {usage.monitors_used} / {usage.monitors_limit} monitors
+                    {t("usageCount", { used: usage.monitors_used, limit: usage.monitors_limit })}
                   </span>
                 </div>
                 <div
                   className="mt-1 h-1.5 w-32 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
                   role="progressbar"
-                  aria-label="Monitor quota used"
+                  aria-label={t("quotaAriaLabel")}
                   aria-valuenow={usage.monitors_used}
                   aria-valuemin={0}
                   aria-valuemax={usage.monitors_limit}
@@ -266,7 +273,7 @@ export default function MonitorsPage() {
             )}
             <Button onClick={() => setShowForm((v) => !v)}>
               {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
-              {showForm ? "Close" : "Add monitor"}
+              {showForm ? c("close") : t("addMonitor")}
             </Button>
           </>
         }
@@ -274,8 +281,11 @@ export default function MonitorsPage() {
 
       {atLimit && !showForm && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-          You&apos;ve reached your <span className="font-medium uppercase">{usage?.plan}</span> plan limit of{" "}
-          {usage?.monitors_limit} monitors. Delete one or upgrade to add more.
+          {t.rich("atLimitBanner", {
+            plan: usage?.plan ?? "",
+            limit: usage?.monitors_limit ?? 0,
+            b: (chunks) => <span className="font-medium uppercase">{chunks}</span>,
+          })}
         </div>
       )}
 
@@ -287,21 +297,21 @@ export default function MonitorsPage() {
           <SearchInput
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="Search by name or target…"
-            label="Search monitors"
+            placeholder={t("searchPlaceholder")}
+            label={t("searchLabel")}
           />
           <select
             value={status}
             onChange={(e) => changeStatus(e.target.value)}
-            aria-label="Filter by status"
+            aria-label={t("filterStatusLabel")}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-44"
           >
-            <option value="">All statuses</option>
-            <option value="up">Up</option>
-            <option value="down">Down</option>
-            <option value="degraded">Degraded</option>
-            <option value="paused">Paused</option>
-            <option value="unknown">Unknown</option>
+            <option value="">{t("statusAll")}</option>
+            <option value="up">{t("statusUp")}</option>
+            <option value="down">{t("statusDown")}</option>
+            <option value="degraded">{t("statusDegraded")}</option>
+            <option value="paused">{t("statusPaused")}</option>
+            <option value="unknown">{t("statusUnknown")}</option>
           </select>
         </div>
       )}
@@ -326,19 +336,19 @@ export default function MonitorsPage() {
                   changeStatus("");
                 }}
               >
-                Clear filters
+                {t("clearFilters")}
               </Button>
             ) : (
               <Button onClick={() => setShowForm(true)}>
                 <PlusIcon className="h-4 w-4" />
-                Add monitor
+                {t("addMonitor")}
               </Button>
             )
           }
         >
           {filtering
-            ? "No monitors match your search or filter. Try a different term."
-            : `Add your first website, API or port and ${brand.name} starts probing it within seconds`}
+            ? t("emptyFilteredBody")
+            : t("emptyBody", { brand: brand.name })}
         </EmptyState>
       ) : (
         <>
@@ -346,12 +356,12 @@ export default function MonitorsPage() {
             <table className="w-full text-[15px]">
               <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
                 <tr>
-                  <th scope="col" className="px-4 py-3 font-semibold">Status</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Name</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Type</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Target</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Interval</th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">{t("colStatus")}</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">{t("colName")}</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">{t("colType")}</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">{t("colTarget")}</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">{t("colInterval")}</th>
+                  <th scope="col" className="px-4 py-3 text-right font-semibold">{t("colActions")}</th>
                 </tr>
               </thead>
               <motion.tbody
@@ -399,6 +409,8 @@ function MonitorRow({
   onMetrics: () => void;
   onEdit: () => void;
 }) {
+  const t = useTranslations("pages.monitors");
+  const c = useTranslations("common");
   const setEnabled = useSetMonitorEnabled();
   const deleteMonitor = useDeleteMonitor();
   const confirm = useConfirm();
@@ -419,11 +431,11 @@ function MonitorRow({
           <StatusBadge status={monitor.enabled ? monitor.last_status : "paused"} />
           {monitor.in_maintenance && (
             <span
-              title="Under an active maintenance window — alerts are suppressed"
+              title={t("maintenanceTooltip")}
               className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
             >
               <WrenchIcon className="h-3 w-3" />
-              Maintenance
+              {t("maintenanceBadge")}
             </span>
           )}
         </div>
@@ -470,10 +482,10 @@ function MonitorRow({
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={onMetrics}>
-            Metrics
+            {t("metricsAction")}
           </Button>
           <Button size="sm" variant="ghost" onClick={onEdit}>
-            Edit
+            {c("edit")}
           </Button>
           <Button
             size="sm"
@@ -481,7 +493,7 @@ function MonitorRow({
             onClick={() => setEnabled.mutate({ id: monitor.id, enabled: !monitor.enabled })}
             disabled={setEnabled.isPending}
           >
-            {monitor.enabled ? "Pause" : "Resume"}
+            {monitor.enabled ? t("pause") : t("resume")}
           </Button>
           <span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
           <Button
@@ -491,9 +503,9 @@ function MonitorRow({
             onClick={async () => {
               if (
                 await confirm({
-                  title: `Delete “${monitor.name}”?`,
-                  body: "This removes the monitor and its history. This can't be undone.",
-                  confirmLabel: "Delete monitor",
+                  title: t("deleteConfirmTitle", { name: monitor.name }),
+                  body: t("deleteConfirmBody"),
+                  confirmLabel: t("deleteConfirmLabel"),
                   danger: true,
                 })
               ) {
@@ -502,7 +514,7 @@ function MonitorRow({
             }}
             disabled={deleteMonitor.isPending}
           >
-            Delete
+            {c("delete")}
           </Button>
         </div>
       </td>
@@ -521,8 +533,9 @@ function MonitorRow({
 }
 
 function Sparkline({ points, color = "#328cff" }: { points: MetricPoint[]; color?: string }) {
+  const t = useTranslations("pages.monitors");
   if (points.length < 2) {
-    return <p className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">Not enough data yet.</p>;
+    return <p className="py-6 text-center text-xs text-slate-500 dark:text-slate-400">{t("notEnoughData")}</p>;
   }
   const w = 320;
   const h = 60;
@@ -545,6 +558,8 @@ function Sparkline({ points, color = "#328cff" }: { points: MetricPoint[]; color
 }
 
 function MonitorMetricsModal({ monitor, onClose }: { monitor: Monitor; onClose: () => void }) {
+  const t = useTranslations("pages.monitors");
+  const c = useTranslations("common");
   const { data, isLoading } = useMonitorMetrics(monitor.id);
 
   return (
@@ -563,7 +578,7 @@ function MonitorMetricsModal({ monitor, onClose }: { monitor: Monitor; onClose: 
           </div>
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label={c("close")}
             className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 motion-reduce:transition-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
           >
             <XIcon className="h-4 w-4" />
@@ -571,28 +586,28 @@ function MonitorMetricsModal({ monitor, onClose }: { monitor: Monitor; onClose: 
         </div>
 
         {isLoading ? (
-          <p className="text-slate-500 dark:text-slate-400">Loading metrics…</p>
+          <p className="text-slate-500 dark:text-slate-400">{t("loadingMetrics")}</p>
         ) : (
           <>
             <div className="mb-4 grid grid-cols-3 gap-3 text-center">
               <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Uptime (24h)</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t("statUptime24h")}</p>
                 <p className="text-xl font-bold text-emerald-600">
                   {data ? `${data.uptime_percent}%` : "—"}
                 </p>
               </div>
               <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Response now</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t("statResponseNow")}</p>
                 <p className="text-xl font-bold">{data ? `${Math.round(data.response_ms_current)}ms` : "—"}</p>
               </div>
               <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/50">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Avg (24h)</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t("statAvg24h")}</p>
                 <p className="text-xl font-bold">{data ? `${Math.round(data.response_ms_avg)}ms` : "—"}</p>
               </div>
             </div>
-            <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">Response time (24h)</p>
+            <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">{t("responseTime24h")}</p>
             <Sparkline points={data?.response_ms ?? []} />
-            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Your organization&apos;s data only, from Prometheus.</p>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{t("metricsPrivacyNote")}</p>
           </>
         )}
       </div>
@@ -600,23 +615,30 @@ function MonitorMetricsModal({ monitor, onClose }: { monitor: Monitor; onClose: 
   );
 }
 
-const editSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  target: z.string().min(1, "Target is required"),
-  interval_seconds: z.coerce.number().int().min(10).max(86400),
-  valid_status_codes: z.string().optional(),
-  body_keyword: z.string().optional(),
-  follow_redirects: z.boolean().optional(),
-  skip_tls_verify: z.boolean().optional(),
-  response_time_warning_ms: z.coerce.number().int().min(0).optional(),
-  ssl_expiry_warning_days: z.coerce.number().int().min(0).max(825).optional(),
-  headers: z.string().optional(),
-  dns_query_type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA"]).optional(),
-  alert_sensitivity: z.enum(["immediate", "balanced", "relaxed"]).optional(),
-});
-type EditValues = z.infer<typeof editSchema>;
+// Built via a factory so validation messages come from next-intl (see makeSchema above).
+function makeEditSchema(t: (key: string) => string) {
+  return z.object({
+    name: z.string().min(1, t("nameRequired")),
+    target: z.string().min(1, t("targetRequired")),
+    interval_seconds: z.coerce.number().int().min(10).max(86400),
+    valid_status_codes: z.string().optional(),
+    body_keyword: z.string().optional(),
+    follow_redirects: z.boolean().optional(),
+    skip_tls_verify: z.boolean().optional(),
+    response_time_warning_ms: z.coerce.number().int().min(0).optional(),
+    ssl_expiry_warning_days: z.coerce.number().int().min(0).max(825).optional(),
+    headers: z.string().optional(),
+    dns_query_type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA"]).optional(),
+    alert_sensitivity: z.enum(["immediate", "balanced", "relaxed"]).optional(),
+  });
+}
+type EditValues = z.infer<ReturnType<typeof makeEditSchema>>;
 
 function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () => void }) {
+  const t = useTranslations("pages.monitors");
+  const c = useTranslations("common");
+  const tv = useTranslations("validation");
+  const editSchema = useMemo(() => makeEditSchema(tv), [tv]);
   const updateMonitor = useUpdateMonitor();
   const { data: usage } = useUsage();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -651,7 +673,7 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
   const minInterval = usage?.min_interval_seconds ?? 10;
   const opts = INTERVAL_OPTIONS.filter((o) => o.v >= minInterval);
   if (!opts.some((o) => o.v === monitor.interval_seconds)) {
-    opts.unshift({ v: monitor.interval_seconds, label: `Every ${monitor.interval_seconds}s (current)` });
+    opts.unshift({ v: monitor.interval_seconds, key: "intervalCurrent" });
   }
 
   const onSubmit = async (values: EditValues) => {
@@ -668,7 +690,7 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
       });
       onClose();
     } catch (err) {
-      setServerError(err instanceof ApiRequestError ? err.message : "Failed to update monitor");
+      setServerError(err instanceof ApiRequestError ? err.message : t("updateError"));
     }
   };
 
@@ -680,12 +702,12 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
       >
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold">Edit monitor</h2>
+            <h2 className="text-lg font-bold">{t("editTitle")}</h2>
             <p className="text-xs uppercase text-slate-500 dark:text-slate-400">{monitor.type}</p>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label={c("close")}
             className="rounded p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 motion-reduce:transition-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
           >
             <XIcon className="h-4 w-4" />
@@ -693,29 +715,29 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
-          <Field label="Name" error={errors.name?.message}>
+          <Field label={t("fieldName")} error={errors.name?.message}>
             <Input {...register("name")} />
           </Field>
-          <Field label="Check interval" error={errors.interval_seconds?.message}>
+          <Field label={t("fieldCheckInterval")} error={errors.interval_seconds?.message}>
             <Select {...register("interval_seconds")}>
               {opts.map((o) => (
                 <option key={o.v} value={o.v}>
-                  {o.label}
+                  {t(o.key, { seconds: o.v })}
                 </option>
               ))}
             </Select>
           </Field>
           <div className="sm:col-span-2">
-            <Field label="Target" error={errors.target?.message}>
+            <Field label={t("fieldTarget")} error={errors.target?.message}>
               <Input {...register("target")} />
             </Field>
           </div>
           <div className="sm:col-span-2">
-            <Field label="Alert sensitivity" error={errors.alert_sensitivity?.message}>
+            <Field label={t("fieldAlertSensitivity")} error={errors.alert_sensitivity?.message}>
               <Select {...register("alert_sensitivity")}>
                 {SENSITIVITY_OPTIONS.map((o) => (
                   <option key={o.v} value={o.v}>
-                    {o.label}
+                    {t(o.key)}
                   </option>
                 ))}
               </Select>
@@ -724,26 +746,26 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
 
           {isHTTP && (
             <>
-              <Field label="Expected status codes" error={errors.valid_status_codes?.message}>
+              <Field label={t("fieldExpectedStatusCodes")} error={errors.valid_status_codes?.message}>
                 <Input placeholder="200, 204, 301" {...register("valid_status_codes")} />
               </Field>
-              <Field label="Response body must contain" error={errors.body_keyword?.message}>
+              <Field label={t("fieldBodyKeyword")} error={errors.body_keyword?.message}>
                 <Input {...register("body_keyword")} />
               </Field>
-              <Field label="Slow-response alert (ms, blank = off)" error={errors.response_time_warning_ms?.message}>
+              <Field label={t("fieldSlowResponse")} error={errors.response_time_warning_ms?.message}>
                 <Input type="number" {...register("response_time_warning_ms")} />
               </Field>
-              <Field label="SSL expiry warning (days)" error={errors.ssl_expiry_warning_days?.message}>
+              <Field label={t("fieldSslExpiry")} error={errors.ssl_expiry_warning_days?.message}>
                 <Input type="number" {...register("ssl_expiry_warning_days")} />
               </Field>
               <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                <input type="checkbox" className="h-4 w-4" {...register("follow_redirects")} /> Follow redirects
+                <input type="checkbox" className="h-4 w-4" {...register("follow_redirects")} /> {t("fieldFollowRedirects")}
               </label>
               <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                <input type="checkbox" className="h-4 w-4" {...register("skip_tls_verify")} /> Skip TLS verification
+                <input type="checkbox" className="h-4 w-4" {...register("skip_tls_verify")} /> {t("fieldSkipTls")}
               </label>
               <div className="sm:col-span-2">
-                <Field label="Custom headers (one per line, Name: value)" error={errors.headers?.message}>
+                <Field label={t("fieldCustomHeaders")} error={errors.headers?.message}>
                   <Textarea rows={3} {...register("headers")} />
                 </Field>
               </div>
@@ -751,7 +773,7 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
           )}
 
           {monitor.type === "dns" && (
-            <Field label="DNS record type" error={errors.dns_query_type?.message}>
+            <Field label={t("fieldDnsRecordType")} error={errors.dns_query_type?.message}>
               <Select {...register("dns_query_type")}>
                 {["A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA"].map((t) => (
                   <option key={t} value={t}>
@@ -765,10 +787,10 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
           {serverError && <p className="text-sm text-red-600 sm:col-span-2">{serverError}</p>}
           <div className="flex gap-2 sm:col-span-2">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : "Save changes"}
+              {isSubmitting ? t("savingLabel") : t("saveChanges")}
             </Button>
             <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
+              {c("cancel")}
             </Button>
           </div>
         </form>
@@ -777,14 +799,18 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
   );
 }
 
+// Labels are resolved via t() at the render site (see the `key`).
 const INTERVAL_OPTIONS = [
-  { v: 30, label: "Every 30 seconds" },
-  { v: 60, label: "Every minute" },
-  { v: 300, label: "Every 5 minutes" },
-  { v: 900, label: "Every 15 minutes" },
+  { v: 30, key: "intervalEvery30Seconds" },
+  { v: 60, key: "intervalEveryMinute" },
+  { v: 300, key: "intervalEvery5Minutes" },
+  { v: 900, key: "intervalEvery15Minutes" },
 ];
 
 function CreateMonitorForm({ onDone }: { onDone: () => void }) {
+  const t = useTranslations("pages.monitors");
+  const tv = useTranslations("validation");
+  const schema = useMemo(() => makeSchema(tv), [tv]);
   const { data: projects } = useProjects();
   const { data: usage } = useUsage();
   const minInterval = usage?.min_interval_seconds ?? 10;
@@ -830,7 +856,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
         onDone();
       }
     } catch (err) {
-      setServerError(err instanceof ApiRequestError ? err.message : "Failed to create monitor");
+      setServerError(err instanceof ApiRequestError ? err.message : t("createError"));
     }
   };
 
@@ -842,7 +868,9 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
     return (
       <Card>
         <p className="text-slate-500 dark:text-slate-400">
-          Create a <span className="font-medium">project</span> first — monitors belong to a project.
+          {t.rich("noProjectsBody", {
+            b: (chunks) => <span className="font-medium">{chunks}</span>,
+          })}
         </p>
       </Card>
     );
@@ -851,9 +879,9 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
   return (
     <Card>
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
-        <Field label="Project" error={errors.project_id?.message}>
+        <Field label={t("fieldProject")} error={errors.project_id?.message}>
           <Select {...register("project_id")}>
-            <option value="">Select a project…</option>
+            <option value="">{t("selectProjectPlaceholder")}</option>
             {projects.data.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -861,54 +889,52 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
             ))}
           </Select>
         </Field>
-        <Field label="Name" error={errors.name?.message}>
-          <Input placeholder="Marketing site" {...register("name")} />
+        <Field label={t("fieldName")} error={errors.name?.message}>
+          <Input placeholder={t("namePlaceholder")} {...register("name")} />
         </Field>
-        <Field label="Type" error={errors.type?.message}>
+        <Field label={t("fieldType")} error={errors.type?.message}>
           <Select {...register("type")}>
-            <option value="https">HTTPS website</option>
-            <option value="http">HTTP website</option>
-            <option value="ssl">SSL certificate</option>
-            <option value="tcp">TCP port</option>
-            <option value="icmp">Ping (ICMP)</option>
-            <option value="dns">DNS</option>
-            <option value="heartbeat">Heartbeat (cron / job)</option>
+            <option value="https">{t("typeHttps")}</option>
+            <option value="http">{t("typeHttp")}</option>
+            <option value="ssl">{t("typeSsl")}</option>
+            <option value="tcp">{t("typeTcp")}</option>
+            <option value="icmp">{t("typeIcmp")}</option>
+            <option value="dns">{t("typeDns")}</option>
+            <option value="heartbeat">{t("typeHeartbeat")}</option>
           </Select>
         </Field>
-        <Field label="Check interval" error={errors.interval_seconds?.message}>
+        <Field label={t("fieldCheckInterval")} error={errors.interval_seconds?.message}>
           <Select {...register("interval_seconds")}>
             {INTERVAL_OPTIONS.filter((o) => o.v >= minInterval).map((o) => (
               <option key={o.v} value={o.v}>
-                {o.label}
+                {t(o.key, { seconds: o.v })}
               </option>
             ))}
           </Select>
           {usage && minInterval > 30 && (
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Your {usage.plan} plan&apos;s fastest interval is {minInterval}s.
+              {t("intervalFloorNote", { plan: usage.plan, seconds: minInterval })}
             </p>
           )}
         </Field>
         {isHeartbeat ? (
           <>
-            <Field label="Grace period" error={errors.grace_seconds?.message}>
+            <Field label={t("fieldGracePeriod")} error={errors.grace_seconds?.message}>
               <Select {...register("grace_seconds")}>
-                <option value="">One interval (default)</option>
-                <option value="60">1 minute</option>
-                <option value="300">5 minutes</option>
-                <option value="900">15 minutes</option>
-                <option value="3600">1 hour</option>
+                <option value="">{t("graceOneInterval")}</option>
+                <option value="60">{t("grace1Minute")}</option>
+                <option value="300">{t("grace5Minutes")}</option>
+                <option value="900">{t("grace15Minutes")}</option>
+                <option value="3600">{t("grace1Hour")}</option>
               </Select>
             </Field>
             <div className="sm:col-span-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
-              A heartbeat has no URL to probe. Instead, {brand.name} gives you a ping URL to
-              call from your cron/job on success — if no ping arrives within the interval
-              plus grace period, you&apos;re alerted. You&apos;ll get the URL after saving.
+              {t("heartbeatInfo", { brand: brand.name })}
             </div>
           </>
         ) : (
           <div className="sm:col-span-2">
-            <Field label="Target" error={errors.target?.message}>
+            <Field label={t("fieldTarget")} error={errors.target?.message}>
               <Input placeholder={targetHints[type]} {...register("target")} />
             </Field>
           </div>
@@ -918,18 +944,17 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
             a heartbeat uses its grace period instead, so it is hidden here. */}
         {!isHeartbeat && (
           <div className="sm:col-span-2">
-            <Field label="Alert sensitivity" error={errors.alert_sensitivity?.message}>
+            <Field label={t("fieldAlertSensitivity")} error={errors.alert_sensitivity?.message}>
               <Select {...register("alert_sensitivity")}>
                 {SENSITIVITY_OPTIONS.map((o) => (
                   <option key={o.v} value={o.v}>
-                    {o.label}
+                    {t(o.key)}
                   </option>
                 ))}
               </Select>
             </Field>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              How long the target must be down before you&apos;re alerted. Immediate catches brief dips; relaxed
-              avoids noise from short blips.
+              {t("sensitivityHelp")}
             </p>
           </div>
         )}
@@ -941,33 +966,33 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
               onClick={() => setShowAdvanced((v) => !v)}
               className="text-sm font-medium text-brand-600 hover:underline"
             >
-              {showAdvanced ? "− Hide" : "+ Show"} advanced settings
+              {showAdvanced ? t("hideAdvanced") : t("showAdvanced")}
             </button>
           </div>
         )}
 
         {showAdvanced && isHTTP && (
           <>
-            <Field label="Expected status codes" error={errors.valid_status_codes?.message}>
-              <Input placeholder="200, 204, 301 (blank = 2xx/3xx)" {...register("valid_status_codes")} />
+            <Field label={t("fieldExpectedStatusCodes")} error={errors.valid_status_codes?.message}>
+              <Input placeholder={t("statusCodesPlaceholder")} {...register("valid_status_codes")} />
             </Field>
-            <Field label="Response body must contain" error={errors.body_keyword?.message}>
-              <Input placeholder='e.g. "status":"ok"' {...register("body_keyword")} />
+            <Field label={t("fieldBodyKeyword")} error={errors.body_keyword?.message}>
+              <Input placeholder={t("bodyKeywordPlaceholder")} {...register("body_keyword")} />
             </Field>
-            <Field label="Slow-response alert (ms, blank = off)" error={errors.response_time_warning_ms?.message}>
+            <Field label={t("fieldSlowResponse")} error={errors.response_time_warning_ms?.message}>
               <Input type="number" placeholder="2000" {...register("response_time_warning_ms")} />
             </Field>
-            <Field label="SSL expiry warning (days)" error={errors.ssl_expiry_warning_days?.message}>
+            <Field label={t("fieldSslExpiry")} error={errors.ssl_expiry_warning_days?.message}>
               <Input type="number" placeholder="30" {...register("ssl_expiry_warning_days")} />
             </Field>
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <input type="checkbox" className="h-4 w-4" {...register("follow_redirects")} /> Follow redirects
+              <input type="checkbox" className="h-4 w-4" {...register("follow_redirects")} /> {t("fieldFollowRedirects")}
             </label>
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <input type="checkbox" className="h-4 w-4" {...register("skip_tls_verify")} /> Skip TLS verification
+              <input type="checkbox" className="h-4 w-4" {...register("skip_tls_verify")} /> {t("fieldSkipTls")}
             </label>
             <div className="sm:col-span-2">
-              <Field label="Custom headers (one per line, Name: value) — use for auth" error={errors.headers?.message}>
+              <Field label={t("fieldCustomHeadersAuth")} error={errors.headers?.message}>
                 <Textarea rows={3} placeholder={"Authorization: Bearer xxx\nX-API-Key: abc123"} {...register("headers")} />
               </Field>
             </div>
@@ -975,7 +1000,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
         )}
 
         {showAdvanced && type === "dns" && (
-          <Field label="DNS record type" error={errors.dns_query_type?.message}>
+          <Field label={t("fieldDnsRecordType")} error={errors.dns_query_type?.message}>
             <Select {...register("dns_query_type")}>
               {["A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA"].map((t) => (
                 <option key={t} value={t}>
@@ -989,10 +1014,10 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
         {serverError && <p className="text-sm text-red-600 sm:col-span-2">{serverError}</p>}
         <div className="sm:col-span-2 flex items-center gap-3">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating…" : "Create monitor"}
+            {isSubmitting ? t("creatingLabel") : t("createMonitor")}
           </Button>
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            Prometheus & Blackbox are configured automatically.
+            {t("autoConfigNote")}
           </span>
         </div>
       </form>

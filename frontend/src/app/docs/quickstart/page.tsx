@@ -1,20 +1,25 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, H2, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "Quickstart",
-  description: "Sign up and get your first domain monitored in about five minutes.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navQuickstart"),
+    description: t("quickstart.metaDesc"),
+  };
+}
 
-export default function Quickstart() {
+export default async function Quickstart() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
-      <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">Quickstart</h1>
+      <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">{t("navQuickstart")}</h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        From nothing to a monitored domain with alerts, in about five minutes.
+        {t("quickstart.lead")}
       </p>
 
       <H2 id="1-account">1. Create an account</H2>

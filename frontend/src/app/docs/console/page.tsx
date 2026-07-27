@@ -1,25 +1,30 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { ApiConsole } from "@/components/docs/api-console";
 import { H2, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "API console",
-  description: `Call the live ${brand.name} API from your browser — paste a key and send a request.`,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navApiConsole"),
+    description: t("consolePage.metaDesc", { brand: brand.name }),
+  };
+}
 
-export default function ConsolePage() {
+export default async function ConsolePage() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-        API console
+        {t("navApiConsole")}
       </h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        Call the real API from here. Paste a key, pick an endpoint, send it, read the
-        response — the same request a <Link href="/docs/api">curl</Link> would make, with
-        nothing to install.
+        {t.rich("consolePage.lead", {
+          link: (chunks) => <Link href="/docs/api">{chunks}</Link>,
+        })}
       </p>
 
       <Note>

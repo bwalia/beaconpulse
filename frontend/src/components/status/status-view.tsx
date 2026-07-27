@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { brand } from "@/brand";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -38,23 +39,26 @@ const TERMINAL_FONT = "var(--font-departure), ui-monospace, SFMono-Regular, Menl
 
 // `bar` is the cursor-block background, kept as a literal class (not derived from
 // `color`) so Tailwind's scanner actually generates it.
+// `label` holds a translation KEY (under the `statusView` namespace), resolved at
+// render time via the hook — the record itself can't call one. `bar`/`dot` are kept
+// as literal classes (not derived from `color`) so Tailwind's scanner emits them.
 const OVERALL: Record<StatusOverall, { label: string; color: string; bar: string }> = {
-  operational: { label: "ALL SYSTEMS OPERATIONAL", color: "text-emerald-400", bar: "bg-emerald-400" },
-  degraded: { label: "PARTIAL DEGRADATION", color: "text-amber-400", bar: "bg-amber-400" },
-  outage: { label: "MAJOR OUTAGE", color: "text-red-400", bar: "bg-red-400" },
-  under_maintenance: { label: "UNDER MAINTENANCE", color: "text-orange-400", bar: "bg-orange-400" },
-  unknown: { label: "AWAITING FIRST CHECKS", color: "text-slate-400", bar: "bg-slate-400" },
+  operational: { label: "overallOperational", color: "text-emerald-400", bar: "bg-emerald-400" },
+  degraded: { label: "overallDegraded", color: "text-amber-400", bar: "bg-amber-400" },
+  outage: { label: "overallOutage", color: "text-red-400", bar: "bg-red-400" },
+  under_maintenance: { label: "underMaintenance", color: "text-orange-400", bar: "bg-orange-400" },
+  unknown: { label: "overallUnknown", color: "text-slate-400", bar: "bg-slate-400" },
 };
 
 const MONITOR: Record<PublicStatusMonitor["status"], { label: string; dot: string; text: string }> = {
-  up: { label: "OPERATIONAL", dot: "bg-emerald-400", text: "text-emerald-400" },
-  down: { label: "DOWN", dot: "bg-red-500", text: "text-red-400" },
-  degraded: { label: "DEGRADED", dot: "bg-amber-400", text: "text-amber-400" },
-  paused: { label: "PAUSED", dot: "bg-slate-500", text: "text-slate-400" },
-  unknown: { label: "NO DATA", dot: "bg-slate-600", text: "text-slate-500" },
+  up: { label: "monitorUp", dot: "bg-emerald-400", text: "text-emerald-400" },
+  down: { label: "monitorDown", dot: "bg-red-500", text: "text-red-400" },
+  degraded: { label: "monitorDegraded", dot: "bg-amber-400", text: "text-amber-400" },
+  paused: { label: "monitorPaused", dot: "bg-slate-500", text: "text-slate-400" },
+  unknown: { label: "monitorUnknown", dot: "bg-slate-600", text: "text-slate-500" },
 };
 
-const MAINT = { label: "UNDER MAINTENANCE", dot: "bg-orange-400", text: "text-orange-400" } as const;
+const MAINT = { label: "underMaintenance", dot: "bg-orange-400", text: "text-orange-400" } as const;
 
 // The CRT layer: horizontal scanlines, a faint RGB vertical grid, and a vignette.
 // Purely decorative, so pointer-events-none and aria-hidden.
@@ -72,19 +76,20 @@ const CRT: React.CSSProperties = {
  * instead of a number the browser would immediately contradict.
  */
 function Ago({ iso }: { iso: string | null }) {
+  const t = useTranslations("statusView");
   const now = useNow(30_000);
   return (
-    <span className="tabular-nums text-slate-500">{now === null ? "" : agoText(iso, now)}</span>
+    <span className="tabular-nums text-slate-500">{now === null ? "" : agoText(iso, now, t)}</span>
   );
 }
 
-function agoText(iso: string | null, now: number): string {
-  if (!iso) return "NEVER";
+function agoText(iso: string | null, now: number, t: ReturnType<typeof useTranslations>): string {
+  if (!iso) return t("agoNever");
   const secs = Math.max(0, (now - new Date(iso).getTime()) / 1000);
-  if (secs < 60) return `${Math.floor(secs)}S AGO`;
-  if (secs < 3600) return `${Math.floor(secs / 60)}M AGO`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}H AGO`;
-  return `${Math.floor(secs / 86400)}D AGO`;
+  if (secs < 60) return t("agoSeconds", { n: Math.floor(secs) });
+  if (secs < 3600) return t("agoMinutes", { n: Math.floor(secs / 60) });
+  if (secs < 86400) return t("agoHours", { n: Math.floor(secs / 3600) });
+  return t("agoDays", { n: Math.floor(secs / 86400) });
 }
 
 /** Local-time window bounds — gated on hydration because the server cannot know the
@@ -103,6 +108,7 @@ function WindowWhen({ startsAt, endsAt }: { startsAt: string; endsAt: string }) 
 }
 
 function Row({ m }: { m: PublicStatusMonitor }) {
+  const t = useTranslations("statusView");
   const s = MONITOR[m.status] ?? MONITOR.unknown;
   const shown = m.in_maintenance ? MAINT : s;
   return (
@@ -116,18 +122,19 @@ function Row({ m }: { m: PublicStatusMonitor }) {
       {m.in_maintenance && (
         <span className={`hidden items-center gap-1.5 opacity-50 sm:flex ${s.text}`}>
           <span aria-hidden className={`h-1.5 w-1.5 ${s.dot}`} />
-          {s.label}
+          {t(s.label)}
         </span>
       )}
       <span className={`flex shrink-0 items-center gap-1.5 font-medium ${shown.text}`}>
         <span aria-hidden className={`h-1.5 w-1.5 ${shown.dot}`} />
-        {shown.label}
+        {t(shown.label)}
       </span>
     </li>
   );
 }
 
 function Group({ group }: { group: PublicStatusGroup }) {
+  const t = useTranslations("statusView");
   const reveal = useRevealVariants();
   const up = group.monitors.filter((m) => m.status === "up").length;
   return (
@@ -137,7 +144,7 @@ function Group({ group }: { group: PublicStatusGroup }) {
         <span className="text-slate-600">[{group.environment}]</span>
         <span aria-hidden className="min-w-6 flex-1 border-b border-slate-800" />
         <span className="tabular-nums text-slate-400">
-          {up}/{group.monitors.length} UP
+          {t("groupUp", { up, total: group.monitors.length })}
         </span>
       </div>
       <ul className="mt-1">
@@ -150,6 +157,7 @@ function Group({ group }: { group: PublicStatusGroup }) {
 }
 
 function MaintenanceBlock({ windows }: { windows: PublicStatusMaintenance[] }) {
+  const t = useTranslations("statusView");
   const reveal = useRevealVariants();
   return (
     <motion.div
@@ -158,7 +166,7 @@ function MaintenanceBlock({ windows }: { windows: PublicStatusMaintenance[] }) {
       className="mx-4 mb-4 border border-orange-500/40 bg-orange-500/[0.06] p-3.5 sm:mx-5"
     >
       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-orange-400">
-        <span aria-hidden>▲</span> Scheduled maintenance
+        <span aria-hidden>▲</span> {t("scheduledMaintenance")}
       </p>
       <ul className="mt-2 space-y-1 text-sm">
         {windows.map((mw, i) => (
@@ -209,6 +217,7 @@ function useLiveRefresh(intervalMs: number) {
 }
 
 export function StatusView({ page }: { page: PublicStatusPage }) {
+  const t = useTranslations("statusView");
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.06);
   const reduceMotion = useReducedMotion();
@@ -263,7 +272,7 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
               href="/"
               className="text-[11px] uppercase tracking-[0.25em] text-slate-500 underline-offset-4 hover:text-orange-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
             >
-              ← Home
+              ← {t("home")}
             </Link>
           </motion.header>
 
@@ -280,7 +289,7 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
               </span>
               <span className="flex shrink-0 items-center gap-2 text-emerald-400">
                 <span aria-hidden className="h-2 w-2 rounded-full bg-emerald-400 motion-safe:animate-pulse" />
-                LIVE
+                {t("live")}
               </span>
             </div>
 
@@ -291,11 +300,11 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
               </p>
               <p className={`mt-2 flex items-center gap-2 text-xl font-semibold tracking-wide sm:text-2xl ${o.color}`}>
                 <span className="text-slate-600">&gt;</span>
-                {o.label}
+                {t(o.label)}
                 <span aria-hidden className={`inline-block h-5 w-2.5 ${o.bar} motion-safe:animate-pulse`} />
               </p>
               <p className="mt-1.5 text-xs uppercase tracking-widest text-slate-500">
-                LAST SYNC <Ago iso={page.updated_at} /> <span className="text-slate-700">·</span> REFRESH 30S
+                {t("lastSync")} <Ago iso={page.updated_at} /> <span className="text-slate-700">·</span> {t("refreshInterval")}
               </p>
             </motion.div>
 
@@ -319,13 +328,13 @@ export function StatusView({ page }: { page: PublicStatusPage }) {
                 href="/"
                 className="text-slate-500 underline-offset-4 hover:text-orange-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
               >
-                POWERED BY {brand.name.toUpperCase()}
+                {t("poweredBy", { brand: brand.name.toUpperCase() })}
               </Link>
             </div>
           </motion.div>
 
           <motion.p variants={reveal} className="mt-4 text-center text-[11px] uppercase tracking-[0.25em] text-slate-700">
-            ▮ end of transmission
+            ▮ {t("endOfTransmission")}
           </motion.p>
         </motion.div>
       </div>

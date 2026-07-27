@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { forwardRef, useEffect, useId, useState, type InputHTMLAttributes } from "react";
+import { forwardRef, useEffect, useId, useMemo, useState, type InputHTMLAttributes } from "react";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { z } from "zod";
@@ -26,20 +26,27 @@ import { ThemeToggle } from "@/lib/theme";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { brand } from "@/brand";
 
-const loginSchema = z.object({
-  email: z.string().email("Enter a valid email address"),
-  password: z.string().min(1, "Enter your password"),
-});
+// Validation messages are built inside the component via a factory so the
+// zod schema can read translated strings from next-intl (a module-scope schema
+// would freeze the messages in English before the translator exists).
+function makeLoginSchema(t: (key: string) => string) {
+  return z.object({
+    email: z.string().email(t("emailInvalid")),
+    password: z.string().min(1, t("passwordRequired")),
+  });
+}
 
-const registerSchema = z.object({
-  org_name: z.string().min(1, "Give your organization a name"),
-  name: z.string().min(1, "Enter your name"),
-  email: z.string().email("Enter a valid email address"),
-  password: z.string().min(8, "Use at least 8 characters"),
-});
+function makeRegisterSchema(t: (key: string) => string) {
+  return z.object({
+    org_name: z.string().min(1, t("orgNameRequired")),
+    name: z.string().min(1, t("yourNameRequired")),
+    email: z.string().email(t("emailInvalid")),
+    password: z.string().min(8, t("passwordMinLength")),
+  });
+}
 
-type LoginValues = z.infer<typeof loginSchema>;
-type RegisterValues = z.infer<typeof registerSchema>;
+type LoginValues = z.infer<ReturnType<typeof makeLoginSchema>>;
+type RegisterValues = z.infer<ReturnType<typeof makeRegisterSchema>>;
 type Mode = "login" | "register";
 
 const inputBase =
@@ -130,6 +137,8 @@ function ServerError({ message }: { message: string | null }) {
 
 function LoginForm() {
   const t = useTranslations("auth");
+  const tv = useTranslations("validation");
+  const schema = useMemo(() => makeLoginSchema(tv), [tv]);
   const { login } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -138,7 +147,7 @@ function LoginForm() {
     handleSubmit,
     setFocus,
     formState: { errors, isSubmitting },
-  } = useForm<LoginValues>({ resolver: zodResolver(loginSchema), mode: "onBlur" });
+  } = useForm<LoginValues>({ resolver: zodResolver(schema), mode: "onBlur" });
 
   const onSubmit = async (values: LoginValues) => {
     setServerError(null);
@@ -146,7 +155,7 @@ function LoginForm() {
       await login(values.email, values.password);
       router.replace("/dashboard");
     } catch (err) {
-      setServerError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
+      setServerError(err instanceof ApiRequestError ? err.message : t("genericError"));
       // Send focus back to the field they will need to correct, rather than
       // leaving it on a disabled button they cannot see the error from.
       setFocus("password");
@@ -160,7 +169,7 @@ function LoginForm() {
         <TextInput type="email" inputMode="email" autoComplete="email" placeholder="you@company.com" {...register("email")} />
       </Field>
       <Field label={t("password")} error={errors.password?.message}>
-        <PasswordInput register={register("password")} autoComplete="current-password" placeholder="Your password" />
+        <PasswordInput register={register("password")} autoComplete="current-password" placeholder={t("passwordPlaceholder")} />
       </Field>
       <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting}>
         {isSubmitting ? "…" : t("signInButton")}
@@ -171,6 +180,8 @@ function LoginForm() {
 
 function RegisterForm() {
   const t = useTranslations("auth");
+  const tv = useTranslations("validation");
+  const schema = useMemo(() => makeRegisterSchema(tv), [tv]);
   const { register: registerAccount } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -179,7 +190,7 @@ function RegisterForm() {
     handleSubmit,
     setFocus,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterValues>({ resolver: zodResolver(registerSchema), mode: "onBlur" });
+  } = useForm<RegisterValues>({ resolver: zodResolver(schema), mode: "onBlur" });
 
   const onSubmit = async (values: RegisterValues) => {
     setServerError(null);
@@ -187,7 +198,7 @@ function RegisterForm() {
       await registerAccount(values);
       router.replace("/dashboard");
     } catch (err) {
-      setServerError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
+      setServerError(err instanceof ApiRequestError ? err.message : t("genericError"));
       setFocus("email");
     }
   };
@@ -195,7 +206,7 @@ function RegisterForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       <ServerError message={serverError} />
-      <Field label={t("organizationName")} error={errors.org_name?.message} hint="Your team or company. You can rename it later.">
+      <Field label={t("organizationName")} error={errors.org_name?.message} hint={t("orgNameHint")}>
         <TextInput autoComplete="organization" placeholder="Acme Inc." {...register("org_name")} />
       </Field>
       <Field label={t("yourName")} error={errors.name?.message}>
@@ -204,8 +215,8 @@ function RegisterForm() {
       <Field label={t("email")} error={errors.email?.message}>
         <TextInput type="email" inputMode="email" autoComplete="email" placeholder="you@company.com" {...register("email")} />
       </Field>
-      <Field label={t("password")} error={errors.password?.message} hint="At least 8 characters.">
-        <PasswordInput register={register("password")} autoComplete="new-password" placeholder="Create a password" />
+      <Field label={t("password")} error={errors.password?.message} hint={t("passwordHint")}>
+        <PasswordInput register={register("password")} autoComplete="new-password" placeholder={t("passwordCreatePlaceholder")} />
       </Field>
       <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting}>
         {isSubmitting ? "…" : t("createAccountButton")}
@@ -214,11 +225,9 @@ function RegisterForm() {
   );
 }
 
-const SELLING_POINTS = [
-  "Twelve monitor types — HTTP, DNS, SSL, TCP, Kubernetes and more",
-  "Alerts that reach a human, with AI incident summaries",
-  "Public status pages your customers actually trust",
-];
+// Keys resolved at render so the bullets speak the reader's language; the tech
+// tokens (HTTP, DNS, SSL, TCP, Kubernetes, AI) stay verbatim inside the catalog.
+const SELLING_POINTS = ["sellingPoint1", "sellingPoint2", "sellingPoint3"] as const;
 
 /**
  * The auth screen, in either mode.
@@ -235,6 +244,7 @@ const SELLING_POINTS = [
  */
 export function AuthScreen({ initialMode }: { initialMode: Mode }) {
   const t = useTranslations("auth");
+  const ta = useTranslations("a11y");
   const [mode, setMode] = useState<Mode>(initialMode);
   const groupId = useId();
 
@@ -283,10 +293,10 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           </motion.h1>
 
           <motion.ul variants={stagger} className="mt-10 space-y-4">
-            {SELLING_POINTS.map((p) => (
-              <motion.li key={p} variants={reveal} className="flex items-start gap-3 text-lg text-slate-300">
+            {SELLING_POINTS.map((key) => (
+              <motion.li key={key} variants={reveal} className="flex items-start gap-3 text-lg text-slate-300">
                 <CheckCircleIcon className="mt-0.5 h-6 w-6 shrink-0 text-emerald-400" />
-                <span>{p}</span>
+                <span>{t(key)}</span>
               </motion.li>
             ))}
           </motion.ul>
@@ -331,7 +341,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
           {/* Mode switch. aria-pressed carries the state — styling alone would not. */}
           <div
             role="group"
-            aria-label="Authentication mode"
+            aria-label={ta("authMode")}
             id={groupId}
             className="mt-8 flex rounded-xl bg-slate-100 p-1.5 dark:bg-slate-900"
           >

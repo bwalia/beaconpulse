@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useSystemInfo } from "@/lib/hooks";
 import { useNow } from "@/lib/time";
 
@@ -26,19 +28,19 @@ const ENV_STYLE: Record<string, string> = {
   int: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
 };
 
-/** "2h ago" — coarse on purpose: nobody promoting a build cares about seconds. */
-function ago(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 48) return h === 1 ? "1h ago" : `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
 export function BuildFooter() {
+  const t = useTranslations("buildFooter");
   const { data } = useSystemInfo();
+  // "2h ago" — coarse on purpose: nobody promoting a build cares about seconds.
+  const ago = (ms: number): string => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    if (s < 60) return t("agoSeconds", { s });
+    const m = Math.floor(s / 60);
+    if (m < 60) return t("agoMinutes", { m });
+    const h = Math.floor(m / 60);
+    if (h < 48) return t("agoHours", { h });
+    return t("agoDays", { d: Math.floor(h / 24) });
+  };
   // Ticks itself, so a footer left open still reads true — and derived from the
   // shared clock rather than Date.now() in render, which would freeze at whatever
   // the compiler memoized.
@@ -58,12 +60,12 @@ export function BuildFooter() {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500 dark:text-slate-400">
         <span
           className={`rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide ${envStyle}`}
-          title={`Environment: ${data.env}`}
+          title={t("envTitle", { env: data.env })}
         >
-          {data.env || "unknown"}
+          {data.env || t("unknown")}
         </span>
 
-        <span className="font-mono" title={`Build ${data.version}`}>
+        <span className="font-mono" title={t("buildTitle", { version: data.version })}>
           {data.version}
         </span>
 
@@ -76,10 +78,8 @@ export function BuildFooter() {
                 exact — this is when the process started, which is the deploy unless a
                 pod restarted on its own, and the tooltip says so rather than letting
                 the short version quietly overstate itself. */}
-            <span
-              title={`Process started ${new Date(started).toLocaleString()} — this is the deploy, unless the pod restarted on its own since.`}
-            >
-              deployed {deployed}
+            <span title={t("processStartedTitle", { time: new Date(started).toLocaleString() })}>
+              {t("deployed", { ago: deployed })}
             </span>
           </>
         )}

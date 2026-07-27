@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
@@ -15,12 +15,16 @@ import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
 
 const PROJECTS_PAGE_SIZE = 12;
 
-const schema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
-  environment: z.enum(["production", "staging", "development"]),
-});
-type Values = z.infer<typeof schema>;
+// Built via a factory so validation messages come from next-intl (a module-scope
+// schema would freeze the messages in English before the translator exists).
+function makeSchema(t: (key: string) => string) {
+  return z.object({
+    name: z.string().min(1, t("nameRequired")),
+    description: z.string().optional(),
+    environment: z.enum(["production", "staging", "development"]),
+  });
+}
+type Values = z.infer<ReturnType<typeof makeSchema>>;
 
 // Tints chosen so the label text clears 4.5:1 against its own background.
 const ENV_STYLES: Record<string, string> = {
@@ -39,6 +43,7 @@ const ENV_ACCENT: Record<string, string> = {
 
 export default function ProjectsPage() {
   const t = useTranslations("pages.projects");
+  const c = useTranslations("common");
   const [page, setPage] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -82,7 +87,7 @@ export default function ProjectsPage() {
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
-            {showForm ? "Close" : "New project"}
+            {showForm ? c("close") : t("newProject")}
           </Button>
         }
       />
@@ -94,19 +99,19 @@ export default function ProjectsPage() {
           <SearchInput
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="Search projects…"
-            label="Search projects"
+            placeholder={t("searchPlaceholder")}
+            label={t("searchLabel")}
           />
           <select
             value={environment}
             onChange={(e) => changeEnvironment(e.target.value)}
-            aria-label="Filter by environment"
+            aria-label={t("filterByEnvironment")}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-48"
           >
-            <option value="">All environments</option>
-            <option value="production">Production</option>
-            <option value="staging">Staging</option>
-            <option value="development">Development</option>
+            <option value="">{t("allEnvironments")}</option>
+            <option value="production">{t("envProduction")}</option>
+            <option value="staging">{t("envStaging")}</option>
+            <option value="development">{t("envDevelopment")}</option>
           </select>
         </div>
       )}
@@ -130,19 +135,17 @@ export default function ProjectsPage() {
                   changeEnvironment("");
                 }}
               >
-                Clear filters
+                {t("clearFilters")}
               </Button>
             ) : (
               <Button onClick={() => setShowForm(true)}>
                 <PlusIcon className="h-4 w-4" />
-                New project
+                {t("newProject")}
               </Button>
             )
           }
         >
-          {filtering
-            ? "No projects match your search or filter."
-            : "Projects group related monitors so alerts and dashboards stay organized by application or team."}
+          {filtering ? t("emptyFilteredBody") : t("emptyBody")}
         </EmptyState>
       ) : (
         <>
@@ -173,7 +176,7 @@ export default function ProjectsPage() {
                         </span>
                       </div>
                       <p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">
-                        {p.description || "No description"}
+                        {p.description || t("noDescription")}
                       </p>
                       <p className="truncate font-mono text-xs text-slate-500 dark:text-slate-400">{p.slug}</p>
                     </div>
@@ -197,6 +200,10 @@ export default function ProjectsPage() {
 }
 
 function CreateProjectForm({ onDone }: { onDone: () => void }) {
+  const t = useTranslations("pages.projects");
+  const c = useTranslations("common");
+  const tv = useTranslations("validation");
+  const schema = useMemo(() => makeSchema(tv), [tv]);
   const createProject = useCreateProject();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
@@ -211,26 +218,26 @@ function CreateProjectForm({ onDone }: { onDone: () => void }) {
       await createProject.mutateAsync(values);
       onDone();
     } catch (err) {
-      setServerError(err instanceof ApiRequestError ? err.message : "Failed to create project");
+      setServerError(err instanceof ApiRequestError ? err.message : t("createError"));
     }
   };
 
   return (
     <Card>
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
-        <Field label="Name" error={errors.name?.message}>
-          <Input placeholder="Production Website" {...register("name")} />
+        <Field label={t("nameLabel")} error={errors.name?.message}>
+          <Input placeholder={t("namePlaceholder")} {...register("name")} />
         </Field>
-        <Field label="Environment" error={errors.environment?.message}>
+        <Field label={t("environmentLabel")} error={errors.environment?.message}>
           <Select {...register("environment")}>
-            <option value="production">Production</option>
-            <option value="staging">Staging</option>
-            <option value="development">Development</option>
+            <option value="production">{t("envProduction")}</option>
+            <option value="staging">{t("envStaging")}</option>
+            <option value="development">{t("envDevelopment")}</option>
           </Select>
         </Field>
         <div className="sm:col-span-2">
-          <Field label="Description" hint="Optional — what this project covers." error={errors.description?.message}>
-            <Input placeholder="Marketing site and its APIs" {...register("description")} />
+          <Field label={t("descriptionLabel")} hint={t("descriptionHint")} error={errors.description?.message}>
+            <Input placeholder={t("descriptionPlaceholder")} {...register("description")} />
           </Field>
         </div>
         {serverError && (
@@ -240,10 +247,10 @@ function CreateProjectForm({ onDone }: { onDone: () => void }) {
         )}
         <div className="flex gap-2 sm:col-span-2">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating…" : "Create project"}
+            {isSubmitting ? t("creating") : t("createProject")}
           </Button>
           <Button type="button" variant="secondary" onClick={onDone}>
-            Cancel
+            {c("cancel")}
           </Button>
         </div>
       </form>

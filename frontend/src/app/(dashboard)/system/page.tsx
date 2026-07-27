@@ -23,8 +23,8 @@ import { ChartLineIcon, LockIcon, MegaphoneIcon } from "@/components/icons";
 // Targets/Config/TSDB reach Prometheus out-of-band (see deploy/README), never
 // through the tenant gateway.
 const tools = [
-  { href: "/explore", label: "Explore", Icon: ChartLineIcon, desc: "Run PromQL against your own metrics — graphs & tables", scoped: true },
-  { href: "/alertmanager/", label: "Alertmanager", Icon: MegaphoneIcon, desc: "Your org's alerts & silences", scoped: true },
+  { href: "/explore", key: "explore", Icon: ChartLineIcon, scoped: true },
+  { href: "/alertmanager/", key: "alertmanager", Icon: MegaphoneIcon, scoped: true },
 ];
 
 export default function SystemPage() {
@@ -36,7 +36,7 @@ export default function SystemPage() {
     return (
       <div className="mx-auto max-w-3xl">
         <Card>
-          <p className="text-slate-500 dark:text-slate-400">This page is restricted to organization owners and admins.</p>
+          <p className="text-slate-500 dark:text-slate-400">{t("restricted")}</p>
         </Card>
       </div>
     );
@@ -49,35 +49,37 @@ export default function SystemPage() {
       <div className="flex items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
         <LockIcon className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
-          <span className="font-medium">Prometheus &amp; Alertmanager are filtered to your organization</span> — the
-          gateway enforces <span className="font-mono">org_id</span> on every query, so you only see your own data.
+          <span className="font-medium">{t("filteredTitle")}</span>{" "}
+          {t.rich("filteredBody", {
+            code: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {tools.map((t) => (
+        {tools.map((tool) => (
           <a
-            key={t.href}
-            href={t.href}
+            key={tool.href}
+            href={tool.href}
             target="_blank"
             rel="noreferrer"
             className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 transition hover:border-brand-400 hover:bg-brand-50/40 dark:border-slate-800 dark:hover:border-brand-700 dark:hover:bg-brand-900/20"
           >
-            <t.Icon className="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" />
+            <tool.Icon className="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-400" />
             <span>
               <span className="flex items-center gap-1.5 text-sm font-medium">
-                {t.label}
-                {t.scoped ? (
+                {t(`tools.${tool.key}.label`)}
+                {tool.scoped ? (
                   <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                    your org
+                    {t("tagYourOrg")}
                   </span>
                 ) : (
                   <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-300">
-                    global
+                    {t("tagGlobal")}
                   </span>
                 )}
               </span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">{t.desc}</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">{t(`tools.${tool.key}.desc`)}</span>
             </span>
           </a>
         ))}

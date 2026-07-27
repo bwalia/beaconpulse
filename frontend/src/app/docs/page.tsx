@@ -1,55 +1,39 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, H2, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "Introduction",
-  description: `What ${brand.name} does, and how to find your way around these docs.`,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navIntroduction"),
+    description: t("indexMetaDesc", { brand: brand.name }),
+  };
+}
 
+// Card titles reuse the nav label keys; each card's one-line description has its own key.
 const PATHS = [
-  {
-    href: "/docs/quickstart",
-    title: "Quickstart",
-    desc: "Sign up and watch your first domain. About five minutes.",
-  },
-  {
-    href: "/docs/authentication",
-    title: "Authentication",
-    desc: "Create an API key and make your first authenticated call.",
-  },
-  {
-    href: "/docs/automation",
-    title: "CI & automation",
-    desc: "Keep your monitors in a file in your repo and apply them on push.",
-  },
-  {
-    href: "/docs/api",
-    title: "API reference",
-    desc: "Every endpoint, with the fields and a curl for each.",
-  },
-  {
-    href: "/docs/console",
-    title: "API console",
-    desc: "Paste a key and call the live API from your browser.",
-  },
+  { href: "/docs/quickstart", titleKey: "navQuickstart", descKey: "cardQuickstartDesc" },
+  { href: "/docs/authentication", titleKey: "navAuthentication", descKey: "cardAuthDesc" },
+  { href: "/docs/automation", titleKey: "navAutomation", descKey: "cardAutomationDesc" },
+  { href: "/docs/api", titleKey: "navApiReference", descKey: "cardApiDesc" },
+  { href: "/docs/console", titleKey: "navApiConsole", descKey: "cardConsoleDesc" },
 ];
 
-export default function DocsHome() {
+export default async function DocsHome() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
       <p className="text-sm font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-        Documentation
+        {t("indexEyebrow")}
       </p>
       <h1 className="mt-2 text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
         {brand.name}
       </h1>
       <p className="mt-4 text-lg leading-relaxed text-slate-600 dark:text-slate-300">
-        {brand.name} watches the things your customers depend on — websites, APIs, TLS
-        certificates, DNS, TCP services and scheduled jobs — and tells you when one of
-        them stops working, before they do.
+        {t("indexLead", { brand: brand.name })}
       </p>
 
       {/* not-prose: these are navigation cards, not prose — the whole card is the
@@ -62,9 +46,9 @@ export default function DocsHome() {
             className="group rounded-xl border border-slate-200 p-4 transition-colors hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:border-slate-800 dark:hover:border-blue-500"
           >
             <p className="font-semibold text-slate-900 group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-400">
-              {p.title}
+              {t(p.titleKey)}
             </p>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{p.desc}</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t(p.descKey)}</p>
           </Link>
         ))}
       </div>

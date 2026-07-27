@@ -49,12 +49,13 @@ function formatRange(startsAt: string, endsAt: string): string {
 }
 
 // The viewer's timezone, shown so nobody wonders which clock the times use. Guarded
-// because a rare environment can throw resolving it.
-function localTimezone(): string {
+// because a rare environment can throw resolving it. The fallback label is translated
+// by the caller when the real zone can't be resolved.
+function localTimezone(): string | null {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "your local time";
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
   } catch {
-    return "your local time";
+    return null;
   }
 }
 
@@ -62,28 +63,29 @@ function localTimezone(): string {
 // a passive feature — the most common confusion is expecting it to "do" something —
 // so we spell out what it changes and that it runs on its own.
 function HowItWorks() {
+  const t = useTranslations("pages.maintenance");
   const steps = [
     {
       n: "1",
-      title: "Pick a time and what it covers",
-      body: "Your whole organisation, some projects, or specific monitors.",
+      title: t("step1Title"),
+      body: t("step1Body"),
     },
     {
       n: "2",
-      title: "While it’s active",
-      body: `${brand.name} pauses alerts for those monitors and shows “Under maintenance” on your public status page — instead of a red outage.`,
+      title: t("step2Title"),
+      body: t("step2Body", { brand: brand.name }),
     },
     {
       n: "3",
-      title: "It’s automatic",
-      body: "Nothing to switch on or off. It starts and ends on its own; when it ends, alerts resume.",
+      title: t("step3Title"),
+      body: t("step3Body"),
     },
   ];
   return (
     <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
       <div className="flex items-center gap-2">
         <WrenchIcon className="h-4 w-4 shrink-0 text-blue-700 dark:text-blue-300" />
-        <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">How maintenance windows work</p>
+        <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">{t("howItWorksTitle")}</p>
       </div>
       <ol className="mt-3 grid gap-3 sm:grid-cols-3">
         {steps.map((s) => (
@@ -106,6 +108,7 @@ function HowItWorks() {
 
 export default function MaintenancePage() {
   const t = useTranslations("pages.maintenance");
+  const c = useTranslations("common");
   const [page, setPage] = useState(0);
   const { data, isLoading, isPlaceholderData } = useMaintenanceWindows({
     page,
@@ -125,7 +128,7 @@ export default function MaintenancePage() {
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
-            {showForm ? "Close" : "Schedule window"}
+            {showForm ? c("close") : t("scheduleWindow")}
           </Button>
         }
       />
@@ -160,12 +163,11 @@ export default function MaintenancePage() {
           action={
             <Button onClick={() => setShowForm(true)}>
               <PlusIcon className="h-4 w-4" />
-              Schedule window
+              {t("scheduleWindow")}
             </Button>
           }
         >
-          Before a deploy or planned outage, schedule a window so {brand.name} holds back the alerts and your
-          public status page shows planned work rather than a red “major outage”.
+          {t("emptyDescription", { brand: brand.name })}
         </EmptyState>
       ) : (
         <>
@@ -189,24 +191,30 @@ export default function MaintenancePage() {
 }
 
 function WindowRow({ window: w, setNotice }: { window: MaintenanceWindow; setNotice: (n: Notice) => void }) {
+  const t = useTranslations("pages.maintenance");
+  const c = useTranslations("common");
   const del = useDeleteMaintenanceWindow();
   const { data: projects } = useProjects();
   const { data: monitors } = useMonitors();
   const confirm = useConfirm();
 
   const scopeLabel = useMemo(() => {
-    if (w.scope === "org") return "All monitors";
+    if (w.scope === "org") return t("scopeAllMonitors");
     if (w.scope === "project") {
       const names = w.scope_ids
         .map((id) => projects?.data.find((p) => p.id === id)?.name)
         .filter(Boolean);
-      return names.length ? `Projects: ${names.join(", ")}` : `${w.scope_ids.length} project(s)`;
+      return names.length
+        ? t("scopeProjects", { names: names.join(", ") })
+        : t("scopeProjectCount", { count: w.scope_ids.length });
     }
     const names = w.scope_ids
       .map((id) => monitors?.data.find((m) => m.id === id)?.name)
       .filter(Boolean);
-    return names.length ? `Monitors: ${names.join(", ")}` : `${w.scope_ids.length} monitor(s)`;
-  }, [w, projects, monitors]);
+    return names.length
+      ? t("scopeMonitors", { names: names.join(", ") })
+      : t("scopeMonitorCount", { count: w.scope_ids.length });
+  }, [w, projects, monitors, t]);
 
   // Ticks from the shared clock rather than reading it during render: a render
   // that calls Date.now() is impure, so the value could be memoized and a window
@@ -223,15 +231,15 @@ function WindowRow({ window: w, setNotice }: { window: MaintenanceWindow; setNot
           {w.active ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
               <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
-              Active now
+              {t("statusActiveNow")}
             </span>
           ) : ended ? (
             <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-              Ended
+              {t("statusEnded")}
             </span>
           ) : (
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              Scheduled
+              {t("statusScheduled")}
             </span>
           )}
         </div>
@@ -249,32 +257,30 @@ function WindowRow({ window: w, setNotice }: { window: MaintenanceWindow; setNot
           onClick={async () => {
             if (
               await confirm({
-                title: `Delete “${w.title}”?`,
-                body: w.active
-                  ? "This window is active now — deleting it resumes alerts for its monitors immediately."
-                  : "This removes the scheduled maintenance window.",
-                confirmLabel: "Delete window",
+                title: t("deleteConfirmTitle", { title: w.title }),
+                body: w.active ? t("deleteConfirmBodyActive") : t("deleteConfirmBody"),
+                confirmLabel: t("deleteConfirmLabel"),
                 danger: true,
               })
             ) {
               del.mutate(w.id, {
                 onError: (e) =>
-                  setNotice({ kind: "err", text: e instanceof ApiRequestError ? e.message : "Delete failed" }),
+                  setNotice({ kind: "err", text: e instanceof ApiRequestError ? e.message : t("deleteFailed") }),
               });
             }
           }}
         >
-          Delete
+          {c("delete")}
         </Button>
       </div>
     </Card>
   );
 }
 
-const SCOPES: { value: MaintenanceScope; label: string; blurb: string }[] = [
-  { value: "org", label: "Whole org", blurb: "Every monitor in the organization." },
-  { value: "project", label: "By project", blurb: "Every monitor in the chosen projects." },
-  { value: "monitor", label: "Specific monitors", blurb: "Only the monitors you pick." },
+const SCOPES: { value: MaintenanceScope; labelKey: string; blurbKey: string }[] = [
+  { value: "org", labelKey: "scopeOrgLabel", blurbKey: "scopeOrgBlurb" },
+  { value: "project", labelKey: "scopeProjectLabel", blurbKey: "scopeProjectBlurb" },
+  { value: "monitor", labelKey: "scopeMonitorLabel", blurbKey: "scopeMonitorBlurb" },
 ];
 
 // A window longer than this gets a soft warning — a permanent window silently
@@ -282,6 +288,7 @@ const SCOPES: { value: MaintenanceScope; label: string; blurb: string }[] = [
 const LONG_WINDOW_HOURS = 24;
 
 function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice: (n: Notice) => void }) {
+  const t = useTranslations("pages.maintenance");
   const create = useCreateMaintenanceWindow();
   const { data: projects } = useProjects();
   const { data: monitors } = useMonitors();
@@ -295,7 +302,7 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const tz = localTimezone();
+  const tz = localTimezone() ?? t("localTimeFallback");
 
   function toggleId(id: string) {
     setIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -318,22 +325,24 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
   // Plain-language summary of what this window will cover, shown live in the form.
   const coverage =
     scope === "org"
-      ? "every monitor in your organisation"
+      ? t("coverageOrg")
       : scope === "project"
-        ? `monitors in ${ids.length || "the selected"} project${ids.length === 1 ? "" : "s"}`
-        : `${ids.length || "the selected"} monitor${ids.length === 1 ? "" : "s"}`;
+        ? t("coverageProject", { count: ids.length })
+        : t("coverageMonitor", { count: ids.length });
 
   const longWarning =
     startsAt && endsAt && new Date(endsAt).getTime() - new Date(startsAt).getTime() > LONG_WINDOW_HOURS * 3600_000;
 
+  const activeScope = SCOPES.find((s) => s.value === scope);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!title.trim()) errs.title = "Title is required";
-    if (!startsAt) errs.startsAt = "Start is required";
-    if (!endsAt) errs.endsAt = "End is required";
-    if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) errs.endsAt = "End must be after start";
-    if (scope !== "org" && ids.length === 0) errs.ids = "Pick at least one";
+    if (!title.trim()) errs.title = t("errTitleRequired");
+    if (!startsAt) errs.startsAt = t("errStartRequired");
+    if (!endsAt) errs.endsAt = t("errEndRequired");
+    if (startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) errs.endsAt = t("errEndAfterStart");
+    if (scope !== "org" && ids.length === 0) errs.ids = t("errPickOne");
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
@@ -349,10 +358,10 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
     setSubmitting(true);
     try {
       await create.mutateAsync(payload);
-      setNotice({ kind: "ok", text: `Maintenance window “${payload.title}” scheduled.` });
+      setNotice({ kind: "ok", text: t("windowScheduled", { title: payload.title }) });
       onDone();
     } catch (err) {
-      setNotice({ kind: "err", text: err instanceof ApiRequestError ? err.message : "Failed to schedule window" });
+      setNotice({ kind: "err", text: err instanceof ApiRequestError ? err.message : t("scheduleFailed") });
     } finally {
       setSubmitting(false);
     }
@@ -361,14 +370,14 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
   return (
     <Card>
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="Title" hint="Shown on the public status page banner." error={errors.title}>
-          <Input placeholder="Database upgrade" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Field label={t("titleLabel")} hint={t("titleHint")} error={errors.title}>
+          <Input placeholder={t("titlePlaceholder")} value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
 
-        <Field label="Description" hint="Optional context for your team.">
+        <Field label={t("descriptionLabel")} hint={t("descriptionHint")}>
           <Textarea
             rows={2}
-            placeholder="Rolling Postgres 15 → 16; brief write pauses expected."
+            placeholder={t("descriptionPlaceholder")}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
@@ -376,37 +385,34 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
 
         <div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Starts" error={errors.startsAt}>
+            <Field label={t("startsLabel")} error={errors.startsAt}>
               <Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
             </Field>
-            <Field label="Ends" error={errors.endsAt}>
+            <Field label={t("endsLabel")} error={errors.endsAt}>
               <Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
             </Field>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Times are in your timezone ({tz}). To take effect right away, start it now.
-            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t("timezoneNote", { tz })}</p>
             <button
               type="button"
               onClick={fillStartNow}
               className="rounded text-xs font-medium text-brand-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400"
             >
-              Start now →
+              {t("startNow")}
             </button>
           </div>
         </div>
 
         {longWarning && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-            This window is longer than {LONG_WINDOW_HOURS} hours. Alerts stay suppressed the whole time —
-            make sure that is intended.
+            {t("longWarning", { hours: LONG_WINDOW_HOURS })}
           </p>
         )}
 
         <div>
-          <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Applies to</span>
-          <div role="group" aria-label="Scope" className="flex flex-wrap gap-2">
+          <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">{t("appliesTo")}</span>
+          <div role="group" aria-label={t("scopeAriaLabel")} className="flex flex-wrap gap-2">
             {SCOPES.map((s) => (
               <button
                 key={s.value}
@@ -419,47 +425,48 @@ function CreateWindowForm({ onDone, setNotice }: { onDone: () => void; setNotice
                     : "border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
                 }`}
               >
-                {s.label}
+                {t(s.labelKey)}
               </button>
             ))}
           </div>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {SCOPES.find((s) => s.value === scope)?.blurb}
+            {activeScope ? t(activeScope.blurbKey) : null}
           </p>
         </div>
 
         {scope === "project" && (
           <SelectList
-            label="Projects"
+            label={t("projectsLabel")}
             error={errors.ids}
             items={(projects?.data ?? []).map((p) => ({ id: p.id, label: p.name, sub: p.environment }))}
             selected={ids}
             onToggle={toggleId}
-            empty="No projects yet."
+            empty={t("noProjects")}
           />
         )}
         {scope === "monitor" && (
           <SelectList
-            label="Monitors"
+            label={t("monitorsLabel")}
             error={errors.ids}
             items={(monitors?.data ?? []).map((m) => ({ id: m.id, label: m.name, sub: m.type }))}
             selected={ids}
             onToggle={toggleId}
-            empty="No monitors yet."
+            empty={t("noMonitors")}
           />
         )}
 
         {/* Live plain-language summary, so the person scheduling sees exactly what
             it will do before they commit. */}
         <p className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
-          While active, {brand.name} will <span className="font-medium text-slate-900 dark:text-slate-100">pause alerts</span>{" "}
-          for {coverage} and mark them{" "}
-          <span className="font-medium text-slate-900 dark:text-slate-100">“Under maintenance”</span> on your public
-          status page.
+          {t.rich("summary", {
+            brand: brand.name,
+            coverage,
+            b: (chunks) => <span className="font-medium text-slate-900 dark:text-slate-100">{chunks}</span>,
+          })}
         </p>
 
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Scheduling…" : "Schedule window"}
+          {submitting ? t("scheduling") : t("scheduleWindow")}
         </Button>
       </form>
     </Card>
@@ -481,11 +488,12 @@ function SelectList({
   onToggle: (id: string) => void;
   empty: string;
 }) {
+  const t = useTranslations("pages.maintenance");
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">{selected.length} selected</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">{t("selectedCount", { count: selected.length })}</span>
       </div>
       {items.length === 0 ? (
         <p className="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-center text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">

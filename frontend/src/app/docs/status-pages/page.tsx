@@ -1,23 +1,27 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, H2, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "Status pages",
-  description: "A public page your customers can check instead of emailing you.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navStatusPages"),
+    description: t("statusPages.metaDesc"),
+  };
+}
 
-export default function StatusPages() {
+export default async function StatusPages() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-        Status pages
+        {t("navStatusPages")}
       </h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        A page anyone can load to see whether your service is working — so during an
-        incident your inbox is not the status page.
+        {t("statusPages.lead")}
       </p>
 
       <H2 id="publishing">Nothing is public until you say so</H2>

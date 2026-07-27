@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 import { StatusView } from "@/components/status/status-view";
@@ -49,20 +50,23 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  const t = await getTranslations("statusView");
   let page: PublicStatusPage | null = null;
   try {
     page = await fetchStatus(slug);
   } catch {
     // A metadata failure must never take the page down with it.
   }
-  if (!page) return { title: "Status — not found" };
+  if (!page) return { title: t("metaNotFoundTitle") };
 
+  const title = t("metaTitle", { title: page.title });
+  const description = t("metaDescription", { orgName: page.org_name });
   return {
-    title: `${page.title} — Status`,
-    description: `Live operational status for ${page.org_name}.`,
+    title,
+    description,
     openGraph: {
-      title: `${page.title} — Status`,
-      description: `Live operational status for ${page.org_name}.`,
+      title,
+      description,
     },
   };
 }

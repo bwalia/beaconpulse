@@ -15,32 +15,6 @@ import type { BillingInfo, PlanInfo } from "@/lib/types";
 
 type Notice = { kind: "ok" | "err"; text: string } | null;
 
-// Hours are the unit people buy in, but "0.4 hours left" is not a sentence anyone
-// says — and under an hour is exactly when the number matters most.
-function formatDuration(hours: number): string {
-  if (hours >= 48) return `${Math.round(hours / 24)} days`;
-  if (hours >= 1) {
-    const h = Math.floor(hours);
-    const m = Math.round((hours - h) * 60);
-    return m > 0 ? `${h}h ${m}m` : `${h} hours`;
-  }
-  return `${Math.max(1, Math.round(hours * 60))} minutes`;
-}
-
-const PLAN_LABEL: Record<string, string> = {
-  free: "Free",
-  starter: "Starter",
-  pro: "Pro",
-  payg: "Pay-as-you-go",
-};
-
-function checkoutNotice(param: string | null): Notice {
-  if (param === "success")
-    return { kind: "ok", text: "Payment received — your account updates within a few seconds." };
-  if (param === "cancel") return { kind: "err", text: "Checkout canceled. Nothing was charged." };
-  return null;
-}
-
 // useSearchParams reads the query without touching window during render, so it needs
 // a Suspense boundary on a prerendered route. Everything below it is client data
 // anyway, so the shell costs nothing.
@@ -58,6 +32,12 @@ function BillingContent() {
   const { data: usage } = useUsage();
   const { user } = useAuth();
   const params = useSearchParams();
+
+  const checkoutNotice = (param: string | null): Notice => {
+    if (param === "success") return { kind: "ok", text: t("checkoutSuccess") };
+    if (param === "cancel") return { kind: "err", text: t("checkoutCancel") };
+    return null;
+  };
 
   // Captured once, on purpose. The Checkout result has to outlive the query string
   // being scrubbed below, so deriving it every render would blank it the instant the
@@ -93,8 +73,7 @@ function BillingContent() {
 
       {data && !data.billing_enabled && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-          Payments are not configured on this deployment, so checkout is disabled. Everything below is
-          read-only.
+          {t("paymentsNotConfigured")}
         </div>
       )}
 
@@ -135,8 +114,21 @@ function CreditCard({
   canManage: boolean;
   setNotice: (n: Notice) => void;
 }) {
+  const t = useTranslations("pages.billing");
   const topUp = useStartTopUp();
   const [dollars, setDollars] = useState("5");
+
+  // Hours are the unit people buy in, but "0.4 hours left" is not a sentence anyone
+  // says — and under an hour is exactly when the number matters most.
+  const formatDuration = (hours: number): string => {
+    if (hours >= 48) return t("durationDays", { count: Math.round(hours / 24) });
+    if (hours >= 1) {
+      const h = Math.floor(hours);
+      const m = Math.round((hours - h) * 60);
+      return m > 0 ? t("durationHoursMinutes", { h, m }) : t("durationHours", { count: h });
+    }
+    return t("durationMinutes", { count: Math.max(1, Math.round(hours * 60)) });
+  };
 
   const monitorHours = info.credit_seconds / 3600;
   // "How long will this last?" — credit ÷ (enabled monitors) at the current count.
@@ -164,14 +156,14 @@ function CreditCard({
     setNotice(null);
     const amount = Math.round(parseFloat(dollars) * 100);
     if (!Number.isFinite(amount) || amount < 100) {
-      setNotice({ kind: "err", text: "Enter at least $1." });
+      setNotice({ kind: "err", text: t("minTopUp") });
       return;
     }
     try {
       const { checkout_url } = await topUp.mutateAsync(amount);
       window.location.assign(checkout_url); // hand off to Stripe Checkout
     } catch (err) {
-      setNotice({ kind: "err", text: err instanceof ApiRequestError ? err.message : "Could not start checkout" });
+      setNotice({ kind: "err", text: err instanceof ApiRequestError ? err.message : t("checkoutStartFailed") });
     }
   };
 
@@ -182,11 +174,11 @@ function CreditCard({
       <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Pay-as-you-go balance
+            {t("paygBalance")}
           </h2>
           <p className="mt-1 text-4xl font-bold tabular-nums text-slate-900 dark:text-white">
             {monitorHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}{" "}
-            <span className="text-lg font-medium text-slate-500 dark:text-slate-400">monitor-hours</span>
+            <span className="text-lg font-medium text-slate-500 dark:text-slate-400">{t("monitorHoursUnit")}</span>
           </p>
           {/* Said plainly, because a balance alone does not answer what people
               actually ask — how long have I had, how long is left, and when does it
@@ -195,35 +187,42 @@ function CreditCard({
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             {wallHours !== null && info.credit_seconds > 0 ? (
               <>
-                That is{" "}
-                <span className="font-medium text-slate-900 dark:text-white tabular-nums">
-                  {formatDuration(wallHours)}
-                </span>{" "}
-                of monitoring left at your current {monitors} monitor{monitors === 1 ? "" : "s"}
-                {runsOutAt && <> — running out around <span className="font-medium text-slate-900 dark:text-white">{runsOutAt}</span></>}.
+                {t.rich("creditLeft", {
+                  count: monitors,
+                  duration: formatDuration(wallHours),
+                  dur: (chunks) => (
+                    <span className="font-medium text-slate-900 dark:text-white tabular-nums">{chunks}</span>
+                  ),
+                })}
+                {runsOutAt &&
+                  t.rich("creditRunsOut", {
+                    time: runsOutAt,
+                    at: (chunks) => <span className="font-medium text-slate-900 dark:text-white">{chunks}</span>,
+                  })}
+                {"."}
               </>
             ) : info.credit_seconds > 0 ? (
-              <>Each monitor uses one hour of credit per hour it runs.</>
+              <>{t("creditPerHour")}</>
             ) : (
-              <>Your credit has run out, so monitoring has dropped back to the Free limits.</>
+              <>{t("creditExhausted")}</>
             )}
           </p>
           {consumedHours > 0 && (
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              You have used{" "}
-              <span className="font-medium tabular-nums text-slate-700 dark:text-slate-200">
-                {formatDuration(consumedHours)}
-              </span>{" "}
-              of monitoring so far, from{" "}
-              <span className="tabular-nums">{grantedHours.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span>{" "}
-              monitor-hours bought.
+              {t.rich("creditConsumed", {
+                duration: formatDuration(consumedHours),
+                granted: grantedHours.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+                dur: (chunks) => (
+                  <span className="font-medium tabular-nums text-slate-700 dark:text-slate-200">{chunks}</span>
+                ),
+                n: (chunks) => <span className="tabular-nums">{chunks}</span>,
+              })}
             </p>
           )}
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            $1 = {info.monitor_hours_per_dollar} monitor-hours
-            {info.diagnosis_cost_seconds > 0 && (
-              <> · one AI diagnosis costs {Math.round(info.diagnosis_cost_seconds / 60)} monitor-minutes</>
-            )}
+            {t("dollarRate", { rate: info.monitor_hours_per_dollar })}
+            {info.diagnosis_cost_seconds > 0 &&
+              t("diagnosisCost", { minutes: Math.round(info.diagnosis_cost_seconds / 60) })}
           </p>
         </div>
 
@@ -238,17 +237,17 @@ function CreditCard({
               step={1}
               value={dollars}
               onChange={(e) => setDollars(e.target.value)}
-              aria-label="Top-up amount in dollars"
+              aria-label={t("topUpAriaLabel")}
               className="w-24 bg-white px-3 py-2.5 text-base tabular-nums text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white"
             />
           </div>
           <Button type="submit" disabled={!canManage || !info.billing_enabled || topUp.isPending}>
-            {topUp.isPending ? "Starting…" : "Add credit"}
+            {topUp.isPending ? t("starting") : t("addCredit")}
           </Button>
         </form>
       </div>
       {!canManage && (
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Only owners and admins can add credit.</p>
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{t("ownerAdminOnlyCredit")}</p>
       )}
     </Card>
   );
@@ -265,7 +264,18 @@ function PlansGrid({
   canManage: boolean;
   setNotice: (n: Notice) => void;
 }) {
+  const t = useTranslations("pages.billing");
   const subscribe = useStartSubscription();
+
+  const planLabel = (id: string): string => {
+    const keys: Record<string, string> = {
+      free: "planFree",
+      starter: "planStarter",
+      pro: "planPro",
+      payg: "planPayg",
+    };
+    return keys[id] ? t(keys[id]) : id;
+  };
 
   const onSubscribe = async (p: PlanInfo) => {
     setNotice(null);
@@ -273,7 +283,7 @@ function PlansGrid({
       const { checkout_url } = await subscribe.mutateAsync(p.id);
       window.location.assign(checkout_url);
     } catch (err) {
-      setNotice({ kind: "err", text: err instanceof ApiRequestError ? err.message : "Could not start checkout" });
+      setNotice({ kind: "err", text: err instanceof ApiRequestError ? err.message : t("checkoutStartFailed") });
     }
   };
 
@@ -284,9 +294,12 @@ function PlansGrid({
   return (
     <div>
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold">Monthly subscriptions</h2>
+        <h2 className="text-lg font-semibold">{t("monthlySubscriptions")}</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Currently effective: <span className="font-medium">{PLAN_LABEL[info.effective_plan] ?? info.effective_plan}</span>
+          {t.rich("currentlyEffective", {
+            plan: planLabel(info.effective_plan),
+            b: (chunks) => <span className="font-medium">{chunks}</span>,
+          })}
         </p>
       </div>
       <div className="grid gap-5 md:grid-cols-3">
@@ -297,13 +310,13 @@ function PlansGrid({
             <Card key={p.id} className={`relative flex flex-col ${isCurrent ? "ring-2 ring-brand-500" : ""}`}>
               {isCurrent && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-600 px-3 py-0.5 text-xs font-medium text-white">
-                  Current plan
+                  {t("currentPlanBadge")}
                 </span>
               )}
               <h3 className="text-lg font-bold">{p.name}</h3>
               <p className="mt-1">
                 <span className="text-3xl font-bold tabular-nums">${p.price_monthly}</span>
-                <span className="text-sm text-slate-500 dark:text-slate-400">/mo</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">{t("perMonth")}</span>
               </p>
               <ul className="mt-4 flex-1 space-y-2 text-sm">
                 {p.features.map((f) => (
@@ -316,7 +329,7 @@ function PlansGrid({
               <div className="mt-5">
                 {isCurrent ? (
                   <Button variant="secondary" className="w-full" disabled>
-                    Your plan
+                    {t("yourPlan")}
                   </Button>
                 ) : isPaid ? (
                   <div>
@@ -327,20 +340,20 @@ function PlansGrid({
                       onClick={() => onSubscribe(p)}
                     >
                       {subscribe.isPending
-                        ? "Starting…"
+                        ? t("starting")
                         : p.subscribable
-                          ? `Subscribe to ${p.name}`
-                          : "Not available"}
+                          ? t("subscribeTo", { name: p.name })
+                          : t("notAvailable")}
                     </Button>
                     {info.billing_enabled && !p.subscribable && (
                       <p className="mt-1.5 text-center text-xs text-slate-500 dark:text-slate-400">
-                        No Stripe price configured — use pay-as-you-go above.
+                        {t("noStripePrice")}
                       </p>
                     )}
                   </div>
                 ) : (
                   <Button variant="secondary" className="w-full" disabled>
-                    Default tier
+                    {t("defaultTier")}
                   </Button>
                 )}
               </div>

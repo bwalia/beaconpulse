@@ -1,22 +1,27 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Fields, H2, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "Plans & billing",
-  description: "What each plan includes, and how pay-as-you-go credit works.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navPlans"),
+    description: t("plans.metaDesc"),
+  };
+}
 
-export default function Plans() {
+export default async function Plans() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-        Plans &amp; billing
+        {t("navPlans")}
       </h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        Pay monthly, or by the hour. Both work; neither locks you in.
+        {t("plans.lead")}
       </p>
 
       <H2 id="plans">Plans</H2>

@@ -1,23 +1,27 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Endpoint, Fields, H2, H3, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "Authentication",
-  description: "Create an API key and make your first authenticated request.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navAuthentication"),
+    description: t("authentication.metaDesc"),
+  };
+}
 
-export default function Authentication() {
+export default async function Authentication() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-        Authentication
+        {t("navAuthentication")}
       </h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        Every API request carries a bearer token. For anything automated, that token is
-        an API key.
+        {t("authentication.lead")}
       </p>
 
       <H2 id="create">Create a key</H2>

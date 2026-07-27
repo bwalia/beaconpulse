@@ -342,6 +342,7 @@ function FinalCTA() {
 function Footer() {
   const t = useTranslations("nav");
   const tm = useTranslations("marketing");
+  const ta = useTranslations("a11y");
   return (
     <footer className="border-t border-slate-900/10 py-12 dark:border-white/10">
       <div className="mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
@@ -352,7 +353,7 @@ function Footer() {
             — {tm("footerTagline")}
           </span>
         </div>
-        <nav aria-label="Footer" className="flex items-center gap-5 text-sm">
+        <nav aria-label={ta("footerNav")} className="flex items-center gap-5 text-sm">
           <a
             href="#features"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"

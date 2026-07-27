@@ -41,13 +41,15 @@ import { RANGES, VIZ, tickLabel } from "@/lib/viz";
  * data even if this page tried.
  */
 
+// The PromQL `expr` is code and stays verbatim; the label is a catalog key resolved
+// at render so the chips speak the reader's language.
 const EXAMPLES = [
-  { label: "Are my monitors up?", expr: "probe_success" },
-  { label: "Response time (seconds)", expr: "probe_duration_seconds" },
-  { label: "HTTP status codes", expr: "probe_http_status_code" },
-  { label: "Days until TLS expiry", expr: "(probe_ssl_earliest_cert_expiry - time()) / 86400" },
-  { label: "Availability, last 24h", expr: "avg_over_time(probe_success[24h])" },
-];
+  { key: "example1", expr: "probe_success" },
+  { key: "example2", expr: "probe_duration_seconds" },
+  { key: "example3", expr: "probe_http_status_code" },
+  { key: "example4", expr: "(probe_ssl_earliest_cert_expiry - time()) / 86400" },
+  { key: "example5", expr: "avg_over_time(probe_success[24h])" },
+] as const;
 
 // Distinct series colours from the validated palette, in a stable order.
 const SERIES_COLORS = [VIZ.blue, VIZ.good, VIZ.warning, VIZ.critical, "#7c3aed", "#0891b2"];
@@ -97,7 +99,7 @@ export default function ExplorePage() {
     retry: false, // a PromQL syntax error is not worth retrying
     placeholderData: (previous) => previous,
   });
-  const error = queryError ? (queryError instanceof Error ? queryError.message : "Query failed") : null;
+  const error = queryError ? (queryError instanceof Error ? queryError.message : t("queryFailed")) : null;
 
   const run = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -140,7 +142,7 @@ export default function ExplorePage() {
         <Card className="p-5">
           <form onSubmit={run} className="space-y-4">
             <label htmlFor={`${listId}-expr`} className="sr-only">
-              PromQL expression
+              {t("promqlLabel")}
             </label>
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative flex-1">
@@ -162,7 +164,7 @@ export default function ExplorePage() {
                 </datalist>
               </div>
               <Button type="submit" size="lg" disabled={running} className="shrink-0">
-                {running ? "Running…" : "Execute"}
+                {running ? t("running") : t("execute")}
               </Button>
             </div>
 
@@ -170,7 +172,7 @@ export default function ExplorePage() {
               {/* instant vs range */}
               <div
                 role="group"
-                aria-label="Query type"
+                aria-label={t("queryType")}
                 className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800"
               >
                 {(["range", "instant"] as const).map((m) => (
@@ -186,13 +188,13 @@ export default function ExplorePage() {
                     }`}
                     style={{ transitionDuration: `${DUR.micro}s` }}
                   >
-                    {m === "range" ? "Over time" : "Right now"}
+                    {m === "range" ? t("overTime") : t("rightNow")}
                   </button>
                 ))}
               </div>
 
               {mode === "range" && (
-                <div role="group" aria-label="Time range" className="flex gap-1">
+                <div role="group" aria-label={t("timeRange")} className="flex gap-1">
                   {RANGES.map((r) => (
                     <button
                       key={r.hours}
@@ -216,7 +218,7 @@ export default function ExplorePage() {
           {/* Examples: PromQL has a blank-page problem — most people cannot write
               a query cold. These are the five that answer real questions. */}
           <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
-            <span className="text-sm text-slate-500 dark:text-slate-400">Try:</span>
+            <span className="text-sm text-slate-500 dark:text-slate-400">{t("tryLabel")}</span>
             {EXAMPLES.map((ex) => (
               <button
                 key={ex.expr}
@@ -224,7 +226,7 @@ export default function ExplorePage() {
                 onClick={() => setExpr(ex.expr)}
                 className="rounded-lg border border-slate-200 px-2.5 py-1 text-sm text-slate-700 transition-colors hover:border-blue-600 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-reduce:transition-none dark:border-slate-700 dark:text-slate-300 dark:hover:border-blue-400 dark:hover:text-blue-400"
               >
-                {ex.label}
+                {t(ex.key)}
               </button>
             ))}
           </div>
@@ -249,7 +251,7 @@ export default function ExplorePage() {
       {!error && mode === "range" && chart.rows.length > 0 && (
         <motion.div variants={reveal}>
           <Card className="p-5">
-            <h2 className="mb-4 font-semibold text-slate-900 dark:text-white">Over time</h2>
+            <h2 className="mb-4 font-semibold text-slate-900 dark:text-white">{t("overTime")}</h2>
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chart.rows} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
@@ -301,7 +303,7 @@ export default function ExplorePage() {
           <Card className="overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
               <h2 className="font-semibold text-slate-900 dark:text-white">
-                {data!.result.length} series
+                {t("seriesCount", { count: data!.result.length })}
               </h2>
               <span className="font-mono text-sm text-slate-500 dark:text-slate-400">
                 {data!.resultType}
@@ -311,9 +313,9 @@ export default function ExplorePage() {
               <table className="w-full text-left">
                 <thead className="border-b border-slate-200 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
                   <tr>
-                    <th scope="col" className="px-5 py-3 font-medium">Series</th>
+                    <th scope="col" className="px-5 py-3 font-medium">{t("columnSeries")}</th>
                     <th scope="col" className="px-5 py-3 text-right font-medium">
-                      {mode === "range" ? "Latest" : "Value"}
+                      {mode === "range" ? t("columnLatest") : t("columnValue")}
                     </th>
                   </tr>
                 </thead>
@@ -346,8 +348,7 @@ export default function ExplorePage() {
         <motion.div variants={reveal}>
           <Card className="p-5">
             <EmptyState icon={<ChartLineIcon className="h-8 w-8" />} title={t("empty")}>
-              The query is valid but returned nothing. Check the metric name, or widen the
-              time range.
+              {t("emptyBody")}
             </EmptyState>
           </Card>
         </motion.div>
@@ -358,7 +359,7 @@ export default function ExplorePage() {
         className="flex items-center justify-center gap-2 pb-2 text-sm text-slate-500 dark:text-slate-400"
       >
         <LockIcon className="h-4 w-4" />
-        Queries are scoped to your organization automatically — you cannot see another tenant&apos;s data.
+        {t("scopedNotice")}
       </motion.p>
     </motion.div>
   );

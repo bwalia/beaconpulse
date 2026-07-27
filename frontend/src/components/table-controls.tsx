@@ -4,13 +4,15 @@
 // projects, maintenance, notifications, alerts, status-page domains) so the
 // "Showing X–Y of N" footer and the search box look and behave identically.
 
+import { useTranslations } from "next-intl";
+
 import { Button } from "@/components/ui";
 import { ArrowRightIcon, SearchIcon } from "@/components/icons";
 
 export function SearchInput({
   value,
   onChange,
-  placeholder = "Search…",
+  placeholder,
   label,
 }: {
   value: string;
@@ -18,13 +20,14 @@ export function SearchInput({
   placeholder?: string;
   label: string;
 }) {
+  const t = useTranslations("tableControls");
   return (
     <div className="relative flex-1">
       <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("searchPlaceholder")}
         aria-label={label}
         className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500"
       />
@@ -49,18 +52,22 @@ export function Pagination({
   busy?: boolean;
   onPageChange: (page: number) => void;
 }) {
+  const t = useTranslations("tableControls");
+  const c = useTranslations("common");
   if (total === 0) return null;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const from = page * pageSize + 1;
   const to = Math.min(total, (page + 1) * pageSize);
   return (
     <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-      <p className="text-sm text-slate-600 dark:text-slate-400">
-        Showing{" "}
-        <span className="font-medium tabular-nums text-slate-900 dark:text-slate-200">
-          {from}–{to}
-        </span>{" "}
-        of <span className="font-medium tabular-nums text-slate-900 dark:text-slate-200">{total}</span> {unit}
+      {/* Language-safe count summary: no trailing English noun in the visible text.
+          The caller's `unit` noun survives only in the aria-label, where an assistive
+          technology can still announce what is being counted. */}
+      <p
+        className="text-sm tabular-nums text-slate-600 dark:text-slate-400"
+        aria-label={t("summaryAria", { from, to, total, unit })}
+      >
+        {t("summary", { from, to, total })}
       </p>
       <div className="flex items-center gap-2">
         <Button
@@ -70,7 +77,7 @@ export function Pagination({
           onClick={() => onPageChange(page - 1)}
         >
           <ArrowRightIcon className="h-4 w-4 rotate-180" />
-          Previous
+          {c("previous")}
         </Button>
         <span className="px-1 text-sm tabular-nums text-slate-500 dark:text-slate-400">
           {page + 1} / {pageCount}
@@ -81,7 +88,7 @@ export function Pagination({
           disabled={page + 1 >= pageCount || busy}
           onClick={() => onPageChange(page + 1)}
         >
-          Next
+          {c("next")}
           <ArrowRightIcon className="h-4 w-4" />
         </Button>
       </div>

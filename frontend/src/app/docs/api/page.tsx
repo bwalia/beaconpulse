@@ -1,24 +1,31 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Endpoint, Fields, H2, H3, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "API reference",
-  description: `Every ${brand.name} endpoint, with fields and examples.`,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navApiReference"),
+    description: t("api.metaDesc", { brand: brand.name }),
+  };
+}
 
-export default function ApiReference() {
+export default async function ApiReference() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-        API reference
+        {t("navApiReference")}
       </h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        Base URL <C>{`https://${brand.apiHost}`}</C>. Everything is under <C>/api/v1</C>, takes
-        and returns JSON, and needs an{" "}
-        <Link href="/docs/authentication">API key</Link>.
+        {t.rich("api.lead", {
+          apiHost: brand.apiHost,
+          code: (chunks) => <C>{chunks}</C>,
+          link: (chunks) => <Link href="/docs/authentication">{chunks}</Link>,
+        })}
       </p>
 
       <Note>

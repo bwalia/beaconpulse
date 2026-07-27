@@ -2,6 +2,7 @@
 // vague — an unpublished org and a non-existent one look identical, so this page is
 // never an oracle for which orgs exist.
 
+import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { brand } from "@/brand";
 
@@ -12,7 +13,8 @@ const CRT: React.CSSProperties = {
   ].join(","),
 };
 
-export default function StatusNotFound() {
+export default async function StatusNotFound() {
+  const t = await getTranslations("statusView");
   return (
     <div
       className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#080a0f] p-6 text-slate-300"
@@ -22,19 +24,19 @@ export default function StatusNotFound() {
       <div className="relative w-full max-w-lg border border-slate-700/70 bg-[#0b0d13] p-6 shadow-[0_0_40px_-12px_rgba(255,90,30,0.25)]">
         <p className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-orange-400">
           <span aria-hidden className="inline-block h-3 w-3 rotate-45 border border-orange-400" />
-          {brand.name.replace(/\s+/g, "").toUpperCase()}{" // STATUS"}
+          {brand.name.replace(/\s+/g, "").toUpperCase()}{" // "}{t("statusLabel")}
         </p>
         <p className="mt-5 text-lg text-red-400">
-          <span className="text-slate-600">&gt;</span> ERROR 404 — NO STATUS PAGE AT THIS ADDRESS
+          <span className="text-slate-600">&gt;</span> {t("notFoundHeading")}
         </p>
         <p className="mt-2 text-sm text-slate-500">
-          The page may not exist, or its owner has not published one. Check the address and try again.
+          {t("notFoundBody")}
         </p>
         <Link
           href="/"
           className="mt-6 inline-block text-xs uppercase tracking-[0.25em] text-slate-500 underline-offset-4 hover:text-orange-400 hover:underline focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-400"
         >
-          ▮ RETURN TO {brand.name.toUpperCase()}
+          ▮ {t("returnTo", { brand: brand.name.toUpperCase() })}
         </Link>
       </div>
     </div>

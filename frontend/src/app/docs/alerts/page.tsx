@@ -1,24 +1,27 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Fields, H2, H3, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "Alerts & maintenance",
-  description: "Where alerts go, how quickly they fire, and how to stay quiet during planned work.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navAlerts"),
+    description: t("alerts.metaDesc"),
+  };
+}
 
-export default function Alerts() {
+export default async function Alerts() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-        Alerts &amp; maintenance
+        {t("navAlerts")}
       </h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        An alert nobody sees is a dashboard. An alert that fires constantly is noise
-        people learn to ignore — which is worse, because it teaches them to ignore the
-        real one.
+        {t("alerts.lead")}
       </p>
 
       <H2 id="channels">Channels</H2>

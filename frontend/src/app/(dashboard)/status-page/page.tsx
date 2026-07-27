@@ -112,12 +112,12 @@ export default function StatusPageSettings() {
               </span>
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  {settings.enabled ? "Your status page is live" : "Your status page is private"}
+                  {settings.enabled ? t("liveHeading") : t("privateHeading")}
                 </h2>
                 <p className="mt-1 text-slate-600 dark:text-slate-300">
                   {settings.enabled
-                    ? "Anyone with the link can see the domains you have published — and nothing else."
-                    : "Turn this on to publish a page at the address below."}
+                    ? t("liveBody")
+                    : t("privateBody")}
                 </p>
 
                 {settings.enabled && (
@@ -141,10 +141,10 @@ export default function StatusPageSettings() {
               className="w-full shrink-0 sm:w-auto"
             >
               {update.isPending
-                ? "Saving…"
+                ? t("saving")
                 : settings.enabled
-                  ? "Unpublish"
-                  : "Publish status page"}
+                  ? t("unpublish")
+                  : t("publish")}
             </Button>
           </div>
 
@@ -157,10 +157,7 @@ export default function StatusPageSettings() {
               className="mt-5 flex items-start gap-2 rounded-lg bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300"
             >
               <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                This page is live but has no domains on it. Publish at least one below, or
-                visitors will see an empty page.
-              </span>
+              <span>{t("enabledButEmpty")}</span>
             </p>
           )}
         </Card>
@@ -169,10 +166,9 @@ export default function StatusPageSettings() {
       {/* ---- Page address (custom slug) ---- */}
       <motion.div variants={reveal}>
         <Card className="p-6">
-          <h2 className="font-semibold text-slate-900 dark:text-white">Page address</h2>
+          <h2 className="font-semibold text-slate-900 dark:text-white">{t("pageAddress")}</h2>
           <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
-            The web address for your status page. Letters, numbers and hyphens — spaces and capitals
-            are tidied automatically.
+            {t("pageAddressHint")}
           </p>
           <form
             onSubmit={(e) => {
@@ -182,13 +178,13 @@ export default function StatusPageSettings() {
                 { slug: slug ?? settings.custom_slug },
                 {
                   onError: (err) =>
-                    setSlugError(err instanceof ApiRequestError ? err.message : "Could not save the address"),
+                    setSlugError(err instanceof ApiRequestError ? err.message : t("saveAddressError")),
                 },
               );
             }}
             className="mt-4"
           >
-            <Label htmlFor="status-slug">Custom URL</Label>
+            <Label htmlFor="status-slug">{t("customUrl")}</Label>
             {/* Label on top, [input + buttons] in one stretch row (so they share a
                 height and align), hint below. Stacks full-width on mobile. */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
@@ -220,7 +216,7 @@ export default function StatusPageSettings() {
                   disabled={update.isPending}
                   className="flex-1 sm:flex-none"
                 >
-                  Save address
+                  {t("saveAddress")}
                 </Button>
                 {settings.custom_slug && (
                   <Button
@@ -234,7 +230,7 @@ export default function StatusPageSettings() {
                       update.mutate({ slug: "" });
                     }}
                   >
-                    Reset to default
+                    {t("resetToDefault")}
                   </Button>
                 )}
               </div>
@@ -245,7 +241,7 @@ export default function StatusPageSettings() {
               </p>
             ) : (
               <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                Leave blank to use the default: <span className="font-mono">/status/{settings.org_slug}</span>
+                {t("slugDefaultHint")} <span className="font-mono">/status/{settings.org_slug}</span>
               </p>
             )}
           </form>
@@ -261,7 +257,7 @@ export default function StatusPageSettings() {
               update.mutate({ title });
             }}
           >
-            <Label htmlFor="status-heading">Public heading</Label>
+            <Label htmlFor="status-heading">{t("publicHeading")}</Label>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
               <input
                 id="status-heading"
@@ -272,11 +268,11 @@ export default function StatusPageSettings() {
                 className="w-full min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               />
               <Button type="submit" variant="secondary" disabled={update.isPending} className="sm:flex-none">
-                Save heading
+                {t("saveHeading")}
               </Button>
             </div>
             <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-              Shown at the top of the page. Leave blank to use “{settings.org_name}”.
+              {t("headingHint", { name: settings.org_name })}
             </p>
           </form>
         </Card>
@@ -287,14 +283,13 @@ export default function StatusPageSettings() {
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-6 py-4 dark:border-slate-800">
             <div>
-              <h2 className="font-semibold text-slate-900 dark:text-white">Published domains</h2>
+              <h2 className="font-semibold text-slate-900 dark:text-white">{t("publishedDomains")}</h2>
               <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
-                Only the name and status are ever exposed — never the target, IP or check
-                configuration.
+                {t("publishedDomainsHint")}
               </p>
             </div>
             <span className="shrink-0 font-mono text-sm tabular-nums text-slate-600 dark:text-slate-300">
-              {settings.published_count} of {monitorTotal} public
+              {t("publicCount", { count: settings.published_count, total: monitorTotal })}
             </span>
           </div>
 
@@ -303,8 +298,8 @@ export default function StatusPageSettings() {
               <SearchInput
                 value={domainSearchInput}
                 onChange={setDomainSearchInput}
-                placeholder="Search monitors…"
-                label="Search monitors to publish"
+                placeholder={t("searchMonitorsPlaceholder")}
+                label={t("searchMonitorsLabel")}
               />
             </div>
           )}
@@ -319,13 +314,13 @@ export default function StatusPageSettings() {
                   {/* The target is shown HERE (authenticated) precisely because it
                       is what will NOT appear on the public page. */}
                   <p className="mt-0.5 truncate font-mono text-xs text-slate-500 dark:text-slate-400">
-                    {m.target} · stays private
+                    {m.target} · {t("staysPrivate")}
                   </p>
                 </div>
 
                 <label className="flex shrink-0 cursor-pointer items-center gap-2.5">
                   <span className="text-sm text-slate-600 dark:text-slate-300">
-                    {m.public ? "Public" : "Private"}
+                    {m.public ? t("public") : t("private")}
                   </span>
                   <input
                     type="checkbox"
@@ -333,7 +328,7 @@ export default function StatusPageSettings() {
                     disabled={setPublic.isPending}
                     onChange={(e) => setPublic.mutate({ id: m.id, isPublic: e.target.checked })}
                     className="h-5 w-5 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-offset-slate-950"
-                    aria-label={`Publish ${m.name} on the public status page`}
+                    aria-label={t("publishMonitorAria", { name: m.name })}
                   />
                 </label>
               </li>
@@ -343,8 +338,8 @@ export default function StatusPageSettings() {
           {monitorTotal === 0 && (
             <p className="px-6 py-10 text-center text-slate-500 dark:text-slate-400">
               {domainSearching
-                ? "No monitors match your search."
-                : "No monitors yet. Add one and it will appear here, private by default."}
+                ? t("noMonitorsMatch")
+                : t("noMonitors")}
             </p>
           )}
 
@@ -368,7 +363,7 @@ export default function StatusPageSettings() {
         className="flex items-center justify-center gap-2 pb-4 text-sm text-slate-500 dark:text-slate-400"
       >
         <CheckCircleIcon className="h-4 w-4" />
-        Domains are grouped on the public page by their project.
+        {t("groupedByProject")}
       </motion.p>
     </motion.div>
   );

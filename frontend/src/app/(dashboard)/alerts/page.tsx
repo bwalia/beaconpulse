@@ -58,7 +58,7 @@ export default function AlertsPage() {
           total > 0 ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-800 dark:bg-red-950/60 dark:text-red-300">
               <AlertTriangleIcon className="h-3.5 w-3.5" />
-              {total} firing
+              {t("firingCount", { count: total })}
             </span>
           ) : null
         }
@@ -69,12 +69,12 @@ export default function AlertsPage() {
           <select
             value={severity}
             onChange={(e) => changeSeverity(e.target.value)}
-            aria-label="Filter by severity"
+            aria-label={t("filterBySeverity")}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-48"
           >
-            <option value="">All severities</option>
-            <option value="critical">Critical</option>
-            <option value="warning">Warning</option>
+            <option value="">{t("allSeverities")}</option>
+            <option value="critical">{t("severityCritical")}</option>
+            <option value="warning">{t("severityWarning")}</option>
           </select>
         </div>
       )}
@@ -101,14 +101,14 @@ export default function AlertsPage() {
                 onClick={() => changeSeverity("")}
                 className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-400"
               >
-                Clear filter
+                {t("clearFilter")}
               </button>
             ) : undefined
           }
         >
           {severity
-            ? `No ${severity} alerts are firing right now.`
-            : "Nothing is firing right now. Alerts appear here the moment a monitor breaches its rule."}
+            ? t("emptyFilteredBody", { severity })
+            : t("emptyBody")}
         </EmptyState>
       ) : (
         <>
@@ -143,11 +143,11 @@ export default function AlertsPage() {
                         </span>
                         {a.in_maintenance && (
                           <span
-                            title="This monitor is under an active maintenance window — its notification was suppressed"
+                            title={t("suppressedTooltip")}
                             className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
                           >
                             <WrenchIcon className="h-3 w-3" />
-                            Suppressed
+                            {t("suppressed")}
                           </span>
                         )}
                       </div>
@@ -160,7 +160,7 @@ export default function AlertsPage() {
                     {a.since && (
                       <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs tabular-nums text-slate-500 dark:text-slate-400">
                         <ClockIcon className="h-3.5 w-3.5" />
-                        firing {now === null ? "" : sinceLabel(a.since, now)}
+                        {t("firing")} {now === null ? "" : sinceLabel(a.since, now)}
                       </span>
                     )}
                   </div>

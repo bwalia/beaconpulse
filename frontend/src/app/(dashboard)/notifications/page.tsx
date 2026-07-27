@@ -32,6 +32,7 @@ type Notice = { kind: "ok" | "err"; text: string } | null;
 
 export default function NotificationsPage() {
   const t = useTranslations("pages.notifications");
+  const c = useTranslations("common");
   const [page, setPage] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -68,7 +69,7 @@ export default function NotificationsPage() {
         actions={
           <Button onClick={() => setShowForm((v) => !v)}>
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
-            {showForm ? "Close" : "Add channel"}
+            {showForm ? c("close") : t("addChannel")}
           </Button>
         }
       />
@@ -92,8 +93,8 @@ export default function NotificationsPage() {
         <SearchInput
           value={searchInput}
           onChange={setSearchInput}
-          placeholder="Search channels by name…"
-          label="Search notification channels"
+          placeholder={t("searchPlaceholder")}
+          label={t("searchLabel")}
         />
       )}
 
@@ -110,19 +111,19 @@ export default function NotificationsPage() {
           action={
             filtering ? (
               <Button variant="secondary" onClick={() => setSearchInput("")}>
-                Clear search
+                {t("clearSearch")}
               </Button>
             ) : (
               <Button onClick={() => setShowForm(true)}>
                 <PlusIcon className="h-4 w-4" />
-                Add channel
+                {t("addChannel")}
               </Button>
             )
           }
         >
           {filtering
-            ? "No notification channels match your search."
-            : `Connect Slack, email, a webhook or Telegram and ${brand.name} will alert you the moment a monitor goes down — enriched with AI triage when enabled.`}
+            ? t("noMatch")
+            : t("emptyDescription", { brand: brand.name })}
         </EmptyState>
       ) : (
         <>
@@ -160,6 +161,9 @@ function ChannelRow({
   channel: NotificationChannel;
   setNotice: (n: Notice) => void;
 }) {
+  const t = useTranslations("pages.notifications");
+  const c = useTranslations("common");
+  const tc = useTranslations("channels");
   const test = useTestChannel();
   const setEnabled = useSetChannelEnabled();
   const del = useDeleteChannel();
@@ -178,19 +182,21 @@ function ChannelRow({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-slate-900 dark:text-white">{channel.name}</span>
             <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-              {def?.label ?? channel.type}
+              {def ? tc(def.label) : channel.type}
             </span>
             {!channel.enabled && (
               <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                paused
+                {t("paused")}
               </span>
             )}
           </div>
           <p className="mt-1 inline-flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
-            <span className="truncate font-mono">{def?.summary(channel) ?? channel.type}</span>
+            <span className="truncate font-mono">
+              {def ? tc(def.summaryKey, def.summaryVars?.(channel)) : channel.type}
+            </span>
             {channel.has_secret && (
               <span className="inline-flex shrink-0 items-center gap-1">
-                · secret <LockIcon className="h-3 w-3" />
+                · {t("secret")} <LockIcon className="h-3 w-3" />
               </span>
             )}
           </p>
@@ -202,20 +208,20 @@ function ChannelRow({
           onClick={async () => {
             try {
               await test.mutateAsync(channel.id);
-              setNotice({ kind: "ok", text: `Test sent to "${channel.name}".` });
+              setNotice({ kind: "ok", text: t("testSent", { name: channel.name }) });
             } catch (e) {
-              setNotice({ kind: "err", text: e instanceof ApiRequestError ? e.message : "Test failed" });
+              setNotice({ kind: "err", text: e instanceof ApiRequestError ? e.message : t("testFailed") });
             }
           }}
         >
-          {test.isPending ? "Sending…" : "Send test"}
+          {test.isPending ? t("sending") : t("sendTest")}
         </Button>
         <Button
           variant="secondary"
           disabled={setEnabled.isPending}
           onClick={() => setEnabled.mutate({ id: channel.id, enabled: !channel.enabled })}
         >
-          {channel.enabled ? "Pause" : "Resume"}
+          {channel.enabled ? t("pause") : t("resume")}
         </Button>
         <Button
           variant="danger"
@@ -223,9 +229,9 @@ function ChannelRow({
           onClick={async () => {
             if (
               await confirm({
-                title: `Delete “${channel.name}”?`,
-                body: "Alerts will no longer be delivered to this channel.",
-                confirmLabel: "Delete channel",
+                title: t("deleteConfirmTitle", { name: channel.name }),
+                body: t("deleteConfirmBody"),
+                confirmLabel: t("deleteConfirmLabel"),
                 danger: true,
               })
             ) {
@@ -233,7 +239,7 @@ function ChannelRow({
             }
           }}
         >
-          Delete
+          {c("delete")}
         </Button>
         </div>
       </div>
@@ -253,6 +259,8 @@ function CreateChannelForm({
   onDone: () => void;
   setNotice: (n: Notice) => void;
 }) {
+  const t = useTranslations("pages.notifications");
+  const tc = useTranslations("channels");
   const createChannel = useCreateChannel();
   const [def, setDef] = useState<ChannelTypeDef>(CHANNEL_TYPES[0]);
   const [name, setName] = useState("");
@@ -278,9 +286,9 @@ function CreateChannelForm({
     // Client-side required check — the backend re-validates authoritatively and
     // returns field errors, which we surface below.
     const errs: Record<string, string> = {};
-    if (!name.trim()) errs.name = "Name is required";
+    if (!name.trim()) errs.name = t("nameRequired");
     for (const f of def.fields) {
-      if (f.required && !(values[f.key] ?? "").trim()) errs[f.key] = `${f.label} is required`;
+      if (f.required && !(values[f.key] ?? "").trim()) errs[f.key] = t("fieldRequired", { field: tc(f.label) });
     }
     setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -288,10 +296,10 @@ function CreateChannelForm({
     setSubmitting(true);
     try {
       await createChannel.mutateAsync(toChannelPayload(def, name, values));
-      setNotice({ kind: "ok", text: `${def.label} channel added. Use “Send test” to verify it.` });
+      setNotice({ kind: "ok", text: t("channelAdded", { type: tc(def.label) }) });
       onDone();
     } catch (e) {
-      setNotice({ kind: "err", text: e instanceof ApiRequestError ? e.message : "Failed to add channel" });
+      setNotice({ kind: "err", text: e instanceof ApiRequestError ? e.message : t("addFailed") });
     } finally {
       setSubmitting(false);
     }
@@ -300,7 +308,7 @@ function CreateChannelForm({
   return (
     <Card>
       {/* Type selector */}
-      <div role="group" aria-label="Channel type" className="mb-4 flex flex-wrap gap-2">
+      <div role="group" aria-label={t("channelType")} className="mb-4 flex flex-wrap gap-2">
         {CHANNEL_TYPES.map((t) => (
           <button
             key={t.value}
@@ -313,26 +321,26 @@ function CreateChannelForm({
                 : "border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300"
             }`}
           >
-            {t.label}
+            {tc(t.label)}
           </button>
         ))}
       </div>
 
       <p className="mb-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
-        {def.blurb}
+        {tc(def.blurb)}
       </p>
 
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="Channel name" error={errors.name}>
+        <Field label={t("channelName")} error={errors.name}>
           <Input
-            placeholder={`${def.label} — on-call`}
+            placeholder={t("channelNamePlaceholder", { type: tc(def.label) })}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </Field>
 
         {def.fields.map((f) => (
-          <Field key={f.key} label={f.label} hint={f.hint} error={errors[f.key]}>
+          <Field key={f.key} label={tc(f.label)} hint={f.hint ? tc(f.hint) : undefined} error={errors[f.key]}>
             {f.options ? (
               <select
                 value={values[f.key] ?? f.options[0].value}
@@ -341,7 +349,9 @@ function CreateChannelForm({
               >
                 {f.options.map((o) => (
                   <option key={o.value} value={o.value}>
-                    {o.label}
+                    {/* A label equal to its raw value is a verbatim data token
+                        (e.g. POST/PUT); anything else is an i18n key. */}
+                    {o.label === o.value ? o.label : tc(o.label)}
                   </option>
                 ))}
               </select>
@@ -349,7 +359,7 @@ function CreateChannelForm({
               <Input
                 type={f.secret ? "password" : "text"}
                 autoComplete={f.secret ? "new-password" : "off"}
-                placeholder={f.placeholder}
+                placeholder={f.placeholderKey ? tc(f.placeholderKey) : f.placeholder}
                 value={values[f.key] ?? ""}
                 onChange={(e) => setField(f.key, e.target.value)}
               />
@@ -358,7 +368,7 @@ function CreateChannelForm({
         ))}
 
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Saving…" : "Save channel"}
+          {submitting ? t("saving") : t("saveChannel")}
         </Button>
       </form>
     </Card>

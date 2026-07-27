@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useMemo, useState, useSyncExternalStore } from "react";
 
+import { brand } from "@/brand";
 import { CheckIcon, LockIcon } from "@/components/icons";
 
 /**
@@ -68,6 +70,8 @@ interface Param {
   where: "path" | "query";
   required?: boolean;
   placeholder?: string;
+  /** Key under `docs.console` for a translatable placeholder (overrides `placeholder`). */
+  placeholderKey?: string;
   hint?: string;
 }
 
@@ -75,8 +79,9 @@ interface Endpoint {
   id: string;
   method: Method;
   path: string;
-  title: string;
-  desc: string;
+  /** Keys under `docs.console`, resolved with t() at render. */
+  titleKey: string;
+  descKey: string;
   params?: Param[];
   body?: string;
   writes?: boolean;
@@ -84,25 +89,27 @@ interface Endpoint {
 }
 
 // Curated rather than generated: the endpoints someone actually reaches for, safe ones
-// first, each with a body a reader can send as-is and then edit.
-const GROUPS: { label: string; endpoints: Endpoint[] }[] = [
+// first, each with a body a reader can send as-is and then edit. Titles, descriptions
+// and the group labels are held as `docs.console` keys and resolved at render, so the
+// console translates without cloning this list per language.
+const GROUPS: { labelKey: string; endpoints: Endpoint[] }[] = [
   {
-    label: "Start here",
+    labelKey: "groupStartHere",
     endpoints: [
       {
         id: "system-info",
         method: "GET",
         path: "/api/v1/system/info",
-        title: "System info",
-        desc: "Needs no key — send it first to confirm the console reaches the API.",
+        titleKey: "epSystemInfoTitle",
+        descKey: "epSystemInfoDesc",
         noAuth: true,
       },
       {
         id: "list-monitors",
         method: "GET",
         path: "/api/v1/monitors",
-        title: "List monitors",
-        desc: "Everything you are watching.",
+        titleKey: "epListMonitorsTitle",
+        descKey: "epListMonitorsDesc",
         params: [
           { name: "status", where: "query", placeholder: "down", hint: "up | down | degraded | paused" },
           { name: "search", where: "query", placeholder: "example.com" },
@@ -113,42 +120,42 @@ const GROUPS: { label: string; endpoints: Endpoint[] }[] = [
         id: "usage",
         method: "GET",
         path: "/api/v1/monitors/usage",
-        title: "Plan usage",
-        desc: "How many monitors you have, against your plan's limit.",
+        titleKey: "epUsageTitle",
+        descKey: "epUsageDesc",
       },
       {
         id: "alerts",
         method: "GET",
         path: "/api/v1/alerts",
-        title: "Firing alerts",
-        desc: "What is broken right now.",
+        titleKey: "epAlertsTitle",
+        descKey: "epAlertsDesc",
         params: [{ name: "severity", where: "query", placeholder: "critical", hint: "critical | warning" }],
       },
       {
         id: "billing",
         method: "GET",
         path: "/api/v1/billing",
-        title: "Billing",
-        desc: "Plan, credit, and what remains.",
+        titleKey: "epBillingTitle",
+        descKey: "epBillingDesc",
       },
     ],
   },
   {
-    label: "Projects & monitors",
+    labelKey: "groupProjects",
     endpoints: [
       {
         id: "list-projects",
         method: "GET",
         path: "/api/v1/projects",
-        title: "List projects",
-        desc: "Your projects — you'll need a project id to create a monitor.",
+        titleKey: "epListProjectsTitle",
+        descKey: "epListProjectsDesc",
       },
       {
         id: "create-project",
         method: "POST",
         path: "/api/v1/projects",
-        title: "Create a project",
-        desc: "A group for monitors.",
+        titleKey: "epCreateProjectTitle",
+        descKey: "epCreateProjectDesc",
         writes: true,
         body: `{
   "name": "Production",
@@ -159,8 +166,8 @@ const GROUPS: { label: string; endpoints: Endpoint[] }[] = [
         id: "create-monitor",
         method: "POST",
         path: "/api/v1/monitors",
-        title: "Create a monitor",
-        desc: "Put a real project_id from the call above.",
+        titleKey: "epCreateMonitorTitle",
+        descKey: "epCreateMonitorDesc",
         writes: true,
         body: `{
   "project_id": "PASTE-A-PROJECT-ID",
@@ -174,39 +181,39 @@ const GROUPS: { label: string; endpoints: Endpoint[] }[] = [
         id: "get-monitor",
         method: "GET",
         path: "/api/v1/monitors/{id}",
-        title: "Get one monitor",
-        desc: "By id.",
-        params: [{ name: "id", where: "path", required: true, placeholder: "a monitor id" }],
+        titleKey: "epGetMonitorTitle",
+        descKey: "epGetMonitorDesc",
+        params: [{ name: "id", where: "path", required: true, placeholderKey: "paramMonitorId" }],
       },
       {
         id: "pause-monitor",
         method: "POST",
         path: "/api/v1/monitors/{id}/pause",
-        title: "Pause a monitor",
-        desc: "Stop probing without deleting.",
+        titleKey: "epPauseMonitorTitle",
+        descKey: "epPauseMonitorDesc",
         writes: true,
-        params: [{ name: "id", where: "path", required: true, placeholder: "a monitor id" }],
+        params: [{ name: "id", where: "path", required: true, placeholderKey: "paramMonitorId" }],
       },
       {
         id: "delete-monitor",
         method: "DELETE",
         path: "/api/v1/monitors/{id}",
-        title: "Delete a monitor",
-        desc: "Removes it and its history. Confirmed before sending.",
+        titleKey: "epDeleteMonitorTitle",
+        descKey: "epDeleteMonitorDesc",
         writes: true,
-        params: [{ name: "id", where: "path", required: true, placeholder: "a monitor id" }],
+        params: [{ name: "id", where: "path", required: true, placeholderKey: "paramMonitorId" }],
       },
     ],
   },
   {
-    label: "Declarative sync",
+    labelKey: "groupSync",
     endpoints: [
       {
         id: "sync-dryrun",
         method: "POST",
         path: "/api/v1/sync",
-        title: "Sync (dry run)",
-        desc: "Shows what applying this file would do, and changes nothing.",
+        titleKey: "epSyncTitle",
+        descKey: "epSyncDesc",
         writes: true,
         body: `{
   "project": "production",
@@ -258,15 +265,16 @@ export function ApiConsole() {
 }
 
 function KeyField({ apiKey, setApiKey }: { apiKey: string; setApiKey: (v: string) => void }) {
+  const t = useTranslations("docs");
   return (
     <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <label htmlFor="console-key" className="text-sm font-semibold text-slate-900 dark:text-white">
-          Your API key
+          {t("console.keyLabel")}
         </label>
         {apiKey && (
           <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
-            <CheckIcon className="h-3 w-3" /> saved in this browser
+            <CheckIcon className="h-3 w-3" /> {t("console.keySaved")}
           </span>
         )}
       </div>
@@ -287,19 +295,22 @@ function KeyField({ apiKey, setApiKey }: { apiKey: string; setApiKey: (v: string
             onClick={() => setApiKey("")}
             className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           >
-            Clear
+            {t("console.clear")}
           </button>
         )}
       </div>
       <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-500 dark:text-slate-400">
         <LockIcon className="mt-0.5 h-3 w-3 shrink-0" />
         <span>
-          Stored only in this browser, and sent only to this Beacon API. Use a{" "}
-          <span className="font-medium">viewer</span> key while exploring —{" "}
-          <Link href="/api-keys" className="text-blue-700 underline dark:text-blue-400">
-            create one
-          </Link>{" "}
-          (you&apos;ll be asked to sign in).
+          {t.rich("console.keyNote", {
+            brand: brand.name,
+            b: (chunks) => <span className="font-medium">{chunks}</span>,
+            link: (chunks) => (
+              <Link href="/api-keys" className="text-blue-700 underline dark:text-blue-400">
+                {chunks}
+              </Link>
+            ),
+          })}
         </span>
       </p>
     </div>
@@ -317,6 +328,7 @@ function RequestPanel({
   onSelect: (id: string) => void;
   selectedId: string;
 }) {
+  const t = useTranslations("docs");
   // Fresh on every mount, and the panel remounts per endpoint (see the key above), so
   // no effect is needed to reset these.
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
@@ -343,24 +355,24 @@ function RequestPanel({
 
     for (const p of endpoint.params ?? []) {
       if (p.required && !paramValues[p.name]?.trim()) {
-        setError(`${p.name} is required.`);
+        setError(t("console.errRequired", { name: p.name }));
         return;
       }
     }
     if (!endpoint.noAuth && !apiKey.trim()) {
-      setError("Add an API key above first.");
+      setError(t("console.errNoKey"));
       return;
     }
     if (endpoint.body && bodyText.trim()) {
       try {
         JSON.parse(bodyText);
       } catch (e) {
-        setError(`The request body is not valid JSON: ${e instanceof Error ? e.message : "parse error"}`);
+        setError(t("console.errInvalidJson", { message: e instanceof Error ? e.message : "parse error" }));
         return;
       }
     }
     if (endpoint.method === "DELETE") {
-      if (!window.confirm(`This sends a real DELETE to ${buildUrl()} and cannot be undone. Continue?`)) {
+      if (!window.confirm(t("console.confirmDelete", { url: buildUrl() }))) {
         return;
       }
     }
@@ -388,12 +400,14 @@ function RequestPanel({
         status: res.status,
         statusText: res.statusText,
         ms: Math.round(performance.now() - started),
-        body: pretty || "(empty response)",
+        body: pretty || t("console.emptyResponse"),
         ok: res.ok,
       });
     } catch (e) {
       setError(
-        e instanceof Error ? `Request failed before reaching the API: ${e.message}` : "Request failed.",
+        e instanceof Error
+          ? t("console.errRequestFailed", { message: e.message })
+          : t("console.errRequestFailedGeneric"),
       );
     } finally {
       setSending(false);
@@ -404,7 +418,7 @@ function RequestPanel({
     <>
       <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
         <label htmlFor="console-endpoint" className="mb-2 block text-sm font-semibold text-slate-900 dark:text-white">
-          Endpoint
+          {t("console.endpointLabel")}
         </label>
         <select
           id="console-endpoint"
@@ -413,10 +427,10 @@ function RequestPanel({
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
         >
           {GROUPS.map((g) => (
-            <optgroup key={g.label} label={g.label}>
+            <optgroup key={g.labelKey} label={t(`console.${g.labelKey}`)}>
               {g.endpoints.map((e) => (
                 <option key={e.id} value={e.id}>
-                  {e.method} · {e.title}
+                  {e.method} · {t(`console.${e.titleKey}`)}
                 </option>
               ))}
             </optgroup>
@@ -430,11 +444,11 @@ function RequestPanel({
           <code className="break-all font-mono text-xs text-slate-700 dark:text-slate-300">{endpoint.path}</code>
           {endpoint.writes && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-300">
-              changes data
+              {t("console.changesData")}
             </span>
           )}
         </div>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{endpoint.desc}</p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t(`console.${endpoint.descKey}`)}</p>
 
         {endpoint.params && endpoint.params.length > 0 && (
           <div className="mt-4 space-y-3">
@@ -443,15 +457,15 @@ function RequestPanel({
                 <label htmlFor={`param-${p.name}`} className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
                   {p.name}
                   <span className="ml-1.5 font-normal text-slate-400">
-                    {p.where}
-                    {p.required ? " · required" : ""}
+                    {t(p.where === "path" ? "console.wherePath" : "console.whereQuery")}
+                    {p.required ? ` · ${t("console.required")}` : ""}
                   </span>
                 </label>
                 <input
                   id={`param-${p.name}`}
                   value={paramValues[p.name] ?? ""}
                   onChange={(e) => setParamValues((v) => ({ ...v, [p.name]: e.target.value }))}
-                  placeholder={p.placeholder}
+                  placeholder={p.placeholderKey ? t(`console.${p.placeholderKey}`) : p.placeholder}
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-mono text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                 />
                 {p.hint && <p className="mt-1 text-xs text-slate-400">{p.hint}</p>}
@@ -463,7 +477,7 @@ function RequestPanel({
         {endpoint.body !== undefined && (
           <div className="mt-4">
             <label htmlFor="console-body" className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Request body
+              {t("console.requestBody")}
             </label>
             <textarea
               id="console-body"
@@ -482,7 +496,7 @@ function RequestPanel({
           disabled={sending}
           className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-60 motion-reduce:transition-none dark:focus-visible:ring-offset-slate-950"
         >
-          {sending ? "Sending…" : `Send ${endpoint.method}`}
+          {sending ? t("console.sending") : t("console.send", { method: endpoint.method })}
         </button>
 
         {error && (
@@ -494,7 +508,7 @@ function RequestPanel({
 
       <div className="rounded-xl border border-slate-200 dark:border-slate-800">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 dark:border-slate-800">
-          <span className="text-sm font-semibold text-slate-900 dark:text-white">Response</span>
+          <span className="text-sm font-semibold text-slate-900 dark:text-white">{t("console.response")}</span>
           {result && (
             <span className="flex items-center gap-3 text-xs">
               <span
@@ -517,7 +531,7 @@ function RequestPanel({
             </pre>
           ) : (
             <p className="py-8 text-center text-sm text-slate-400">
-              {sending ? "Waiting for the API…" : "Send a request to see the response here."}
+              {sending ? t("console.waiting") : t("console.empty")}
             </p>
           )}
         </div>

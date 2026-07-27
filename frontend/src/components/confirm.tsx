@@ -9,6 +9,7 @@
 // product. This one is focus-managed, Escape/backdrop dismissable, and styled with
 // the app's design system.
 
+import { useTranslations } from "next-intl";
 import {
   createContext,
   useCallback,
@@ -71,6 +72,8 @@ function ConfirmDialog({
   opts: ConfirmOptions;
   onResolve: (ok: boolean) => void;
 }) {
+  const t = useTranslations("confirm");
+  const c = useTranslations("common");
   const confirmRef = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -108,14 +111,14 @@ function ConfirmDialog({
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <Button ref={cancelRef} variant="secondary" onClick={() => onResolve(false)}>
-            {opts.cancelLabel ?? "Cancel"}
+            {opts.cancelLabel ?? c("cancel")}
           </Button>
           <Button
             ref={confirmRef}
             variant={opts.danger ? "danger" : "primary"}
             onClick={() => onResolve(true)}
           >
-            {opts.confirmLabel ?? "Confirm"}
+            {opts.confirmLabel ?? t("confirm")}
           </Button>
         </div>
       </div>

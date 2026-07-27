@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { BeaconMark } from "@/components/icons";
@@ -19,49 +20,54 @@ import { brand } from "@/brand";
 
 interface Item {
   href: string;
-  label: string;
+  /** Key under the `docs` namespace resolved at render. */
+  labelKey: string;
 }
 interface Group {
-  title: string;
+  /** Key under the `docs` namespace resolved at render. */
+  titleKey: string;
   items: Item[];
 }
 
+// Labels and group titles are held as `docs` namespace keys and resolved with t() at
+// render, so the nav translates without duplicating the string list per language.
 const NAV: Group[] = [
   {
-    title: "Getting started",
+    titleKey: "navGettingStarted",
     items: [
-      { href: "/docs", label: "Introduction" },
-      { href: "/docs/quickstart", label: "Quickstart" },
-      { href: "/docs/monitors", label: "Monitor types" },
+      { href: "/docs", labelKey: "navIntroduction" },
+      { href: "/docs/quickstart", labelKey: "navQuickstart" },
+      { href: "/docs/monitors", labelKey: "navMonitorTypes" },
     ],
   },
   {
-    title: "API",
+    titleKey: "navApiGroup",
     items: [
-      { href: "/docs/authentication", label: "Authentication" },
-      { href: "/docs/api", label: "API reference" },
-      { href: "/docs/console", label: "API console" },
-      { href: "/docs/automation", label: "CI & automation" },
+      { href: "/docs/authentication", labelKey: "navAuthentication" },
+      { href: "/docs/api", labelKey: "navApiReference" },
+      { href: "/docs/console", labelKey: "navApiConsole" },
+      { href: "/docs/automation", labelKey: "navAutomation" },
     ],
   },
   {
-    title: "Platform",
+    titleKey: "navPlatform",
     items: [
-      { href: "/docs/alerts", label: "Alerts & maintenance" },
-      { href: "/docs/status-pages", label: "Status pages" },
-      { href: "/docs/plans", label: "Plans & billing" },
+      { href: "/docs/alerts", labelKey: "navAlerts" },
+      { href: "/docs/status-pages", labelKey: "navStatusPages" },
+      { href: "/docs/plans", labelKey: "navPlans" },
     ],
   },
 ];
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const t = useTranslations("docs");
   return (
-    <nav aria-label="Documentation">
+    <nav aria-label={t("navAriaLabel")}>
       {NAV.map((group) => (
-        <div key={group.title} className="mb-7">
+        <div key={group.titleKey} className="mb-7">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            {group.title}
+            {t(group.titleKey)}
           </p>
           <ul className="space-y-0.5">
             {group.items.map((item) => {
@@ -80,7 +86,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                         : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-100"
                     }`}
                   >
-                    {item.label}
+                    {t(item.labelKey)}
                   </Link>
                 </li>
               );
@@ -94,6 +100,8 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 
 export function DocsShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const t = useTranslations("docs");
+  const tCommon = useTranslations("common");
 
   return (
     <div className="min-h-dvh bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -101,7 +109,7 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
         href="#doc"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-white dark:focus:bg-white dark:focus:text-slate-900"
       >
-        Skip to content
+        {t("skipToContent")}
       </a>
 
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
@@ -114,14 +122,14 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
             <span className="whitespace-nowrap font-semibold tracking-tight">{brand.name}</span>
           </Link>
           <span className="hidden text-sm text-slate-400 dark:text-slate-600 sm:inline">/</span>
-          <span className="hidden text-sm text-slate-600 dark:text-slate-300 sm:inline">Docs</span>
+          <span className="hidden text-sm text-slate-600 dark:text-slate-300 sm:inline">{t("docsLabel")}</span>
 
           <div className="ml-auto flex items-center gap-2">
             <Link
               href="/dashboard"
               className="hidden rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white sm:block"
             >
-              Dashboard
+              {t("dashboard")}
             </Link>
             <LanguageSwitcher className="hidden sm:inline-flex" />
             <ThemeToggle />
@@ -129,10 +137,10 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
               aria-expanded={menuOpen}
-              aria-label="Toggle documentation menu"
+              aria-label={t("menuToggleAria")}
               className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:border-slate-700 dark:text-slate-200 lg:hidden"
             >
-              {menuOpen ? "Close" : "Contents"}
+              {menuOpen ? tCommon("close") : t("contents")}
             </button>
           </div>
         </div>
@@ -160,13 +168,13 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
       <footer className="mt-12 border-t border-slate-200 dark:border-slate-800">
         <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-6 text-sm text-slate-500 sm:px-6 lg:px-8 dark:text-slate-400">
           <Link href="/" className="hover:text-slate-900 dark:hover:text-white">
-            Home
+            {t("home")}
           </Link>
           <Link href="/docs" className="hover:text-slate-900 dark:hover:text-white">
-            Docs
+            {t("docsLabel")}
           </Link>
           <Link href="/register" className="hover:text-slate-900 dark:hover:text-white">
-            Create an account
+            {t("createAccount")}
           </Link>
         </div>
       </footer>

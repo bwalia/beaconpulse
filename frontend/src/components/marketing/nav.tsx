@@ -29,6 +29,7 @@ const LINKS = [
 export function MarketingNav() {
   const { user, loading } = useAuth();
   const t = useTranslations("nav");
+  const ta = useTranslations("a11y");
   const { scrollY } = useScroll();
 
   // Drive the chrome from scroll position rather than a state + listener, so no
@@ -48,7 +49,7 @@ export function MarketingNav() {
       <motion.div aria-hidden style={{ background: bgDark }} className="absolute inset-0 hidden dark:block" />
 
       <nav
-        aria-label="Primary"
+        aria-label={ta("primaryNav")}
         className="relative mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16 flex items-center gap-8 py-5"
       >
         <Link

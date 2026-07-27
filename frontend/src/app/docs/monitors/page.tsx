@@ -1,23 +1,27 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Fields, H2, H3, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "Monitor types",
-  description: `Every kind of check ${brand.name} can run, and when to reach for each.`,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navMonitorTypes"),
+    description: t("monitors.metaDesc", { brand: brand.name }),
+  };
+}
 
-export default function Monitors() {
+export default async function Monitors() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-        Monitor types
+        {t("navMonitorTypes")}
       </h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        Seven kinds of check. The type decides what a target means and what counts as a
-        failure.
+        {t("monitors.lead")}
       </p>
 
       <H2 id="https">https &amp; http</H2>

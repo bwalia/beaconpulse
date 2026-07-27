@@ -1,23 +1,27 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { brand } from "@/brand";
 import Link from "next/link";
 
 import { C, Code, Fields, H2, H3, Note } from "@/components/docs/parts";
 
-export const metadata: Metadata = {
-  title: "CI & automation",
-  description: "Keep your monitors in your repository and apply them from a workflow.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("docs");
+  return {
+    title: t("navAutomation"),
+    description: t("automation.metaDesc"),
+  };
+}
 
-export default function Automation() {
+export default async function Automation() {
+  const t = await getTranslations("docs");
   return (
     <article className="prose-docs">
       <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-        CI &amp; automation
+        {t("navAutomation")}
       </h1>
       <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-        Keep the domains you monitor next to the code that serves them, and keep the two
-        in step automatically.
+        {t("automation.lead")}
       </p>
 
       <H2 id="why">Why not just POST a monitor?</H2>

@@ -21,6 +21,7 @@ export const LOCALES = [
   { code: "ko", name: "Korean", native: "한국어" },
   { code: "zh", name: "Chinese (Simplified)", native: "简体中文" },
   { code: "hi", name: "Hindi", native: "हिन्दी" },
+  { code: "pa", name: "Punjabi", native: "ਪੰਜਾਬੀ" },
   { code: "ar", name: "Arabic", native: "العربية" },
 ] as const;
 
