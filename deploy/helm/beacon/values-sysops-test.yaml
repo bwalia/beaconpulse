@@ -1,0 +1,40 @@
+# ── SysOps 24/7 — test environment (white-label) ────────────────────────────
+# Namespace: sysops-test   Host: https://test.sysops247.com
+# Deploy: run the workflow with BRAND=sysops, TARGET_ENV=test (fully automated).
+# See DEPLOY-A-BRAND.md. Mirrors values-test.yaml, re-skinned for the SysOps brand.
+env: sysops-test
+host: test.sysops247.com
+
+app:
+  beaconEnv: staging
+  logLevel: info
+  promRetention: 7d
+  replicas:
+    api: 1
+    frontend: 1
+
+ai:
+  enabled: true
+  baseURL: https://ollama.workstation.co.uk
+  model: qwen3:30b-a3b
+  timeout: 60s
+
+storage:
+  postgres: 5Gi
+  redis: 1Gi
+  prometheus: 5Gi
+  alertmanager: 1Gi
+
+ingress:
+  enabled: true
+  tls: true
+
+# Reuse the test environment's secrets — the deploy pipeline copies beacon-secrets +
+# nebulacr-login from the `test` namespace into `sysops-test` (no per-brand sealing).
+secretsSource: existing
+
+image:
+  registry: test-spectoncr.diytaxreturn.co.uk
+  frontendTag: sysops-latest
+  pullSecret: nebulacr-login
+  pullSecretCreate: false

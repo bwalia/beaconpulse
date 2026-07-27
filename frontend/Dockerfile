@@ -11,6 +11,10 @@ COPY . .
 # NEXT_PUBLIC_* is inlined into the client bundle at build time.
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+# Selects the white-label brand (src/brand). Unset/unknown falls back to "beacon".
+# Build a branded image with:  --build-arg NEXT_PUBLIC_BRAND=sysops
+ARG NEXT_PUBLIC_BRAND=beacon
+ENV NEXT_PUBLIC_BRAND=$NEXT_PUBLIC_BRAND
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

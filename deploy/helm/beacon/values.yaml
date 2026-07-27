@@ -26,6 +26,12 @@ image:
   namespace: beacon
   # Overridden per-deploy by CI with the git SHA for immutable, traceable rollouts.
   tag: latest
+  # White-label override for the ONE brand-specific image. The frontend bakes its
+  # name/logo/colour in at build time (NEXT_PUBLIC_BRAND), so a second brand needs its
+  # own frontend image — but the api/worker binaries are brand-neutral and shared.
+  # Empty = use `tag` above (the Beacon default). Set it (e.g. "sysops-latest") to run
+  # a branded dashboard on the shared backend. See values-sysops-int.yaml.
+  frontendTag: ""
   pullPolicy: IfNotPresent
   # dockerconfigjson pull secret the pods reference. Empty = public registry.
   pullSecret: beacon-registry

@@ -38,6 +38,14 @@ on:
         description: "Image tag to DEPLOY (deploy-only). Leave blank to use this commit's short SHA."
         default: ""
         required: false
+      BRAND:
+        type: choice
+        description: "White-label brand. 'beacon' = default product; 'sysops' = SysOps 24/7 on its own domain + namespace, fully automated (DNS, wslproxy, deploy)."
+        default: "beacon"
+        required: true
+        options:
+          - beacon
+          - sysops
 
 env:
   # SpectonCR (private OCI registry, https via the wslproxy ingress). The host is
@@ -63,6 +71,10 @@ env:
   BUILDX_FLAGS: --provenance=false --sbom=false
   TARGET_ENV: ${{ github.event.inputs.TARGET_ENV || 'int' }}
   DEPLOYMENT_TYPE: ${{ github.event.inputs.DEPLOYMENT_TYPE || 'build-and-deploy' }}
+  # White-label brand baked into the frontend image (NEXT_PUBLIC_BRAND). Default keeps
+  # every push to main building Beacon exactly as before; only a manual dispatch with a
+  # different BRAND produces a branded image (tagged <brand>-<sha>).
+  BRAND: ${{ github.event.inputs.BRAND || 'beacon' }}
   # DNS: every environment host is a CNAME to the wslproxy edge, same as the rest
   # of the platform. The hostname itself is read from the env's Helm values file so
   # DNS can never drift from what the Ingress actually serves.
@@ -89,18 +101,32 @@ jobs:
         if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CLOUDFLARE_ZONE: ${{ env.DNS_ZONE }}
+          # Only beaconpulse.net's zone id is held in CI. For any OTHER brand domain the
+          # DNS script resolves the zone id from the zone NAME (the token needs Zone:Read
+          # on that zone), so no new per-domain secret is required.
+          BEACONPULSE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: |
           set -euo pipefail
-          VALUES="deploy/helm/beacon/values-${TARGET_ENV}.yaml"
-          [ -f "$VALUES" ] || { echo "no values file for env '${TARGET_ENV}'"; exit 1; }
+          # The brand selects its own values overlay — host + namespace differ per brand.
+          if [ "$BRAND" = "beacon" ]; then
+            VALUES="deploy/helm/beacon/values-${TARGET_ENV}.yaml"
+          else
+            VALUES="deploy/helm/beacon/values-${BRAND}-${TARGET_ENV}.yaml"
+          fi
+          [ -f "$VALUES" ] || { echo "::error::no values file '$VALUES' (brand='${BRAND}', env='${TARGET_ENV}')"; exit 1; }
 
           # Single source of truth: whatever host the chart's Ingress claims.
           HOST="$(awk '/^host:/{print $2; exit}' "$VALUES")"
-          [ -n "$HOST" ] || { echo "no 'host:' in $VALUES"; exit 1; }
+          [ -n "$HOST" ] || { echo "::error::no 'host:' in $VALUES"; exit 1; }
 
-          echo "Ensuring ${HOST} -> ${DNS_TARGET} (proxied=${DNS_PROXIED})"
+          # The Cloudflare zone is the registrable apex (last two labels) of the host, so
+          # a brand on any domain works without hardcoding a zone. Beacon keeps its exact
+          # path — the known zone id is passed so no Zone:Read scope is needed for it.
+          ZONE="$(echo "$HOST" | awk -F. '{print $(NF-1)"."$NF}')"
+          export CLOUDFLARE_ZONE="$ZONE"
+          if [ "$ZONE" = "beaconpulse.net" ]; then export CLOUDFLARE_ZONE_ID="$BEACONPULSE_ZONE_ID"; fi
+
+          echo "Ensuring ${HOST} (zone ${ZONE}) -> ${DNS_TARGET} (proxied=${DNS_PROXIED})"
           ./deploy/scripts/cloudflare-dns.sh \
             --name "$HOST" \
             --content "$DNS_TARGET" \
@@ -208,6 +234,16 @@ jobs:
           set -euo pipefail
           SHA=${{ steps.tag.outputs.sha }}
           NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
+          BRAND="${BRAND:-beacon}"
+          # The frontend is the ONLY brand-specific image: NEXT_PUBLIC_BRAND (src/brand)
+          # is inlined into the bundle at build time. A non-default brand gets a
+          # brand-prefixed tag so a SysOps build never overwrites Beacon's
+          # frontend:latest — deploy it with --set image.frontendTag=<brand>-<tag>.
+          if [ "$BRAND" = "beacon" ]; then
+            FE_SHA="frontend:$SHA"; FE_LATEST="frontend:latest"
+          else
+            FE_SHA="frontend:${BRAND}-$SHA"; FE_LATEST="frontend:${BRAND}-latest"
+          fi
           # Empty NEXT_PUBLIC_API_BASE_URL => the browser calls the API same-origin
           # (/api/...) through the gateway. No CORS.
           # Native amd64: npm installs arch-specific native modules (next/swc,
@@ -217,11 +253,12 @@ jobs:
           docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
             -f frontend/Dockerfile \
             --build-arg NEXT_PUBLIC_API_BASE_URL="" \
-            -t "$NS/frontend:$SHA" -t "$NS/frontend:latest" \
+            --build-arg NEXT_PUBLIC_BRAND="$BRAND" \
+            -t "$NS/$FE_SHA" -t "$NS/$FE_LATEST" \
             ./frontend
-          ./deploy/scripts/assert-image-arch.sh "$NS/frontend:$SHA"
-          docker push "$NS/frontend:$SHA"
-          docker push "$NS/frontend:latest"
+          ./deploy/scripts/assert-image-arch.sh "$NS/$FE_SHA"
+          docker push "$NS/$FE_SHA"
+          docker push "$NS/$FE_LATEST"
 
   deploy:
     runs-on: self-hosted
@@ -267,22 +304,51 @@ jobs:
           set -euo pipefail
           TAG="${{ github.event.inputs.IMAGE_TAG }}"
           [ -z "$TAG" ] && TAG="${GITHUB_SHA::7}"
-          echo "Deploying beacon to '$TARGET_ENV' namespace with image tag '$TAG'..."
+
+          # Beacon deploys as release `beacon` into the env namespace, exactly as before.
+          # A white-label brand deploys as its own release into `<brand>-<env>`, so it
+          # never collides with Beacon (the chart's resource names are `beacon-*` and are
+          # not release-scoped, so two brands cannot share one namespace).
+          if [ "$BRAND" = "beacon" ]; then
+            RELEASE="beacon"; NAMESPACE="${TARGET_ENV}"
+            VALUES="values-${TARGET_ENV}.yaml"; EXTRA=""
+          else
+            RELEASE="${BRAND}"; NAMESPACE="${BRAND}-${TARGET_ENV}"
+            VALUES="values-${BRAND}-${TARGET_ENV}.yaml"
+            # The brand ships a branded frontend image ($BRAND-$TAG); api/worker are
+            # brand-neutral and stay on the shared backend tag ($TAG).
+            EXTRA="--set image.frontendTag=${BRAND}-${TAG}"
+            # Zero-manual secrets: reuse the base env's already-provisioned secrets by
+            # copying them into the brand namespace. `existing` in the brand values file
+            # tells the chart to reference `beacon-secrets` without creating it, so there
+            # is no per-brand sealing step. Idempotent (apply) on every redeploy.
+            kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
+            for s in beacon-secrets nebulacr-login; do
+              echo "Copying secret '$s': ${TARGET_ENV} -> ${NAMESPACE}"
+              kubectl -n "$TARGET_ENV" get secret "$s" -o json \
+                | jq 'del(.metadata.namespace, .metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.ownerReferences, .metadata.managedFields, .metadata.annotations."kubectl.kubernetes.io/last-applied-configuration", .metadata.labels, .status)' \
+                | kubectl -n "$NAMESPACE" apply -f -
+            done
+          fi
+          echo "NAMESPACE=$NAMESPACE" >> "$GITHUB_ENV"
+
+          echo "Deploying release '$RELEASE' (brand=$BRAND) to namespace '$NAMESPACE' with image tag '$TAG'..."
           # image.registry is pinned to the host the build job actually pushed to,
           # so a values-file edit can never send the cluster to a different registry.
-          helm upgrade --install beacon ./deploy/helm/beacon \
-            -f ./deploy/helm/beacon/values-${TARGET_ENV}.yaml \
+          helm upgrade --install "$RELEASE" ./deploy/helm/beacon \
+            -f "./deploy/helm/beacon/${VALUES}" \
             --set image.registry="${{ needs.build.outputs.registry }}" \
             --set image.tag="$TAG" \
-            --namespace "$TARGET_ENV" --create-namespace \
+            $EXTRA \
+            --namespace "$NAMESPACE" --create-namespace \
             --wait --timeout 10m
 
       - name: Rollout status
         if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         run: |
-          kubectl -n "$TARGET_ENV" rollout status deploy/beacon-api --timeout=5m || true
+          kubectl -n "$NAMESPACE" rollout status deploy/beacon-api --timeout=5m || true
           # The namespace is shared with other products, so scope the listing to ours.
-          kubectl -n "$TARGET_ENV" get pods -o wide -l app.kubernetes.io/part-of=beacon
+          kubectl -n "$NAMESPACE" get pods -o wide -l app.kubernetes.io/part-of=beacon
 
       - name: Slack notification
         if: ${{ always() && (env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy') }}
@@ -291,6 +357,6 @@ jobs:
           SLACK_CHANNEL: general
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: "Beacon deployment status"
-          SLACK_MESSAGE: "Beacon deployed to ${{ env.TARGET_ENV }} :rocket:"
+          SLACK_MESSAGE: "${{ env.BRAND }} deployed to ${{ env.NAMESPACE || env.TARGET_ENV }} :rocket:"
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         continue-on-error: true

@@ -3,16 +3,20 @@ import { createElement } from "react";
 import type { Brand } from "./types";
 
 /**
- * SysOps — an example second brand, and the proof that white-labelling actually works.
+ * SysOps 24/7 — a complete second brand, and the proof that white-labelling works.
  *
- * It is a complete, real alternative: different name, a violet ramp instead of blue, and
- * its own mark. Build with NEXT_PUBLIC_BRAND=sysops and the entire product — landing
- * page, dashboard, docs, titles, favicon accent — comes out as SysOps, with no other
- * file touched. Copy this to start a third.
+ * It is a real alternative, not a stub: its own name, a cyan ramp instead of Beacon's
+ * blue, and its own mark. Build with NEXT_PUBLIC_BRAND=sysops and the entire product —
+ * landing page, dashboard, docs, page titles, focus rings, the logo — comes out as
+ * SysOps 24/7 with no other file touched. Copy this to start a third brand.
+ *
+ * To recolour: replace the eleven `primary` hex values with any hand-tuned 50–900 ramp
+ * (e.g. paste a Tailwind palette). Everything `brand-*` re-tints from this block alone.
  */
 
 // A distinct mark so the switch is unmistakable: concentric monitoring rings around a
-// central node. Same 24×24 / 1.75-stroke geometry as every other icon.
+// central node — "watching, around the clock". Same 24×24 / 1.75-stroke geometry as
+// every other icon, so it inherits currentColor and sits right next to the wordmark.
 function SysOpsMark({ className }: { className?: string }) {
   return createElement(
     "svg",
@@ -34,25 +38,28 @@ function SysOpsMark({ className }: { className?: string }) {
 }
 
 export const sysops: Brand = {
-  name: "SysOps",
+  name: "SysOps 24/7",
   shortName: "SysOps",
-  tagline: "Operations, watched.",
+  tagline: "Always on. Always watching.",
   description:
-    "Infrastructure and service monitoring with alerting and public status pages. Self-hosted and multi-tenant.",
-  apiHost: "sysops.example.com",
+    "Round-the-clock infrastructure and service monitoring with alerting and public status pages. Self-hosted and multi-tenant.",
+  // Cosmetic only — the host shown in the docs' curl examples. Set this to your real
+  // domain; the running app always calls its API same-origin regardless.
+  apiHost: "sysops247.io",
 
-  // A violet ramp — visibly not Beacon's blue, so a glance confirms the brand changed.
+  // A green ramp — visibly not Beacon's blue, so a glance confirms the brand changed.
+  // Swap these eleven values for any palette to recolour the whole product.
   primary: {
-    50: "#f5f3ff",
-    100: "#ede9fe",
-    200: "#ddd6fe",
-    300: "#c4b5fd",
-    400: "#a78bfa",
-    500: "#8b5cf6",
-    600: "#7c3aed",
-    700: "#6d28d9",
-    800: "#5b21b6",
-    900: "#4c1d95",
+    50: "#ecfdf5",
+    100: "#d1fae5",
+    200: "#a7f3d0",
+    300: "#6ee7b7",
+    400: "#34d399",
+    500: "#10b981",
+    600: "#059669",
+    700: "#047857",
+    800: "#065f46",
+    900: "#064e3b",
   },
 
   Mark: SysOpsMark,

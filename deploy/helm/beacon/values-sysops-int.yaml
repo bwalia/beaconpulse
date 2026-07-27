@@ -1,0 +1,81 @@
+# ── SysOps 24/7 — integration environment (white-label example) ─────────────
+# A second BRAND on its own DOMAIN, proving the chart is brand- and domain-portable.
+# Namespace: sysops-int   Host: https://int.sysops247.com
+#
+# What makes this "SysOps" rather than "Beacon":
+#   • image.frontendTag points at a frontend image built with NEXT_PUBLIC_BRAND=sysops
+#     (name, logo and the GREEN theme are baked in at build time — src/brand/sysops.ts).
+#   • The api/worker images are brand-neutral, so they are shared with Beacon unchanged.
+#
+# FULLY AUTOMATED: run the "Beacon … Deploy to K3S" workflow with BRAND=sysops,
+# TARGET_ENV=int — it does DNS + wslproxy + build + deploy with no manual step (the
+# pipeline picks up this file, deploys release `sysops` into namespace `sysops-int`, and
+# copies the int secrets in). See DEPLOY-A-BRAND.md.
+#
+# Manual equivalent (for debugging), into its OWN namespace — the chart's resource names
+# are `beacon-*` and NOT release-scoped, so two brands cannot share a namespace:
+#
+#   helm upgrade --install sysops ./deploy/helm/beacon \
+#     -f deploy/helm/beacon/values-sysops-int.yaml \
+#     --set image.tag=<backend-sha> --set image.frontendTag=sysops-<sha> \
+#     --namespace sysops-int --create-namespace --wait
+
+# env selects the sealed-secrets path (sealed/<env>/) and labels. It must match the
+# namespace you deploy into, because a SealedSecret is decrypted only in the namespace
+# it was sealed for. Generate it with:  deploy/scripts/seal-secrets.sh sysops-int
+env: sysops-int
+
+# The domain. This one value drives the Ingress host, the TLS SAN, CORS, the dashboard
+# URL, Alertmanager's external URL and the Stripe return URLs. Change it to deploy the
+# same brand on a different domain.
+host: int.sysops247.com
+
+app:
+  beaconEnv: staging
+  logLevel: debug
+  promRetention: 7d
+  replicas:
+    api: 1
+    frontend: 1
+
+# AI alert enrichment (API key comes from the sealed secret: BEACON_AI_API_KEY).
+ai:
+  enabled: true
+  baseURL: https://ollama.workstation.co.uk
+  model: qwen3:30b-a3b
+  timeout: 60s
+
+storage:
+  postgres: 5Gi
+  redis: 1Gi
+  prometheus: 5Gi
+  alertmanager: 1Gi
+
+ingress:
+  enabled: true
+  tls: true
+
+# Secrets: reuse the base int environment's secrets with ZERO manual sealing. The deploy
+# pipeline copies `beacon-secrets` (and the `nebulacr-login` pull secret) from the `int`
+# namespace into `sysops-int` before helm runs; `existing` tells the chart to reference
+# `beacon-secrets` by name without creating or owning it.
+# NOTE: fine for a shared INT tier (same JWT/encryption/DB creds as Beacon-int). For a
+# production brand, give it dedicated secrets instead: run
+#   deploy/scripts/seal-secrets.sh sysops-prod  and set secretsSource: sealed.
+secretsSource: existing
+
+image:
+  # Backend (api/worker) images are shared with Beacon-int — same brand-neutral binaries,
+  # same registry. Pass --set image.tag=<sha> at deploy time (or set it here).
+  registry: int-spectoncr.diytaxreturn.co.uk
+  # The branded frontend image, built by CI with BRAND=sysops (tag: sysops-<sha>).
+  # Pin a specific sha in production; sysops-latest tracks the newest branded build.
+  frontendTag: sysops-latest
+  # The pull secret must exist in the sysops-int namespace. Simplest: copy the shared
+  # one from the int namespace once —
+  #   kubectl -n int get secret nebulacr-login -o yaml \
+  #     | sed 's/namespace: int/namespace: sysops-int/' \
+  #     | kubectl -n sysops-int apply -f -
+  # then reference it here without the chart trying to own it.
+  pullSecret: nebulacr-login
+  pullSecretCreate: false

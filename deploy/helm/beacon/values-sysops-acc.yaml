@@ -1,0 +1,40 @@
+# ── SysOps 24/7 — acceptance environment (white-label) ──────────────────────
+# Namespace: sysops-acc   Host: https://acc.sysops247.com
+# Deploy: run the workflow with BRAND=sysops, TARGET_ENV=acc (fully automated).
+# See DEPLOY-A-BRAND.md. Mirrors values-acc.yaml, re-skinned for the SysOps brand.
+env: sysops-acc
+host: acc.sysops247.com
+
+app:
+  beaconEnv: staging
+  logLevel: info
+  promRetention: 15d
+  replicas:
+    api: 2
+    frontend: 1
+
+ai:
+  enabled: true
+  baseURL: https://ollama.workstation.co.uk
+  model: qwen3:30b-a3b
+  timeout: 60s
+
+storage:
+  postgres: 5Gi
+  redis: 1Gi
+  prometheus: 5Gi
+  alertmanager: 1Gi
+
+ingress:
+  enabled: true
+  tls: true
+
+# Reuse the acc environment's secrets — the deploy pipeline copies beacon-secrets +
+# nebulacr-login from the `acc` namespace into `sysops-acc` (no per-brand sealing).
+secretsSource: existing
+
+image:
+  registry: acc-spectoncr.diytaxreturn.co.uk
+  frontendTag: sysops-latest
+  pullSecret: nebulacr-login
+  pullSecretCreate: false
