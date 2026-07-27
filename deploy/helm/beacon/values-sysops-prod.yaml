@@ -1,0 +1,47 @@
+# ── SysOps 24/7 — production environment (white-label) ──────────────────────
+# Namespace: sysops-prod   Host: https://sysops247.com   (apex, via CNAME flattening)
+# Deploy: run the workflow with BRAND=sysops, TARGET_ENV=prod (fully automated).
+# See DEPLOY-A-BRAND.md. Mirrors values-prod.yaml, re-skinned for the SysOps brand.
+env: sysops-prod
+host: sysops247.com
+
+app:
+  beaconEnv: production
+  logLevel: info
+  promRetention: 30d
+  replicas:
+    api: 2
+    frontend: 2
+
+ai:
+  enabled: true
+  baseURL: https://ollama.workstation.co.uk
+  model: qwen3:30b-a3b
+  timeout: 60s
+
+storage:
+  postgres: 5Gi
+  redis: 1Gi
+  prometheus: 10Gi
+  alertmanager: 1Gi
+
+ingress:
+  enabled: true
+  tls: true
+
+# ⚠️  PRODUCTION SECRETS — read this.
+# `existing` reuses beacon-prod's secrets (the pipeline copies beacon-secrets from the
+# `prod` namespace), which means SysOps-prod shares Beacon-prod's JWT + ENCRYPTION keys.
+# That is fine to get running, but for a real production brand you SHOULD give it its
+# own secrets so the two products are cryptographically isolated:
+#   1) put SysOps' secret values in deploy/.env
+#   2) deploy/scripts/seal-secrets.sh sysops-prod   (seals for the sysops-prod namespace)
+#   3) git add deploy/helm/beacon/sealed/sysops-prod/ && commit
+#   4) change the line below to:  secretsSource: sealed
+secretsSource: existing
+
+image:
+  registry: spectoncr.diytaxreturn.co.uk
+  frontendTag: sysops-latest
+  pullSecret: nebulacr-login
+  pullSecretCreate: false

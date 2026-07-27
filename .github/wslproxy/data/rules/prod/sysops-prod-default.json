@@ -1,0 +1,35 @@
+{
+  "id": "sysops-prod-default",
+  "name": "sysops-prod-default",
+  "profile_id": "prod",
+  "priority": 1,
+  "rules_tags": ["sysops", "prod"],
+  "match": {
+    "rules": {
+      "path": "/",
+      "path_key": "starts_with",
+      "jwt_token_validation": "equals"
+    },
+    "response": {
+      "code": 305,
+      "redirect_uri": "13.42.188.136:80",
+      "strip_path": false,
+      "backends": [
+        {
+          "address": "13.42.188.136:80",
+          "weight": 100,
+          "label": "k3s1 traefik ingress (wslproxy class); traefik routes by Host to the sysops-int ingress"
+        }
+      ],
+      "routing": {
+        "mode": "least_conn"
+      }
+    }
+  },
+  "servers": [
+    "host:int.sysops247.com",
+    "host:test.sysops247.com",
+    "host:acc.sysops247.com",
+    "host:sysops247.com"
+  ]
+}

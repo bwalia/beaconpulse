@@ -36,7 +36,15 @@ Usage: {{ include "beacon.image" (dict "root" . "name" "api") }}
 */}}
 {{- define "beacon.image" -}}
 {{- $img := .root.Values.image -}}
-{{ $img.registry }}/{{ $img.namespace }}/{{ .name }}:{{ $img.tag }}
+{{- $tag := $img.tag -}}
+{{- /* The frontend is the only brand-specific image (name/logo/colour are baked in
+       at build time via NEXT_PUBLIC_BRAND). frontendTag lets a white-label release
+       point its frontend at a branded image tag while sharing the brand-neutral
+       api/worker images. Empty (the default) falls back to the shared image.tag. */ -}}
+{{- if and (eq .name "frontend") $img.frontendTag -}}
+{{- $tag = $img.frontendTag -}}
+{{- end -}}
+{{ $img.registry }}/{{ $img.namespace }}/{{ .name }}:{{ $tag }}
 {{- end -}}
 
 {{/*
