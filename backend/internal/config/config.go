@@ -37,6 +37,7 @@ type Config struct {
 	Notify    Notify
 	AI        AI
 	Billing   Billing
+	Google    Google
 
 	// AllowPrivateMonitorTargets lets tenants point monitors at private, loopback and
 	// link-local addresses.
@@ -183,6 +184,20 @@ type Auth struct {
 	RefreshTTL    time.Duration
 }
 
+// Google holds "Sign in with Google" (OpenID Connect) configuration. Empty ClientIDs
+// disables it entirely — the endpoint 403s and the frontend hides the button — the same
+// graceful-degradation pattern as Stripe/AI. No client SECRET is needed: the app
+// verifies Google's signed ID token directly (audience = one of these client ids).
+type Google struct {
+	// ClientIDs are the accepted ID-token audiences. One per brand (each white-label
+	// ships its own Google OAuth client id in its frontend), comma-separated in
+	// BEACON_GOOGLE_CLIENT_ID so one API can accept tokens from every brand it serves.
+	ClientIDs []string
+}
+
+// Enabled reports whether Google sign-in is configured.
+func (g Google) Enabled() bool { return len(g.ClientIDs) > 0 }
+
 // Crypto holds symmetric-encryption configuration used to protect secrets at
 // rest (e.g. notification credentials).
 type Crypto struct {
@@ -294,6 +309,9 @@ func Load() (Config, error) {
 			MonitorHoursPerDollar: getInt("BEACON_BILLING_MONITOR_HOURS_PER_DOLLAR", 5, add),
 			SuccessURL:            getStr("BEACON_BILLING_SUCCESS_URL", "http://localhost:3000/billing?checkout=success"),
 			CancelURL:             getStr("BEACON_BILLING_CANCEL_URL", "http://localhost:3000/billing?checkout=cancel"),
+		},
+		Google: Google{
+			ClientIDs: getCSV("BEACON_GOOGLE_CLIENT_ID", nil),
 		},
 		AllowPrivateMonitorTargets:  getBool("BEACON_ALLOW_PRIVATE_MONITOR_TARGETS", false, add),
 		RequireReachableSignupEmail: getBool("BEACON_REQUIRE_REACHABLE_SIGNUP_EMAIL", true, add),

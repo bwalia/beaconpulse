@@ -57,4 +57,9 @@ export const beacon: Brand = {
   },
 
   Mark: BeaconMark,
+
+  // "Continue with Google" is hidden until a client id is set. For the default brand
+  // this reads NEXT_PUBLIC_GOOGLE_CLIENT_ID (baked at build) so it can be enabled from
+  // deploy/.env with no source edit; paste a literal id here to hardcode it instead.
+  googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "",
 };

@@ -48,6 +48,9 @@ export interface Brand {
     /** Public company/site URL, if different from this app. */
     website?: string;
   };
+
+  /** Google OAuth 2.0 Client ID for "Sign in with Google". Empty = Google sign-in hidden. Per-brand so each white-label uses its own Google app. */
+  googleClientId?: string;
 }
 
 /** A Tailwind-style colour ramp, 50 (lightest) to 900 (darkest), as hex. */

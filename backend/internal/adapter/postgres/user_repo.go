@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -45,10 +46,10 @@ func (r *UserRepository) CreateOrgAndOwner(ctx context.Context, org *auth.Organi
 	}
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO users (id, org_id, email, password_hash, name, role, is_active, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		owner.ID, owner.OrgID, owner.Email, owner.PasswordHash, owner.Name,
-		string(owner.Role), owner.IsActive, owner.CreatedAt, owner.UpdatedAt,
+		`INSERT INTO users (id, org_id, email, password_hash, google_sub, name, role, is_active, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		owner.ID, owner.OrgID, owner.Email, nullString(owner.PasswordHash), nullString(owner.GoogleSub),
+		owner.Name, string(owner.Role), owner.IsActive, owner.CreatedAt, owner.UpdatedAt,
 	); err != nil {
 		if c, ok := isUniqueViolation(err); ok && c == "ux_users_email" {
 			return apperror.Conflict("an account with that email already exists")
@@ -62,20 +63,40 @@ func (r *UserRepository) CreateOrgAndOwner(ctx context.Context, org *auth.Organi
 	return nil
 }
 
-const userColumns = `id, org_id, email, password_hash, name, role, is_active,
+const userColumns = `id, org_id, email, password_hash, google_sub, name, role, is_active,
 	twofa_enabled, last_login_at, created_at, updated_at`
 
 func scanUser(row pgx.Row) (*auth.User, error) {
 	var u auth.User
 	var role string
+	// password_hash and google_sub are nullable (an account has one or the other, or
+	// both), so scan through NullString and flatten a NULL to "".
+	var passwordHash, googleSub sql.NullString
 	if err := row.Scan(
-		&u.ID, &u.OrgID, &u.Email, &u.PasswordHash, &u.Name, &role, &u.IsActive,
+		&u.ID, &u.OrgID, &u.Email, &passwordHash, &googleSub, &u.Name, &role, &u.IsActive,
 		&u.TwoFAEnabled, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
+	u.PasswordHash = passwordHash.String
+	u.GoogleSub = googleSub.String
 	u.Role = auth.Role(role)
 	return &u, nil
+}
+
+// LinkGoogleSub attaches a Google subject id to an existing user (first Google sign-in
+// for an email that already has an account).
+func (r *UserRepository) LinkGoogleSub(ctx context.Context, userID uuid.UUID, googleSub string) error {
+	if _, err := r.pool.Exec(ctx,
+		`UPDATE users SET google_sub = $2, updated_at = now() WHERE id = $1 AND deleted_at IS NULL`,
+		userID, googleSub,
+	); err != nil {
+		if c, ok := isUniqueViolation(err); ok && c == "ux_users_google_sub" {
+			return apperror.Conflict("this Google account is already linked to another user")
+		}
+		return apperror.Internal(fmt.Errorf("link google sub: %w", err))
+	}
+	return nil
 }
 
 // GetUserByID fetches a non-deleted user by id.

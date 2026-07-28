@@ -70,6 +70,15 @@ func (f *fakeUserRepo) SlugExists(_ context.Context, slug string) (bool, error) 
 	return ok, nil
 }
 
+func (f *fakeUserRepo) LinkGoogleSub(_ context.Context, id uuid.UUID, googleSub string) error {
+	u, ok := f.usersByID[id]
+	if !ok {
+		return apperror.NotFound("user not found")
+	}
+	u.GoogleSub = googleSub
+	return nil
+}
+
 type fakeRefreshRepo struct {
 	byHash map[string]*RefreshToken
 	byID   map[uuid.UUID]*RefreshToken
@@ -195,5 +204,91 @@ func TestRefreshRotatesToken(t *testing.T) {
 	// The old token must no longer be usable.
 	if _, err := svc.Refresh(ctx, res.RefreshToken, RequestMeta{}); !apperror.IsCode(err, apperror.CodeUnauthorized) {
 		t.Fatalf("expected old refresh token to be revoked, got %v", err)
+	}
+}
+
+// ---- Google sign-in ----
+
+type fakeGoogleVerifier struct {
+	id  *GoogleIdentity
+	err error
+}
+
+func (f fakeGoogleVerifier) Verify(_ context.Context, _ string) (*GoogleIdentity, error) {
+	return f.id, f.err
+}
+
+func TestLoginWithGoogleCreatesOrgForNewUser(t *testing.T) {
+	svc := newTestService().WithGoogle(fakeGoogleVerifier{
+		id: &GoogleIdentity{Subject: "google-123", Email: "New@Example.com", EmailVerified: true, Name: "New Person"},
+	})
+	res, err := svc.LoginWithGoogle(context.Background(), "tok", RequestMeta{})
+	if err != nil {
+		t.Fatalf("LoginWithGoogle: %v", err)
+	}
+	if res.User.Role != RoleOwner {
+		t.Errorf("role = %s, want owner", res.User.Role)
+	}
+	if res.User.Email != "new@example.com" {
+		t.Errorf("email not normalized: %q", res.User.Email)
+	}
+	if res.User.GoogleSub != "google-123" {
+		t.Errorf("google_sub = %q, want google-123", res.User.GoogleSub)
+	}
+	if res.User.PasswordHash != "" {
+		t.Errorf("google-only user should have no password hash")
+	}
+	if res.AccessToken == "" {
+		t.Errorf("expected an access token")
+	}
+}
+
+func TestLoginWithGoogleLinksExistingPasswordUser(t *testing.T) {
+	svc := newTestService().WithGoogle(fakeGoogleVerifier{
+		id: &GoogleIdentity{Subject: "google-xyz", Email: "jane@example.com", EmailVerified: true, Name: "Jane"},
+	})
+	ctx := context.Background()
+	reg, err := svc.Register(ctx, RegisterInput{OrgName: "Acme", Name: "Jane", Email: "jane@example.com", Password: "supersecret"}, RequestMeta{})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	res, err := svc.LoginWithGoogle(ctx, "tok", RequestMeta{})
+	if err != nil {
+		t.Fatalf("LoginWithGoogle: %v", err)
+	}
+	if res.User.ID != reg.User.ID {
+		t.Errorf("logged into a different user; expected the existing account")
+	}
+	if res.User.GoogleSub != "google-xyz" {
+		t.Errorf("existing user not linked to google")
+	}
+}
+
+func TestLoginWithGoogleRejectsUnverifiedEmail(t *testing.T) {
+	svc := newTestService().WithGoogle(fakeGoogleVerifier{
+		id: &GoogleIdentity{Subject: "s", Email: "x@example.com", EmailVerified: false, Name: "X"},
+	})
+	if _, err := svc.LoginWithGoogle(context.Background(), "tok", RequestMeta{}); err == nil {
+		t.Fatal("expected rejection for an unverified Google email")
+	}
+}
+
+func TestLoginWithGoogleDisabled(t *testing.T) {
+	svc := newTestService() // no WithGoogle
+	if _, err := svc.LoginWithGoogle(context.Background(), "tok", RequestMeta{}); err == nil {
+		t.Fatal("expected error when Google sign-in is not configured")
+	}
+}
+
+func TestPasswordLoginRejectedForGoogleOnlyUser(t *testing.T) {
+	svc := newTestService().WithGoogle(fakeGoogleVerifier{
+		id: &GoogleIdentity{Subject: "s", Email: "g@example.com", EmailVerified: true, Name: "G"},
+	})
+	ctx := context.Background()
+	if _, err := svc.LoginWithGoogle(ctx, "tok", RequestMeta{}); err != nil {
+		t.Fatalf("seed google user: %v", err)
+	}
+	if _, err := svc.Login(ctx, "g@example.com", "whatever", RequestMeta{}); err == nil {
+		t.Fatal("expected password login to fail for a Google-only account")
 	}
 }

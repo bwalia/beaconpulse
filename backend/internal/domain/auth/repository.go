@@ -17,6 +17,26 @@ type UserRepository interface {
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	TouchLastLogin(ctx context.Context, userID uuid.UUID) error
 	SlugExists(ctx context.Context, slug string) (bool, error)
+
+	// LinkGoogleSub attaches a Google subject id to an existing user (first time
+	// they sign in with Google using an email that already has an account). A
+	// conflict apperror is returned if that subject is already linked elsewhere.
+	LinkGoogleSub(ctx context.Context, userID uuid.UUID, googleSub string) error
+}
+
+// GoogleIdentity is the verified result of a Google ID token.
+type GoogleIdentity struct {
+	Subject       string // the stable Google user id ("sub")
+	Email         string
+	EmailVerified bool
+	Name          string
+}
+
+// GoogleVerifier validates a Google-issued OIDC ID token (signature against
+// Google's public keys, issuer, expiry, and audience) and returns the identity.
+// Implemented in internal/adapter/googleauth; a nil verifier disables Google sign-in.
+type GoogleVerifier interface {
+	Verify(ctx context.Context, idToken string) (*GoogleIdentity, error)
 }
 
 // RefreshTokenRepository persists hashed refresh tokens.

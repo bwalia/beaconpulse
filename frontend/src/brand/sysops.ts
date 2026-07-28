@@ -63,4 +63,8 @@ export const sysops: Brand = {
   },
 
   Mark: SysOpsMark,
+
+  // Empty = "Continue with Google" stays hidden until this brand pastes its real
+  // OAuth 2.0 Client ID (from its own Google Cloud project).
+  googleClientId: "",
 };

@@ -116,6 +116,11 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
   value: "{{ include "beacon.name" "blackbox" }}:9115"
 - name: BEACON_DNS_RESOLVER
   value: {{ .Values.app.dnsResolver | quote }}
+# "Sign in with Google" — the OAuth client id(s) whose ID tokens this API accepts.
+# Not a secret (it is the public audience). Empty disables Google sign-in. For a
+# white-label brand, set this to the same client id baked into that brand's frontend.
+- name: BEACON_GOOGLE_CLIENT_ID
+  value: {{ .Values.app.googleClientId | default "" | quote }}
 - name: BEACON_AI_ENABLED
   value: {{ .Values.ai.enabled | quote }}
 {{- if .Values.ai.enabled }}

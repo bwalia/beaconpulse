@@ -15,6 +15,12 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 # Build a branded image with:  --build-arg NEXT_PUBLIC_BRAND=sysops
 ARG NEXT_PUBLIC_BRAND=beacon
 ENV NEXT_PUBLIC_BRAND=$NEXT_PUBLIC_BRAND
+# "Sign in with Google" client id for the default (beacon) brand — baked into the
+# bundle. Empty hides the button. Branded builds normally hardcode it in
+# src/brand/<brand>.ts instead; this arg is the env-driven fallback for the default
+# brand (handy for local dev and single-brand deploys).
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=""
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
