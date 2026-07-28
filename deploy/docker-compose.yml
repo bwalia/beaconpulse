@@ -31,6 +31,9 @@ x-backend-env: &backend-env
   BEACON_BLACKBOX_RELOAD_URL: http://blackbox:9115/-/reload
   BEACON_BLACKBOX_ADDR: blackbox:9115
   BEACON_DNS_RESOLVER: 8.8.8.8:53
+  # "Sign in with Google": the OAuth 2.0 client id whose ID tokens the API accepts.
+  # Set BEACON_GOOGLE_CLIENT_ID in deploy/.env to enable it (empty = disabled).
+  BEACON_GOOGLE_CLIENT_ID: ${BEACON_GOOGLE_CLIENT_ID:-}
   # Must match the credentials in deploy/alertmanager/alertmanager.yml.
   BEACON_WEBHOOK_TOKEN: beacon-dev-webhook-token
   # Base URL used for "open dashboard" links in notification messages.
@@ -200,6 +203,9 @@ services:
         # Empty => the browser calls the API same-origin (/api/...) through the
         # gateway. No host, no port, no CORS.
         NEXT_PUBLIC_API_BASE_URL: ""
+        # Same client id as the API above, baked into the bundle so the "Continue with
+        # Google" button appears. One value in deploy/.env drives both sides.
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${BEACON_GOOGLE_CLIENT_ID:-}
     environment:
       # Server-side only. The status page is rendered on the server, which cannot
       # use the empty same-origin base above — it needs a real host to fetch from.
