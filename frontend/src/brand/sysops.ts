@@ -64,7 +64,9 @@ export const sysops: Brand = {
 
   Mark: SysOpsMark,
 
-  // Empty = "Continue with Google" stays hidden until this brand pastes its real
-  // OAuth 2.0 Client ID (from its own Google Cloud project).
-  googleClientId: "",
+  // Read from NEXT_PUBLIC_GOOGLE_CLIENT_ID (injected at build from a GitHub Actions
+  // secret / deploy/.env) rather than committed here — the client id is public but is
+  // kept out of git like every other credential. Give this brand its own Google client
+  // later by mapping BRAND=sysops to a different build-time value.
+  googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "",
 };

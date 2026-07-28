@@ -230,6 +230,11 @@ jobs:
 
       - name: Build & push frontend
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        env:
+          # "Sign in with Google" client id, baked into the bundle at build. It is public
+          # (it ships in the browser regardless) but kept OUT of git — set it once as the
+          # GOOGLE_CLIENT_ID GitHub Actions secret. Empty => the button stays hidden.
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
         run: |
           set -euo pipefail
           SHA=${{ steps.tag.outputs.sha }}
@@ -254,6 +259,7 @@ jobs:
             -f frontend/Dockerfile \
             --build-arg NEXT_PUBLIC_API_BASE_URL="" \
             --build-arg NEXT_PUBLIC_BRAND="$BRAND" \
+            --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
             -t "$NS/$FE_SHA" -t "$NS/$FE_LATEST" \
             ./frontend
           ./deploy/scripts/assert-image-arch.sh "$NS/$FE_SHA"

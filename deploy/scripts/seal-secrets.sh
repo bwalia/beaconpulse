@@ -132,6 +132,11 @@ read_env_for() { # read_env_for KEY -> overlay value if the overlay names it, el
 }
 
 BEACON_AI_API_KEY="$(read_env_for BEACON_AI_API_KEY)"
+# Google sign-in client id. Public by nature (it ships in the browser bundle), but it
+# still reaches the cluster from git, so it is sealed like everything else here rather
+# than committed raw. Optional: absent => the chart marks it optional and Google sign-in
+# stays disabled.
+BEACON_GOOGLE_CLIENT_ID="$(read_env_for BEACON_GOOGLE_CLIENT_ID)"
 # Stripe billing — all optional. Read from deploy/.env; only the ones present get
 # sealed. An absent key leaves billing disabled (the chart marks the env optional).
 STRIPE_SECRET_KEY="$(read_env_for STRIPE_SECRET_KEY)"
@@ -273,6 +278,12 @@ if [[ -n "$BEACON_AI_API_KEY" ]]; then
   note "including BEACON_AI_API_KEY"
 else
   note "BEACON_AI_API_KEY absent from deploy/.env — omitting (AI enrichment degrades to no-analysis)"
+fi
+if [[ -n "$BEACON_GOOGLE_CLIENT_ID" ]]; then
+  ARGS+=(--from-literal=BEACON_GOOGLE_CLIENT_ID="$BEACON_GOOGLE_CLIENT_ID")
+  note "including BEACON_GOOGLE_CLIENT_ID"
+else
+  note "BEACON_GOOGLE_CLIENT_ID absent from deploy/.env — omitting (Google sign-in disabled)"
 fi
 seal beacon-secrets "${ARGS[@]}"
 

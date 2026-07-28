@@ -63,11 +63,10 @@ app:
   logFormat: json
   # DNS resolver used by DNS monitors.
   dnsResolver: 8.8.8.8:53
-  # "Sign in with Google": the OAuth 2.0 client id whose ID tokens the API accepts
-  # (public, not a secret). Empty disables Google sign-in. Set it per deployment to the
-  # same client id the brand's frontend uses (src/brand/<brand>.ts → googleClientId).
-  # Comma-separate to accept more than one brand's tokens on a shared API.
-  googleClientId: ""
+  # NOTE: "Sign in with Google" — BEACON_GOOGLE_CLIENT_ID is NOT a raw chart value.
+  # It travels through the sealed beacon-secrets (deploy/scripts/seal-secrets.sh reads
+  # it from deploy/.env), same as the JWT/Stripe secrets, and the API reads it via a
+  # secretKeyRef. Nothing to set here.
   # Prometheus TSDB retention.
   promRetention: 15d
   replicas:
