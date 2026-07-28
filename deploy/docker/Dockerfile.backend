@@ -13,7 +13,7 @@
 # CI builds on an amd64 runner, so this is a no-op there. It matters for anyone
 # building on arm64: Go retargets with GOARCH alone, so this stays at native speed
 # instead of emulating the whole compile under QEMU.
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS build
 WORKDIR /src
 
 # Populated by buildx from --platform (e.g. linux/amd64).
