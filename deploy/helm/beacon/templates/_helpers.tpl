@@ -117,10 +117,16 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
 - name: BEACON_DNS_RESOLVER
   value: {{ .Values.app.dnsResolver | quote }}
 # "Sign in with Google" — the OAuth client id(s) whose ID tokens this API accepts.
-# Not a secret (it is the public audience). Empty disables Google sign-in. For a
-# white-label brand, set this to the same client id baked into that brand's frontend.
+# It is public (it ships in the browser bundle), but it reaches the cluster from git,
+# so it travels through the sealed beacon-secrets like every other from-git value —
+# never a raw chart value. Optional so an absent key never blocks pod start; empty
+# simply leaves Google sign-in disabled.
 - name: BEACON_GOOGLE_CLIENT_ID
-  value: {{ .Values.app.googleClientId | default "" | quote }}
+  valueFrom:
+    secretKeyRef:
+      name: beacon-secrets
+      key: BEACON_GOOGLE_CLIENT_ID
+      optional: true
 - name: BEACON_AI_ENABLED
   value: {{ .Values.ai.enabled | quote }}
 {{- if .Values.ai.enabled }}
