@@ -97,6 +97,10 @@ func (h *AuthHandler) Routes() chi.Router {
 		Post("/register", h.register)
 	r.With(middleware.RateLimit(loginLimiter, middleware.ByIP, 30*time.Second)).
 		Post("/login", h.login)
+	// Google sign-in doubles as signup (a new email creates an org), so rate-limit it
+	// on the tighter signup bucket rather than the login one.
+	r.With(middleware.RateLimit(signupLimiter, middleware.ByIP, time.Minute)).
+		Post("/google", h.google)
 	r.Post("/refresh", h.refresh)
 	r.Post("/logout", h.logout)
 	return r
@@ -118,6 +122,11 @@ type loginRequest struct {
 
 type refreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+type googleRequest struct {
+	// IDToken is the credential returned by Google Identity Services in the browser.
+	IDToken string `json:"id_token" validate:"required"`
 }
 
 type authResponse struct {
@@ -201,6 +210,27 @@ func (h *AuthHandler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := h.svc.Login(r.Context(), req.Email, req.Password, requestMeta(r))
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	h.setProxyCookie(w, res.ProxyToken)
+	httpx.OK(w, presentAuth(res))
+}
+
+// google signs a user in from a Google ID token, creating an org + owner on first
+// sight of the email. It returns the same session response as login.
+func (h *AuthHandler) google(w http.ResponseWriter, r *http.Request) {
+	var req googleRequest
+	if err := httpx.DecodeJSON(w, r, &req, maxBodyBytes); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	if err := h.validator.Struct(req); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	res, err := h.svc.LoginWithGoogle(r.Context(), req.IDToken, requestMeta(r))
 	if err != nil {
 		httpx.Error(w, r, err)
 		return

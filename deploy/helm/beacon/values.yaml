@@ -63,6 +63,11 @@ app:
   logFormat: json
   # DNS resolver used by DNS monitors.
   dnsResolver: 8.8.8.8:53
+  # "Sign in with Google": the OAuth 2.0 client id whose ID tokens the API accepts
+  # (public, not a secret). Empty disables Google sign-in. Set it per deployment to the
+  # same client id the brand's frontend uses (src/brand/<brand>.ts → googleClientId).
+  # Comma-separate to accept more than one brand's tokens on a shared API.
+  googleClientId: ""
   # Prometheus TSDB retention.
   promRetention: 15d
   replicas:

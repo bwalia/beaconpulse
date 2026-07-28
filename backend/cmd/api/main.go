@@ -18,6 +18,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"beacon/internal/adapter/ai"
+	"beacon/internal/adapter/googleauth"
 	"beacon/internal/adapter/netprobe"
 	"beacon/internal/adapter/notifier"
 	"beacon/internal/adapter/postgres"
@@ -212,6 +213,12 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	// Services.
 	authSvc := auth.NewService(userRepo, refreshRepo, tokens, hasher, auditRec).
 		WithEmailPolicy(auth.NewEmailPolicy(cfg.RequireReachableSignupEmail))
+	// "Sign in with Google" is enabled only when at least one client id is configured;
+	// otherwise the endpoint 403s and the frontend hides the button.
+	if cfg.Google.Enabled() {
+		authSvc = authSvc.WithGoogle(googleauth.New(cfg.Google.ClientIDs))
+		log.Info("google sign-in enabled", "client_ids", len(cfg.Google.ClientIDs))
+	}
 	projectSvc := project.NewService(projectRepo, syncEnqueuer, auditRec)
 	// Tenants choose monitor targets, and Blackbox probes them from inside the cluster,
 	// so where a target may point is a tenant-facing security boundary. Same address

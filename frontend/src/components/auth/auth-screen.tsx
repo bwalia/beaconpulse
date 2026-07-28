@@ -17,6 +17,7 @@ import {
   EyeOffIcon,
   LockIcon,
 } from "@/components/icons";
+import { GoogleButton } from "@/components/auth/google-button";
 import { Spotlight } from "@/components/marketing/pointer";
 import { Button, Field } from "@/components/ui";
 import { ApiRequestError } from "@/lib/api";
@@ -360,6 +361,20 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
               </button>
             ))}
           </div>
+
+          {/* "Continue with Google" sits above the form in both modes. Self-hides
+              when the brand has no googleClientId; the wrapper is gated on the same
+              value so the "or" divider never appears without a button above it. */}
+          {brand.googleClientId ? (
+            <div className="mt-8">
+              <GoogleButton />
+              <div className="mt-6 flex items-center gap-4" aria-hidden>
+                <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                <span className="text-sm font-medium text-slate-500 dark:text-slate-400">or</span>
+                <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-8">
             {/* Crossfade between forms: same container, replaced content. */}

@@ -12,6 +12,7 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -68,6 +69,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyAuth],
   );
 
+  const loginWithGoogle = useCallback(
+    async (idToken: string) => {
+      // Same response shape and cookie behaviour as /auth/login, so the token
+      // store + user hydrate is identical — only the credential differs.
+      const res = await api.post<AuthResponse>("/api/v1/auth/google", { id_token: idToken }, false);
+      applyAuth(res);
+    },
+    [applyAuth],
+  );
+
   const register = useCallback(
     async (input: RegisterInput) => {
       const res = await api.post<AuthResponse>("/api/v1/auth/register", input, false);
@@ -86,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

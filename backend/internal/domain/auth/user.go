@@ -53,10 +53,15 @@ type Organization struct {
 
 // User is a member of an organization.
 type User struct {
-	ID           uuid.UUID
-	OrgID        uuid.UUID
-	Email        string
+	ID    uuid.UUID
+	OrgID uuid.UUID
+	Email string
+	// PasswordHash is empty for accounts that authenticate only via a federated
+	// identity (e.g. Google). At least one credential is always present.
 	PasswordHash string
+	// GoogleSub is the stable Google (OIDC) subject id when the account is linked to
+	// Google, else empty. Unique across accounts.
+	GoogleSub    string
 	Name         string
 	Role         Role
 	IsActive     bool
@@ -65,6 +70,9 @@ type User struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
+
+// HasPassword reports whether the account can authenticate with a password.
+func (u *User) HasPassword() bool { return u.PasswordHash != "" }
 
 // RefreshToken is a persisted, hashed refresh credential. The plaintext value is
 // only ever held in memory and returned to the client once.

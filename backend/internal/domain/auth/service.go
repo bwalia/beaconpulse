@@ -53,13 +53,21 @@ type Service struct {
 	auditlog audit.Recorder
 	// emailPolicy vets signup addresses. Nil disables the checks.
 	emailPolicy *EmailPolicy
-	now         func() time.Time
+	// google verifies Google ID tokens. Nil disables "Sign in with Google".
+	google GoogleVerifier
+	now    func() time.Time
 }
 
 // WithEmailPolicy vets the address a signup is made with. See emailpolicy.go for why
 // this is a cost control rather than input validation.
 func (s *Service) WithEmailPolicy(p *EmailPolicy) *Service {
 	s.emailPolicy = p
+	return s
+}
+
+// WithGoogle enables "Sign in with Google" using the given ID-token verifier.
+func (s *Service) WithGoogle(v GoogleVerifier) *Service {
+	s.google = v
 	return s
 }
 
@@ -154,6 +162,12 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 		}
 		return nil, err
 	}
+	// A federated-only account (Google, no password) can never satisfy a password
+	// login. Say so plainly rather than "invalid password" — the user is on the login
+	// form and the Google button is right there.
+	if !user.HasPassword() {
+		return nil, apperror.Unauthorized("this account uses Google sign-in — continue with Google")
+	}
 	ok, err := s.hasher.Verify(user.PasswordHash, password)
 	if err != nil {
 		return nil, apperror.Internal(err)
@@ -177,6 +191,98 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 		return result, nil
 	}
 	s.audit(ctx, user, audit.ActionUserLogin, "user", user.ID.String(), meta, nil)
+	return result, nil
+}
+
+// LoginWithGoogle verifies a Google ID token and signs the user in. On first sight of
+// an email it creates a new organization + owner (open signup, mirroring Register); an
+// existing account is signed in and linked to the Google identity. Google's
+// email_verified stands in for the app's own email verification.
+func (s *Service) LoginWithGoogle(ctx context.Context, idToken string, meta RequestMeta) (*AuthResult, error) {
+	if s.google == nil {
+		return nil, apperror.Forbidden("Google sign-in is not enabled")
+	}
+	id, err := s.google.Verify(ctx, idToken)
+	if err != nil {
+		return nil, apperror.Unauthorized("invalid Google sign-in")
+	}
+	// Guards against signing in as an address the Google account has not confirmed it
+	// owns — Google only sets this for verified mailboxes.
+	if !id.EmailVerified {
+		return nil, apperror.Forbidden("your Google account's email is not verified")
+	}
+	email := normalizeEmail(id.Email)
+	if email == "" {
+		return nil, apperror.Unauthorized("Google did not return an email address")
+	}
+
+	user, err := s.users.GetUserByEmail(ctx, email)
+	if err != nil {
+		if apperror.IsCode(err, apperror.CodeNotFound) {
+			return s.registerGoogleUser(ctx, id, email, meta)
+		}
+		return nil, err
+	}
+
+	if !user.IsActive {
+		return nil, apperror.Forbidden("this account has been deactivated")
+	}
+	// Link the Google identity the first time an existing (password) account uses it.
+	if user.GoogleSub == "" {
+		if err := s.users.LinkGoogleSub(ctx, user.ID, id.Subject); err != nil {
+			return nil, err
+		}
+		user.GoogleSub = id.Subject
+	}
+
+	result, err := s.issueTokens(ctx, user, meta)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.users.TouchLastLogin(ctx, user.ID) // non-fatal
+	s.audit(ctx, user, audit.ActionUserLogin, "user", user.ID.String(), meta, map[string]any{"via": "google"})
+	return result, nil
+}
+
+// registerGoogleUser creates a fresh organization + owner for a first-time Google
+// sign-in (no password). The org is auto-named from the person's name; it can be
+// renamed later.
+func (s *Service) registerGoogleUser(ctx context.Context, id *GoogleIdentity, email string, meta RequestMeta) (*AuthResult, error) {
+	name := strings.TrimSpace(id.Name)
+	if name == "" {
+		name = localPart(email)
+	}
+	orgName := deriveOrgName(name)
+
+	orgSlug, err := s.uniqueOrgSlug(ctx, orgName)
+	if err != nil {
+		return nil, err
+	}
+	now := s.now().UTC()
+	org := &Organization{ID: uuid.New(), Name: orgName, Slug: orgSlug, CreatedAt: now, UpdatedAt: now}
+	owner := &User{
+		ID:        uuid.New(),
+		OrgID:     org.ID,
+		Email:     email,
+		GoogleSub: id.Subject,
+		Name:      name,
+		Role:      RoleOwner,
+		IsActive:  true,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := s.users.CreateOrgAndOwner(ctx, org, owner); err != nil {
+		return nil, err // conflict apperror on a racing duplicate email
+	}
+	result, err := s.issueTokens(ctx, owner, meta)
+	if err != nil {
+		return nil, err
+	}
+	s.audit(ctx, owner, audit.ActionUserRegistered, "user", owner.ID.String(), meta, map[string]any{
+		"org_id": org.ID.String(),
+		"email":  owner.Email,
+		"via":    "google",
+	})
 	return result, nil
 }
 
@@ -316,6 +422,28 @@ func (s *Service) audit(ctx context.Context, user *User, action audit.Action, re
 }
 
 func normalizeEmail(e string) string { return strings.ToLower(strings.TrimSpace(e)) }
+
+// localPart returns the portion of an email before the "@", used as a fallback display
+// name when Google returns no name.
+func localPart(email string) string {
+	if i := strings.IndexByte(email, '@'); i > 0 {
+		return email[:i]
+	}
+	return email
+}
+
+// deriveOrgName builds a sensible default organization name from a person's name for a
+// first-time Google signup — the given name plus a possessive, e.g. "Jane's team".
+func deriveOrgName(name string) string {
+	first := strings.TrimSpace(name)
+	if i := strings.IndexByte(first, ' '); i > 0 {
+		first = first[:i]
+	}
+	if first == "" {
+		return "My team"
+	}
+	return first + "'s team"
+}
 
 func truncateSlug(s string, max int) string {
 	if max < 1 {
