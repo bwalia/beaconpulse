@@ -12,18 +12,13 @@
     },
     "response": {
       "code": 305,
-      "redirect_uri": "192.168.11.121:32100",
+      "redirect_uri": "77.68.126.63:80",
       "strip_path": false,
       "backends": [
         {
-          "address": "192.168.11.121:32100",
+          "address": "77.68.126.63:80",
           "weight": 100,
-          "label": "k3s1 traefik ingress (wslproxy class) via operator LAN — same target the working diytax-prod-default rule uses; 13.42.188.136 was the pre-migration k3s0 IP"
-        },
-        {
-          "address": "192.168.11.132:32100",
-          "weight": 100,
-          "label": "k3s1 traefik ingress (wslproxy class) — second node for HA"
+          "label": "cloud003 public IP — the working diytax-prod-cloud003 rule (which serves gatus/tax/api on this same wslproxy IngressClass) uses this same target. Pop1 (18.133.126.242) is on the internet and cannot reach 192.168.11.x LAN or 13.42.188.136 (dead)."
         }
       ],
       "routing": {

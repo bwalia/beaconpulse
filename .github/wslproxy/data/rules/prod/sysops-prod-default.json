@@ -12,13 +12,13 @@
     },
     "response": {
       "code": 305,
-      "redirect_uri": "13.42.188.136:80",
+      "redirect_uri": "77.68.126.63:80",
       "strip_path": false,
       "backends": [
         {
-          "address": "13.42.188.136:80",
+          "address": "77.68.126.63:80",
           "weight": 100,
-          "label": "k3s1 traefik ingress (wslproxy class); traefik routes by Host to the sysops-int ingress"
+          "label": "cloud003 public IP — same target the working diytax-prod-cloud003 rule uses. 13.42.188.136 was the pre-migration k3s0 IP and no longer exists."
         }
       ],
       "routing": {
