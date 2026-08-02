@@ -29,6 +29,23 @@ ingress:
   enabled: true
   tls: false
 
+# Pod placement: pin to cloud003, same as the working diytaxreturn workloads on
+# this cluster. WHY: the wslproxy edge on pop1 forwards int.beaconpulse.net to
+# 77.68.126.63:80, which is traefik-edge running hostNetwork on cloud003. From
+# there, traefik-edge must open a connection to beacon-nginx's Pod IP to serve
+# the request. Cross-node overlay networking on this k3s cluster is broken —
+# cloud003 → debworker00 packets die in Flannel VXLAN — so beacon MUST land on
+# cloud003 too, otherwise traefik-edge → beacon-nginx hangs and the request
+# times out. cloud003 carries the node-role.kubernetes.io/edge:NoSchedule taint;
+# the toleration below is required to schedule there. Same pair the working
+# diytaxreturn-gatus Deployment uses.
+nodeSelector:
+  kubernetes.io/hostname: cloud003
+tolerations:
+  - key: node-role.kubernetes.io/edge
+    operator: Exists
+    effect: NoSchedule
+
 # Secrets come from the committed SealedSecret at sealed/int/, decrypted in-cluster
 # by the sealed-secrets controller. (Vault/ESO is not usable here yet: the ESO role
 # has no read policy on secret/data/beaconpulse/*, so it 403s.)
