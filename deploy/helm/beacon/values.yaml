@@ -163,9 +163,15 @@ secrets:
   registryPassword: ""
 
 # ── Ingress (single gateway host) ──────────────────────────────────────────
+# Uses the traefik-edge IngressClass — that's the controller pinned to cloud003
+# with hostNetwork on 77.68.126.63:80, which is the backend all beaconpulse and
+# sysops247 wslproxy vhosts on pop1 forward to. The default `wslproxy`
+# IngressClass is served by the standard k3s traefik on 192.168.1.x, which is
+# LAN-only and unreachable from the public pop1 edge — routing worked from the
+# operator VPN but 404'd for real users.
 ingress:
   enabled: true
-  className: wslproxy
+  className: traefik-edge
   clusterIssuer: main-issuer
   tls: true
   # host comes from top-level .Values.host
