@@ -24,10 +24,6 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       initContainers:
         # Seed a minimal config so Blackbox can start before the worker's first
         # reconcile. Runs as 10001 (like the worker) so the worker can later
