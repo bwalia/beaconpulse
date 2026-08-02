@@ -27,7 +27,7 @@ storage:
 
 ingress:
   enabled: true
-  tls: true
+  tls: false
 
 # Secrets come from the committed SealedSecret at sealed/int/, decrypted in-cluster
 # by the sealed-secrets controller. (Vault/ESO is not usable here yet: the ESO role
