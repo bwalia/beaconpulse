@@ -27,7 +27,7 @@ storage:
 
 ingress:
   enabled: true
-  tls: true
+  tls: false
 
 # Reuse the acc environment's secrets — the deploy pipeline copies beacon-secrets +
 # nebulacr-login from the `acc` namespace into `sysops-acc` (no per-brand sealing).

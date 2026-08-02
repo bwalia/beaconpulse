@@ -35,7 +35,7 @@ storage:
 
 ingress:
   enabled: true
-  tls: true
+  tls: false
 
 # Images for this environment live on its own SpectonCR host.
 image:

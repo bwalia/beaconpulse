@@ -27,7 +27,7 @@ storage:
 
 ingress:
   enabled: true
-  tls: true
+  tls: false
 
 # Reuse the test environment's secrets — the deploy pipeline copies beacon-secrets +
 # nebulacr-login from the `test` namespace into `sysops-test` (no per-brand sealing).

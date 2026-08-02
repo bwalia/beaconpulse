@@ -169,11 +169,20 @@ secrets:
 # IngressClass is served by the standard k3s traefik on 192.168.1.x, which is
 # LAN-only and unreachable from the public pop1 edge — routing worked from the
 # operator VPN but 404'd for real users.
+#
+# tls: false is deliberate. TLS is terminated at pop1 by wslproxy itself
+# (ssl_enabled=true + ssl_auto_renew=true in the server records) using its own
+# ACME/HTTP-01 flow — a valid cert for int.beaconpulse.net is already presented
+# by pop1 at TLS handshake time. Cert-manager is NOT installed on this cluster
+# (no CRDs, no ClusterIssuer), so declaring `tls:` on the Ingress just tells
+# traefik-edge to attach a Secret that will never be created, and traefik
+# quietly stops serving the vhost cleanly for that host. The working
+# prod/diytaxreturn-gatus Ingress on this same cluster uses this exact pattern:
+# no tls: block, wslproxy owns the cert. cluster serves plain HTTP.
 ingress:
   enabled: true
   className: traefik-edge
-  clusterIssuer: main-issuer
-  tls: true
+  tls: false
   # host comes from top-level .Values.host
 
 # ── Per-component resource requests/limits (modest defaults) ───────────────

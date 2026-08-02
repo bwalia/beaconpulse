@@ -53,7 +53,7 @@ storage:
 
 ingress:
   enabled: true
-  tls: true
+  tls: false
 
 # Secrets: reuse the base int environment's secrets with ZERO manual sealing. The deploy
 # pipeline copies `beacon-secrets` (and the `nebulacr-login` pull secret) from the `int`
