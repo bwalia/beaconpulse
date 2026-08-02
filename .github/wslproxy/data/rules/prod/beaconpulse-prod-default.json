@@ -12,13 +12,18 @@
     },
     "response": {
       "code": 305,
-      "redirect_uri": "13.42.188.136:80",
+      "redirect_uri": "192.168.11.121:32100",
       "strip_path": false,
       "backends": [
         {
-          "address": "13.42.188.136:80",
+          "address": "192.168.11.121:32100",
           "weight": 100,
-          "label": "k3s1 traefik ingress (wslproxy class); beacon pods pinned to debworker00"
+          "label": "k3s1 traefik ingress (wslproxy class) via operator LAN — same target the working diytax-prod-default rule uses; 13.42.188.136 was the pre-migration k3s0 IP"
+        },
+        {
+          "address": "192.168.11.132:32100",
+          "weight": 100,
+          "label": "k3s1 traefik ingress (wslproxy class) — second node for HA"
         }
       ],
       "routing": {
