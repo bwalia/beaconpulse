@@ -12,13 +12,13 @@
     },
     "response": {
       "code": 305,
-      "redirect_uri": "77.68.126.63:80",
+      "redirect_uri": "193.237.176.232:8888",
       "strip_path": false,
       "backends": [
         {
-          "address": "77.68.126.63:80",
+          "address": "193.237.176.232:8888",
           "weight": 100,
-          "label": "cloud003 public IP — the working diytax-prod-cloud003 rule (which serves gatus/tax/api on this same wslproxy IngressClass) uses this same target. Pop1 (18.133.126.242) is on the internet and cannot reach 192.168.11.x LAN or 13.42.188.136 (dead)."
+          "label": "k3s1 traefik ingress entry (klipper) — the same target aws-k3s1-ingress-klipper-80 uses for every working wslproxy host (int.diytaxreturn.co.uk, grafana, ...). 193.237.176.232:8888 forwards to k3s1 traefik, which routes by Host to beacon-nginx. Verified HTTP 200. cloud003 (77.68.126.63) was a dead-end for beacon."
         }
       ],
       "routing": {
