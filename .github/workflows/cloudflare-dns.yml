@@ -1,6 +1,7 @@
 name: ->Cloudflare DNS (manual record)
 
-# Ad-hoc DNS record management for the beaconpulse.net zone.
+# Ad-hoc DNS record management for any brand zone (beaconpulse.net, sysops247.com, ...).
+# The zone is derived from RECORD_NAME's registrable apex.
 #
 # Environment hosts are handled automatically by the `dns` job in deploy-k3s.yml,
 # which reads the hostname straight out of the env's Helm values file. Use this
@@ -52,10 +53,18 @@ jobs:
       - name: Upsert DNS record
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CLOUDFLARE_ZONE: beaconpulse.net
+          # Only beaconpulse.net's zone id is held in CI. For any other brand domain
+          # (sysops247.com, ...) the DNS script resolves the zone id from the zone NAME,
+          # so the token needs Zone:Read on that zone — same contract as deploy-k3s.yml.
+          BEACONPULSE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: |
           set -euo pipefail
+          # The zone is the registrable apex (last two labels) of the record name, so a
+          # record on any brand domain works without hardcoding a zone.
+          ZONE="$(echo "${{ inputs.RECORD_NAME }}" | awk -F. '{print $(NF-1)"."$NF}')"
+          export CLOUDFLARE_ZONE="$ZONE"
+          if [ "$ZONE" = "beaconpulse.net" ]; then export CLOUDFLARE_ZONE_ID="$BEACONPULSE_ZONE_ID"; fi
+          echo "Upserting ${{ inputs.RECORD_NAME }} (zone ${ZONE})"
           ARGS=(
             --name "${{ inputs.RECORD_NAME }}"
             --content "${{ inputs.RECORD_CONTENT }}"
