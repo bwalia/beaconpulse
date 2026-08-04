@@ -5,6 +5,12 @@
 env: sysops-test
 host: test.sysops247.com
 
+# debworker00 (the chart-wide default home) is at its 110-pod kubelet cap with
+# sysops-int + sysops-acc + the rest of the platform on it, so this env gets its
+# own node. Fresh env — its PVCs were deleted and re-provisioned here on 2026-08-05.
+nodeSelector:
+  kubernetes.io/hostname: debian001
+
 app:
   beaconEnv: staging
   logLevel: info
