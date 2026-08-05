@@ -55,6 +55,14 @@ on:
         required: false
         type: string
 
+  # Drift guard: someone has repeatedly rewritten the live gateway rules out of
+  # band (admin UI / direct edit — Aug 4 18:14, Aug 5 13:21, Aug 5 21:33 UTC),
+  # breaking every sysops247.com host each time. Re-assert the committed state
+  # every 30 minutes so any such edit is automatically reverted. The import is
+  # an idempotent upsert, so quiet runs are no-ops.
+  schedule:
+    - cron: "*/30 * * * *"
+
   workflow_dispatch:
     inputs:
       TARGET_ENV:
@@ -92,7 +100,7 @@ on:
 
 jobs:
   push-domains:
-    name: "Push ${{ inputs.TARGET_ENV }} domains to WSL Proxy"
+    name: "Push ${{ inputs.TARGET_ENV || 'prod' }} domains to WSL Proxy"
     runs-on: self-hosted
     steps:
       - name: Checkout
@@ -108,7 +116,8 @@ jobs:
 
       - name: Validate inputs and data dir
         env:
-          TARGET_ENV: ${{ inputs.TARGET_ENV }}
+          # Scheduled (drift-guard) runs carry no inputs: default to prod.
+          TARGET_ENV: ${{ inputs.TARGET_ENV || 'prod' }}
           GATEWAY_DOMAIN: ${{ inputs.GATEWAY_DOMAIN || vars.WSLPROXY_GATEWAY_DOMAIN }}
           WSLPROXY_TOKEN: ${{ secrets.WSLPROXY_TOKEN }}
           ADMIN_PASSWORD_INPUT: ${{ inputs.ADMIN_PASSWORD }}
@@ -172,8 +181,11 @@ jobs:
         env:
           TOKEN: ${{ steps.auth.outputs.TOKEN }}
           GATEWAY_DOMAIN: ${{ inputs.GATEWAY_DOMAIN || vars.WSLPROXY_GATEWAY_DOMAIN }}
-          TARGET_ENV: ${{ inputs.TARGET_ENV }}
-          ACTIVATE_CONFIG: ${{ inputs.ACTIVATE_CONFIG }}
+          TARGET_ENV: ${{ inputs.TARGET_ENV || 'prod' }}
+          # Scheduled runs must go live (that's the whole point of the drift
+          # guard); dispatch/call runs keep their explicit choice. NOT `||` —
+          # that would coerce an explicit false to true.
+          ACTIVATE_CONFIG: ${{ github.event_name == 'schedule' && 'true' || inputs.ACTIVATE_CONFIG }}
           DRY_RUN: ${{ inputs.DRY_RUN }}
         run: |
           set -euo pipefail
