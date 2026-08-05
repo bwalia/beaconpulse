@@ -3,27 +3,33 @@
   "name": "sysops-prod-default",
   "profile_id": "prod",
   "priority": 1,
-  "rules_tags": ["sysops", "prod"],
+  "rules_tags": [
+    "sysops",
+    "prod"
+  ],
   "match": {
-    "rules": {
-      "path": "/",
-      "path_key": "starts_with",
-      "jwt_token_validation": "equals"
-    },
     "response": {
-      "code": 305,
-      "redirect_uri": "193.237.176.232:8888",
       "strip_path": false,
+      "auto_redirect_https": false,
+      "code": 305,
+      "allow": true,
+      "routing": {
+        "mode": "least_conn"
+      },
+      "is_consul": false,
+      "redirect_uri": "193.237.176.232:8888",
       "backends": [
         {
           "address": "193.237.176.232:8888",
           "weight": 100,
-          "label": "k3s1 traefik ingress entry (klipper) — same target as aws-k3s1-ingress-klipper-80, the backend every working wslproxy host uses. traefik routes by Host. Do NOT point this at 13.42.188.136:80 (times out from the edge) or pop1.wslproxy.com (the edge itself — proxy loop)."
+          "label": "193.237.176.232:8888-origin"
         }
-      ],
-      "routing": {
-        "mode": "least_conn"
-      }
+      ]
+    },
+    "rules": {
+      "path_key": "starts_with",
+      "path": "/",
+      "jwt_token_validation": "equals"
     }
   },
   "servers": [
