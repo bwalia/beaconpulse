@@ -22,6 +22,9 @@ data:
 
     rule_files:
       - /etc/prometheus/generated/rules_*.yml
+    {{- if .Values.controlPlaneMonitoring.enabled }}
+      - /etc/prometheus/cp-rules/*.yaml
+    {{- end }}
 
     scrape_config_files:
       - /etc/prometheus/generated/scrape_*.yml
@@ -44,6 +47,27 @@ data:
         metrics_path: /metrics
         static_configs:
           - targets: ['{{ include "beacon.name" "blackbox" }}:9115']
+    {{- if .Values.controlPlaneMonitoring.enabled }}
+      # Cluster control plane. Scrapes the apiserver's own /metrics, which
+      # carries etcd_request_duration_seconds and apiserver_storage_size_bytes
+      # (the etcd DB size). Deliberately NOT scraping etcd directly: k3s binds
+      # the etcd metrics port to 127.0.0.1, and exposing it needs a k3s restart
+      # that is unsafe while the cluster runs on 2 etcd members.
+      - job_name: kube-apiserver
+        scheme: https
+        kubernetes_sd_configs:
+          - role: endpoints
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_service_name
+              - __meta_kubernetes_endpoint_port_name
+            action: keep
+            regex: default;kubernetes;https
+    {{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap

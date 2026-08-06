@@ -1,0 +1,65 @@
+{{- if .Values.controlPlaneMonitoring.enabled }}
+# ─────────────────────────────────────────────────────────────────────────────
+# Cluster control-plane monitoring — identity for scraping the kube-apiserver.
+#
+# WHY THIS IS OPT-IN AND OFF BY DEFAULT
+#   Beacon is a tenant-facing product deployed once per environment. Cluster
+#   control-plane health is NOT per-tenant — enabling this on every release
+#   would scrape the same apiserver N times and fire N copies of every alert.
+#   Turn it on for exactly ONE release per cluster.
+#
+# WHY THE RULES ARE NOT IN THIS CHART
+#   They are owned by the infra repo, which is where the cluster is defined:
+#     diy-tax-return-infra: clusters/k3s/monitoring/etcd-control-plane-rules.yaml
+#   That repo applies them as a ConfigMap; this chart only mounts it by name via
+#   .Values.controlPlaneMonitoring.rulesConfigMap. Copying the rules here would
+#   create a second source of truth that silently drifts.
+#
+# BACKGROUND
+#   Added after the 2026-07-29 k3s1 outage: an etcd member behind home broadband
+#   fell out of raft sync, the leader looped on shipping it a full DB snapshot,
+#   compaction stalled, and every etcd-backed API call timed out. Node status
+#   stayed Ready and /livez passed throughout — only etcd's own metrics and
+#   /readyz showed it.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "beacon.name" "prometheus" }}-cp
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  # Cluster-scoped, and this chart is installed once per namespace, so the
+  # namespace has to be part of the name or releases collide.
+  name: {{ include "beacon.name" "prometheus" }}-cp-{{ .Release.Namespace }}
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+rules:
+  # Scrape the apiserver's own /metrics. This is where etcd_request_duration_*
+  # and apiserver_storage_size_bytes come from — no access to etcd needed, which
+  # matters because k3s binds the etcd metrics port to 127.0.0.1 only.
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+  # Service discovery for the kubernetes endpoints role.
+  - apiGroups: [""]
+    resources: ["endpoints", "services", "pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "beacon.name" "prometheus" }}-cp-{{ .Release.Namespace }}
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "beacon.name" "prometheus" }}-cp-{{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "beacon.name" "prometheus" }}-cp
+    namespace: {{ .Release.Namespace }}
+{{- end }}

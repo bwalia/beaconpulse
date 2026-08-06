@@ -225,3 +225,16 @@ resources:
 # Override per-env in values-<env>.yaml if a different node is wanted.
 nodeSelector:
   kubernetes.io/hostname: debworker00
+
+# ── Cluster control-plane monitoring (etcd / kube-apiserver) ─────────────────
+# OFF by default, and intended for exactly ONE release per cluster: control-plane
+# health is not per-tenant, so enabling it on every release would scrape the same
+# apiserver N times and duplicate every alert.
+#
+# The alert rules live in the infra repo, which owns the cluster:
+#   diy-tax-return-infra: clusters/k3s/monitoring/etcd-control-plane-rules.yaml
+# That repo applies them as the ConfigMap named below; this chart only mounts it
+# (optional: true, so the release installs cleanly before the ConfigMap exists).
+controlPlaneMonitoring:
+  enabled: false
+  rulesConfigMap: etcd-control-plane-rules

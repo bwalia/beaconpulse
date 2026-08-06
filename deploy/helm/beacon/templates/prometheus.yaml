@@ -22,6 +22,10 @@ spec:
       # them, read here) needs no per-pod ownership dance.
       securityContext:
         fsGroup: 10001
+      {{- if .Values.controlPlaneMonitoring.enabled }}
+      # Identity for scraping the kube-apiserver — see control-plane-monitoring.yaml
+      serviceAccountName: {{ include "beacon.name" "prometheus" }}-cp
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -66,10 +70,24 @@ spec:
               readOnly: true
             - name: data
               mountPath: /prometheus
+            {{- if .Values.controlPlaneMonitoring.enabled }}
+            # Rules owned by the infra repo, applied there as a ConfigMap and
+            # mounted here by name. Kept OUT of /etc/prometheus/generated, which
+            # Beacon writes to itself.
+            - name: cp-rules
+              mountPath: /etc/prometheus/cp-rules
+              readOnly: true
+            {{- end }}
       volumes:
         - name: config
           configMap:
             name: beacon-prometheus-config
+        {{- if .Values.controlPlaneMonitoring.enabled }}
+        - name: cp-rules
+          configMap:
+            name: {{ .Values.controlPlaneMonitoring.rulesConfigMap }}
+            optional: true
+        {{- end }}
         - name: generated
           persistentVolumeClaim:
             claimName: beacon-prom-generated
