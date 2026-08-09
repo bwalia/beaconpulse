@@ -61,7 +61,14 @@ jobs:
           set -euo pipefail
           # The zone is the registrable apex (last two labels) of the record name, so a
           # record on any brand domain works without hardcoding a zone.
-          ZONE="$(echo "${{ inputs.RECORD_NAME }}" | awk -F. '{print $(NF-1)"."$NF}')"
+          # Registrable apex: last two labels, or last THREE when the TLD is a
+          # two-label public suffix (co.uk, org.uk, ...) — "last two" alone
+          # derived the zone of grafana.workstation.co.uk as "co.uk".
+          ZONE="$(echo "${{ inputs.RECORD_NAME }}" | awk -F. '{
+            if ($NF=="uk" || $NF=="au" || $NF=="nz" || $NF=="jp" || $NF=="br")
+              print $(NF-2)"."$(NF-1)"."$NF;
+            else
+              print $(NF-1)"."$NF }')"
           export CLOUDFLARE_ZONE="$ZONE"
           if [ "$ZONE" = "beaconpulse.net" ]; then export CLOUDFLARE_ZONE_ID="$BEACONPULSE_ZONE_ID"; fi
           echo "Upserting ${{ inputs.RECORD_NAME }} (zone ${ZONE})"
