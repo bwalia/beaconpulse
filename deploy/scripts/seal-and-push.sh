@@ -30,7 +30,14 @@ case ":$PATH:" in *":$HOME/bin:"*) : ;; *) PATH="$HOME/bin:$PATH" ;; esac
 export PATH
 
 REPO_HOST="github.com"                       # for the printed PR URL only
-VALID_ENVS="int acc test prod"
+# Accepted: bare tiers, or a white-label brand env (<brand>-<tier>, e.g. sysops-prod).
+ENV_HINT="int|acc|test|prod  (or a brand env like sysops-prod)"
+is_valid_env() {
+  case "$1" in
+    int|acc|test|prod|*-int|*-acc|*-test|*-prod) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 c_red=$'\033[31m'; c_grn=$'\033[32m'; c_yel=$'\033[33m'; c_bld=$'\033[1m'; c_rst=$'\033[0m'
 say()  { printf '%s\n' "$*"; }
@@ -72,11 +79,15 @@ ENV_ARG="${1:-}"
 if [ -n "$ENV_ARG" ]; then
   TARGET_ENV="$ENV_ARG"
 else
-  say "${c_bld}Which environment do you want to seal?${c_rst}  ($VALID_ENVS)"
+  say "${c_bld}Which environment do you want to seal?${c_rst}  ($ENV_HINT)"
   printf "  env [int]: "; read -r TARGET_ENV || true
   [ -n "$TARGET_ENV" ] || TARGET_ENV="int"
 fi
-case " $VALID_ENVS " in *" $TARGET_ENV "*) : ;; *) die "invalid env '$TARGET_ENV' (expected: $VALID_ENVS)";; esac
+is_valid_env "$TARGET_ENV" || die "invalid env '$TARGET_ENV' (expected $ENV_HINT)"
+# A brand env must have its values file, else the deploy has nothing to use.
+if [ ! -f "$REPO_ROOT/deploy/helm/beacon/values-$TARGET_ENV.yaml" ]; then
+  die "no values file: deploy/helm/beacon/values-$TARGET_ENV.yaml (create it before sealing '$TARGET_ENV')"
+fi
 ok "environment: $TARGET_ENV"
 
 # ── 2. which env file holds the inputs (AI/Google/Stripe/registry) ──────────

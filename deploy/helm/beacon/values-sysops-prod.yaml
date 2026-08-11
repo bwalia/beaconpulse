@@ -27,18 +27,21 @@ storage:
 
 ingress:
   enabled: true
-  tls: true
+  # TLS is terminated at the wslproxy edge (pop0), NOT in-cluster. This cluster has
+  # no cert-manager, so tls:true would make traefik attach a Secret that never exists
+  # and silently stop serving the vhost. The int/acc/test brands use false for the
+  # same reason; the edge holds a valid sysops247.com cert (ssl_auto_renew).
+  tls: false
 
-# ⚠️  PRODUCTION SECRETS — read this.
-# `existing` reuses beacon-prod's secrets (the pipeline copies beacon-secrets from the
-# `prod` namespace), which means SysOps-prod shares Beacon-prod's JWT + ENCRYPTION keys.
-# That is fine to get running, but for a real production brand you SHOULD give it its
-# own secrets so the two products are cryptographically isolated:
-#   1) put SysOps' secret values in deploy/.env
-#   2) deploy/scripts/seal-secrets.sh sysops-prod   (seals for the sysops-prod namespace)
-#   3) git add deploy/helm/beacon/sealed/sysops-prod/ && commit
-#   4) change the line below to:  secretsSource: sealed
-secretsSource: existing
+# PRODUCTION SECRETS — DEDICATED & ISOLATED.
+# sysops-prod has its OWN sealed secrets under deploy/helm/beacon/sealed/sysops-prod/,
+# so its JWT + ENCRYPTION keys are cryptographically independent of Beacon. The
+# sealed-secrets controller decrypts them in-namespace; the committed ciphertext is
+# safe. Regenerate with:  deploy/scripts/seal-secrets.sh sysops-prod
+# The deploy pipeline still copies the nebulacr-login PULL secret from `prod`, but it
+# only copies beacon-secrets for brands that use secretsSource: existing — so this
+# brand's dedicated secret is never overwritten.
+secretsSource: sealed
 
 image:
   registry: spectoncr.diytaxreturn.co.uk
