@@ -152,18 +152,17 @@ jobs:
     secrets: inherit
 
   build:
-    # GitHub-hosted, and deliberately NOT self-hosted. The k3s nodes are amd64 but
-    # the self-hosted runner is an arm64 Mac, so building there produced arm64
-    # images and every pod died with "exec format error". Emulating the build for
-    # amd64 on that Mac works but is unusably slow (the Next.js stage ran >20min
-    # under QEMU and had not finished). ubuntu-latest is already amd64, so the
-    # build is NATIVE — correct and fast, with no emulation or cross-compilation.
-    #
-    # This is only viable because the registry is public: int-spectoncr answers
-    # from outside the operator network (HTTP 401 = reachable, needs auth). The
-    # `deploy` job must stay self-hosted, because the k3s API does NOT answer from
-    # outside (it times out), and neither does the wslproxy control plane.
-    runs-on: ubuntu-latest
+    # RUNNER SELECTION IS ARCH- AND NETWORK-DRIVEN:
+    #   • non-prod builds run on ubuntu-latest — amd64 (native, matches the k3s
+    #     nodes) and the int/acc/test registries answer publicly over HTTPS.
+    #   • prod builds run on the LAN self-hosted runner (labels self-hosted,Linux,X64):
+    #     the prod registry's public path (pop1) 499s large blob PUTs, so prod images
+    #     must be pushed to the LAN NodePort 192.168.1.104:30502 — reachable ONLY from a
+    #     runner on the 192.168.1.0/24 LAN. That runner is amd64 Linux, so the build is
+    #     still native. Mirrors diy-tax-return-uk/.github/workflows/auto-tag-main.yml.
+    # The `deploy` job stays self-hosted regardless: the k3s API and wslproxy control
+    # plane don't answer from outside the LAN.
+    runs-on: ${{ (github.event.inputs.TARGET_ENV || 'int') == 'prod' && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     outputs:
       registry: ${{ steps.reg.outputs.registry }}
     steps:
@@ -179,14 +178,19 @@ jobs:
         id: reg
         run: |
           set -euo pipefail
+          # REGISTRY = where the CLUSTER pulls from (the values-file host, HTTPS).
+          # PUSH_HOST = where CI pushes to. Same as REGISTRY everywhere except prod,
+          # which pushes to the LAN NodePort (the public path 499s large blob PUTs).
+          # Both map to the SAME registry backend, so the cluster still pulls fine
+          # from the hostname. Port map (spectoncr NodePorts): prod=30502.
           case "$TARGET_ENV" in
-            prod) REGISTRY="spectoncr.diytaxreturn.co.uk" ;;
-            *)    REGISTRY="${TARGET_ENV}-spectoncr.diytaxreturn.co.uk" ;;
+            prod) REGISTRY="spectoncr.diytaxreturn.co.uk"; PUSH_HOST="192.168.1.104:30502" ;;
+            *)    REGISTRY="${TARGET_ENV}-spectoncr.diytaxreturn.co.uk"; PUSH_HOST="$REGISTRY" ;;
           esac
 
-          # Drift guard: the chart must pull from the same host we push to.
-          # Without this you can publish to int-spectoncr and have the cluster
-          # quietly ImagePullBackOff against a stale registry from the values file.
+          # Drift guard: the chart must PULL from the host CI publishes to (same backend).
+          # Validated against REGISTRY (the pull host); the prod push goes to the LAN
+          # NodePort but lands in the identical registry the hostname serves.
           VALUES="deploy/helm/beacon/values-${TARGET_ENV}.yaml"
           CHART_REG="$(awk '/^image:/{f=1;next} f && /^  registry:/{print $2; exit}' "$VALUES")"
           if [ "$CHART_REG" != "$REGISTRY" ]; then
@@ -195,7 +199,20 @@ jobs:
           fi
 
           echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
-          echo "Registry for '${TARGET_ENV}': ${REGISTRY}"
+          echo "push_host=$PUSH_HOST" >> "$GITHUB_OUTPUT"
+          echo "Registry for '${TARGET_ENV}': pull=${REGISTRY} push=${PUSH_HOST}"
+
+      # prod pushes to the LAN NodePort over plain HTTP. buildkit refuses http
+      # registries unless told they're insecure — do that per-job via a container
+      # builder rather than editing the shared runner's docker daemon.
+      - name: Set up Buildx for the prod LAN registry
+        if: ${{ (github.event.inputs.TARGET_ENV || 'int') == 'prod' && (env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy') }}
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config-inline: |
+            [registry."192.168.1.104:30502"]
+              http = true
+              insecure = true
 
       - name: Registry auth (SpectonCR)
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
@@ -209,35 +226,26 @@ jobs:
         run: |
           set -euo pipefail
           REG="${{ steps.reg.outputs.registry }}"
+          PUSH_HOST="${{ steps.reg.outputs.push_host }}"
           if [ "$TARGET_ENV" = "prod" ] && [ -n "${NEBULACR_PROD_USERNAME:-}" ]; then
             RUSER="$NEBULACR_PROD_USERNAME"; RPASS="$NEBULACR_PROD_PASSWORD"
           else
             RUSER="$NEBULACR_USERNAME"; RPASS="$NEBULACR_PASSWORD"
           fi
-          # The prod registry answers `GET /v2/` with 200 instead of the standard
-          # 401 + WWW-Authenticate, so `docker login` (which probes /v2/) fails there
-          # even with a valid credential. Its PER-REPO endpoints DO challenge correctly
-          # and issue a token, so `docker push` works. For prod we therefore write the
-          # auth into docker's config directly and let push run the per-repo token dance;
-          # other envs keep the standard `docker login` (their /v2/ challenges correctly).
           if [ "$TARGET_ENV" = "prod" ]; then
+            # Write the credential straight into docker config for the LAN NodePort host.
+            # buildkit uses it for the push token dance; transport is plain HTTP (the
+            # config-inline above). We deliberately do NOT touch the shared runner's
+            # docker daemon.
             mkdir -p "$HOME/.docker"
             AUTH="$(printf '%s:%s' "$RUSER" "$RPASS" | base64 | tr -d '\n')"
-            if [ -s "$HOME/.docker/config.json" ]; then
-              tmp="$(mktemp)"; jq --arg r "$REG" --arg a "$AUTH" '.auths[$r]={auth:$a}' "$HOME/.docker/config.json" >"$tmp" && mv "$tmp" "$HOME/.docker/config.json"
-            else
-              printf '{"auths":{"%s":{"auth":"%s"}}}\n' "$REG" "$AUTH" >"$HOME/.docker/config.json"
-            fi
-            # Fail fast if the credential can't obtain a push token. Derive realm/service
-            # from the registry's own challenge so nothing is hardcoded per host.
-            CH="$(curl -sI "https://$REG/v2/$IMAGE_NAMESPACE/frontend/tags/list" | tr -d '\r' | grep -i '^www-authenticate:' || true)"
-            REALM="$(printf '%s' "$CH" | sed -n 's/.*realm="\([^"]*\)".*/\1/p')"
-            SVC="$(printf '%s' "$CH" | sed -n 's/.*service="\([^"]*\)".*/\1/p')"
-            if [ -n "$REALM" ]; then
-              code="$(curl -s -o /dev/null -w '%{http_code}' -u "$RUSER:$RPASS" "$REALM?service=$SVC&scope=repository:$IMAGE_NAMESPACE/frontend:pull,push" || true)"
-              [ "$code" = "200" ] || { echo "::error::prod registry token check failed (HTTP $code) — check NEBULACR_PROD_USERNAME/PASSWORD"; exit 1; }
-            fi
-            echo "Configured prod registry auth for $REG (token check OK)"
+            printf '{"auths":{"%s":{"auth":"%s"}}}\n' "$PUSH_HOST" "$AUTH" >"$HOME/.docker/config.json"
+            # Fail fast (with an actionable message) if the LAN NodePort isn't reachable.
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -u "$RUSER:$RPASS" "http://$PUSH_HOST/v2/" || echo 000)"
+            case "$code" in
+              200|401) echo "prod LAN registry $PUSH_HOST reachable (HTTP $code); cluster pulls from $REG" ;;
+              *) echo "::error::prod LAN registry $PUSH_HOST unreachable (HTTP $code) — is this runner on the 192.168.1.0/24 LAN and is the spectoncr-registry-nodeport (30502) up?"; exit 1 ;;
+            esac
           else
             printf '%s' "$RPASS" | docker login "$REG" -u "$RUSER" --password-stdin
           fi
@@ -247,24 +255,32 @@ jobs:
         run: |
           set -euo pipefail
           SHA=${{ steps.tag.outputs.sha }}
-          NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
+          NS="${{ steps.reg.outputs.push_host }}/$IMAGE_NAMESPACE"
           # One backend image contains both binaries; api/worker differ by command.
-          # --platform is stated explicitly (and asserted below) rather than left
-          # implicit: it is the one thing that, if it silently follows the builder
-          # instead of the cluster, ships an unrunnable image. On ubuntu-latest this
-          # is native. --load lands a plain image in the docker store so the
-          # existing `docker push` path sends a manifest SpectonCR accepts
-          # (BuildKit's direct --push emits an OCI index, which it mishandles).
-          docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
-            -f deploy/docker/Dockerfile.backend \
-            --build-arg BEACON_VERSION="$SHA" \
-            -t "$NS/api:$SHA" -t "$NS/api:latest" \
-            -t "$NS/worker:$SHA" -t "$NS/worker:latest" .
-          ./deploy/scripts/assert-image-arch.sh "$NS/api:$SHA"
-          docker push "$NS/api:$SHA"
-          docker push "$NS/api:latest"
-          docker push "$NS/worker:$SHA"
-          docker push "$NS/worker:latest"
+          # --platform is explicit so a wrong-arch image can never ship silently.
+          # --provenance/--sbom are off (BUILDX_FLAGS) so buildx emits a single manifest
+          # the registry accepts.
+          if [ "$TARGET_ENV" = "prod" ]; then
+            # prod: buildkit pushes straight to the LAN NodePort over HTTP (native amd64
+            # on the LAN runner — no emulation).
+            docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --push \
+              -f deploy/docker/Dockerfile.backend \
+              --build-arg BEACON_VERSION="$SHA" \
+              -t "$NS/api:$SHA" -t "$NS/api:latest" \
+              -t "$NS/worker:$SHA" -t "$NS/worker:latest" .
+          else
+            # non-prod: --load a plain image, assert arch, then docker push to the public host.
+            docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
+              -f deploy/docker/Dockerfile.backend \
+              --build-arg BEACON_VERSION="$SHA" \
+              -t "$NS/api:$SHA" -t "$NS/api:latest" \
+              -t "$NS/worker:$SHA" -t "$NS/worker:latest" .
+            ./deploy/scripts/assert-image-arch.sh "$NS/api:$SHA"
+            docker push "$NS/api:$SHA"
+            docker push "$NS/api:latest"
+            docker push "$NS/worker:$SHA"
+            docker push "$NS/worker:latest"
+          fi
 
       - name: Build & push frontend
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
@@ -276,7 +292,7 @@ jobs:
         run: |
           set -euo pipefail
           SHA=${{ steps.tag.outputs.sha }}
-          NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
+          NS="${{ steps.reg.outputs.push_host }}/$IMAGE_NAMESPACE"
           BRAND="${BRAND:-beacon}"
           # The frontend is the ONLY brand-specific image: NEXT_PUBLIC_BRAND (src/brand)
           # is inlined into the bundle at build time. A non-default brand gets a
@@ -288,21 +304,28 @@ jobs:
             FE_SHA="frontend:${BRAND}-$SHA"; FE_LATEST="frontend:${BRAND}-latest"
           fi
           # Empty NEXT_PUBLIC_API_BASE_URL => the browser calls the API same-origin
-          # (/api/...) through the gateway. No CORS.
-          # Native amd64: npm installs arch-specific native modules (next/swc,
-          # sharp) which get traced into .next/standalone, so the deps must match
-          # the target arch. Building this on the arm64 runner would mean emulating
-          # the whole npm/next stage under QEMU — measured at >20min and unfinished.
-          docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
-            -f frontend/Dockerfile \
-            --build-arg NEXT_PUBLIC_API_BASE_URL="" \
-            --build-arg NEXT_PUBLIC_BRAND="$BRAND" \
-            --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
-            -t "$NS/$FE_SHA" -t "$NS/$FE_LATEST" \
-            ./frontend
-          ./deploy/scripts/assert-image-arch.sh "$NS/$FE_SHA"
-          docker push "$NS/$FE_SHA"
-          docker push "$NS/$FE_LATEST"
+          # (/api/...) through the gateway. No CORS. amd64 is native on both runners
+          # (ubuntu-latest for non-prod, the LAN Linux/X64 runner for prod).
+          if [ "$TARGET_ENV" = "prod" ]; then
+            docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --push \
+              -f frontend/Dockerfile \
+              --build-arg NEXT_PUBLIC_API_BASE_URL="" \
+              --build-arg NEXT_PUBLIC_BRAND="$BRAND" \
+              --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
+              -t "$NS/$FE_SHA" -t "$NS/$FE_LATEST" \
+              ./frontend
+          else
+            docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
+              -f frontend/Dockerfile \
+              --build-arg NEXT_PUBLIC_API_BASE_URL="" \
+              --build-arg NEXT_PUBLIC_BRAND="$BRAND" \
+              --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
+              -t "$NS/$FE_SHA" -t "$NS/$FE_LATEST" \
+              ./frontend
+            ./deploy/scripts/assert-image-arch.sh "$NS/$FE_SHA"
+            docker push "$NS/$FE_SHA"
+            docker push "$NS/$FE_LATEST"
+          fi
 
   deploy:
     runs-on: self-hosted
