@@ -197,28 +197,50 @@ jobs:
           echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
           echo "Registry for '${TARGET_ENV}': ${REGISTRY}"
 
-      - name: Registry login (SpectonCR)
+      - name: Registry auth (SpectonCR)
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         env:
           NEBULACR_USERNAME: ${{ secrets.NEBULACR_USERNAME }}
           NEBULACR_PASSWORD: ${{ secrets.NEBULACR_PASSWORD }}
-          # prod lives on a SEPARATE registry (spectoncr, bare host) whose admin
-          # password differs from int-spectoncr's, so a single shared credential 401s
-          # there. Set NEBULACR_PROD_USERNAME/PASSWORD (the prod registry's push creds)
-          # and prod uses them; every other env keeps the shared credential unchanged.
+          # prod keeps its own secret so a future rotation of one registry can't break
+          # the other; the value is the same admin credential today.
           NEBULACR_PROD_USERNAME: ${{ secrets.NEBULACR_PROD_USERNAME }}
           NEBULACR_PROD_PASSWORD: ${{ secrets.NEBULACR_PROD_PASSWORD }}
         run: |
           set -euo pipefail
+          REG="${{ steps.reg.outputs.registry }}"
           if [ "$TARGET_ENV" = "prod" ] && [ -n "${NEBULACR_PROD_USERNAME:-}" ]; then
             RUSER="$NEBULACR_PROD_USERNAME"; RPASS="$NEBULACR_PROD_PASSWORD"
-            echo "Using prod registry credentials (NEBULACR_PROD_*)"
           else
             RUSER="$NEBULACR_USERNAME"; RPASS="$NEBULACR_PASSWORD"
-            [ "$TARGET_ENV" = "prod" ] && echo "::warning::TARGET_ENV=prod but NEBULACR_PROD_USERNAME is unset — falling back to the shared credential, which 401s on the prod registry. Set NEBULACR_PROD_USERNAME/PASSWORD."
           fi
-          # --password-stdin: keeps the secret out of the process list / logs.
-          printf '%s' "$RPASS" | docker login "${{ steps.reg.outputs.registry }}" -u "$RUSER" --password-stdin
+          # The prod registry answers `GET /v2/` with 200 instead of the standard
+          # 401 + WWW-Authenticate, so `docker login` (which probes /v2/) fails there
+          # even with a valid credential. Its PER-REPO endpoints DO challenge correctly
+          # and issue a token, so `docker push` works. For prod we therefore write the
+          # auth into docker's config directly and let push run the per-repo token dance;
+          # other envs keep the standard `docker login` (their /v2/ challenges correctly).
+          if [ "$TARGET_ENV" = "prod" ]; then
+            mkdir -p "$HOME/.docker"
+            AUTH="$(printf '%s:%s' "$RUSER" "$RPASS" | base64 | tr -d '\n')"
+            if [ -s "$HOME/.docker/config.json" ]; then
+              tmp="$(mktemp)"; jq --arg r "$REG" --arg a "$AUTH" '.auths[$r]={auth:$a}' "$HOME/.docker/config.json" >"$tmp" && mv "$tmp" "$HOME/.docker/config.json"
+            else
+              printf '{"auths":{"%s":{"auth":"%s"}}}\n' "$REG" "$AUTH" >"$HOME/.docker/config.json"
+            fi
+            # Fail fast if the credential can't obtain a push token. Derive realm/service
+            # from the registry's own challenge so nothing is hardcoded per host.
+            CH="$(curl -sI "https://$REG/v2/$IMAGE_NAMESPACE/frontend/tags/list" | tr -d '\r' | grep -i '^www-authenticate:' || true)"
+            REALM="$(printf '%s' "$CH" | sed -n 's/.*realm="\([^"]*\)".*/\1/p')"
+            SVC="$(printf '%s' "$CH" | sed -n 's/.*service="\([^"]*\)".*/\1/p')"
+            if [ -n "$REALM" ]; then
+              code="$(curl -s -o /dev/null -w '%{http_code}' -u "$RUSER:$RPASS" "$REALM?service=$SVC&scope=repository:$IMAGE_NAMESPACE/frontend:pull,push" || true)"
+              [ "$code" = "200" ] || { echo "::error::prod registry token check failed (HTTP $code) — check NEBULACR_PROD_USERNAME/PASSWORD"; exit 1; }
+            fi
+            echo "Configured prod registry auth for $REG (token check OK)"
+          else
+            printf '%s' "$RPASS" | docker login "$REG" -u "$RUSER" --password-stdin
+          fi
 
       - name: Build & push backend (api + worker share one image)
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
