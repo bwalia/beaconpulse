@@ -1,0 +1,101 @@
+name: ->Beacon Postgres Backup
+
+# Backs up each Beacon environment's Postgres to object storage:
+#   • int / acc / test  -> in-cluster MinIO (workstation-minio, existing creds)
+#   • prod              -> S3 (credentials from GitHub secrets)
+#
+# The heavy lifting runs as an in-cluster Job (see deploy/scripts/backup-postgres.sh)
+# so it can reach the ClusterIP MinIO and the DB; this workflow just orchestrates it
+# from the self-hosted runner, which already has cluster access.
+#
+# NOTE: scheduled runs need the self-hosted runner online. If the runner is offline
+# at the scheduled time GitHub queues (then drops after ~24h) the run — an in-cluster
+# CronJob would be more resilient, but this keeps backups in one place with the rest
+# of the pipeline, as requested.
+
+on:
+  schedule:
+    # 03:00 UTC daily — after the 02:00 window other platform backups use.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      TARGET_ENV:
+        type: choice
+        description: "Which environment(s) to back up"
+        default: "all"
+        required: true
+        options:
+          - all          # every env that has Beacon deployed
+          - int
+          - acc
+          - test
+          - prod
+          - sysops-int
+          - sysops-prod
+      RETENTION_DAYS:
+        type: string
+        description: "Delete snapshots older than this many days"
+        default: "14"
+        required: false
+
+concurrency:
+  # Never run two backup sweeps at once (they'd contend on the same runner + DB).
+  group: beacon-pg-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: self-hosted
+    env:
+      RETENTION_DAYS: ${{ github.event.inputs.RETENTION_DAYS || '14' }}
+      # prod (S3) credentials — set these as repository secrets.
+      BEACON_BACKUP_S3_ENDPOINT: ${{ secrets.BEACON_BACKUP_S3_ENDPOINT }}
+      BEACON_BACKUP_S3_BUCKET: ${{ secrets.BEACON_BACKUP_S3_BUCKET }}
+      BEACON_BACKUP_S3_ACCESS_KEY: ${{ secrets.BEACON_BACKUP_S3_ACCESS_KEY }}
+      BEACON_BACKUP_S3_SECRET_KEY: ${{ secrets.BEACON_BACKUP_S3_SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Decode kubeconfig
+        env:
+          KUBECONFIG_BASE64: ${{ secrets.KUBE_CONFIG_DATA_K3S }}
+        run: |
+          echo "$KUBECONFIG_BASE64" | base64 -d > kubeconfig
+          echo "KUBECONFIG=$(pwd)/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Back up selected environment(s)
+        run: |
+          set -euo pipefail
+          SEL="${{ github.event.inputs.TARGET_ENV || 'all' }}"
+          if [ "$SEL" = "all" ]; then
+            # Only envs that actually run Beacon (have a beacon-postgres deployment).
+            ENVS=""
+            for ns in int acc test prod sysops-int sysops-prod; do
+              if kubectl -n "$ns" get deploy beacon-postgres >/dev/null 2>&1; then ENVS="$ENVS $ns"; fi
+            done
+          else
+            ENVS="$SEL"
+          fi
+          echo "Backing up:${ENVS:- (none found)}"
+          [ -n "${ENVS// /}" ] || { echo "::warning::no Beacon environments found to back up"; exit 0; }
+
+          chmod +x deploy/scripts/backup-postgres.sh
+          rc=0
+          for ns in $ENVS; do
+            echo "::group::backup $ns"
+            deploy/scripts/backup-postgres.sh "$ns" || { echo "::error::backup failed for $ns"; rc=1; }
+            echo "::endgroup::"
+          done
+          exit $rc
+
+      - name: Slack notification
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: general
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: "Beacon Postgres backup"
+          SLACK_MESSAGE: "Backup run ${{ job.status }} (env=${{ github.event.inputs.TARGET_ENV || 'all' }})"
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
