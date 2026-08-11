@@ -72,13 +72,16 @@ note() { echo "  $*"; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    int | acc | test | prod) TARGET_ENV="$1"; shift ;;
+    # Bare tiers (int/acc/test/prod) AND white-label brand envs (<brand>-<tier>, e.g.
+    # sysops-prod). The namespace, sealed/<env>/ dir and values-<env>.yaml all derive
+    # from this string, so a brand env just needs its values-<brand>-<tier>.yaml to exist.
+    int | acc | test | prod | *-int | *-acc | *-test | *-prod) TARGET_ENV="$1"; shift ;;
     --apply) APPLY=true; shift ;;
     --rotate) ROTATE=true; shift ;;
     --show-keys) SHOW_KEYS=true; shift ;;
     --cert) CERT_ARG="${2:-}"; shift 2 ;;
     -h | --help) sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) die "unknown argument: $1 (expected one of: int acc test prod [--apply] [--rotate] [--show-keys])" ;;
+    *) die "unknown argument: $1 (expected a tier: int|acc|test|prod, or a brand env like sysops-prod, plus [--apply] [--rotate] [--show-keys])" ;;
   esac
 done
 

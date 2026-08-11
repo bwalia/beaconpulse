@@ -56,7 +56,11 @@ resources:
 
 ingress:
   enabled: true
-  tls: true
+  # TLS terminates at the wslproxy edge (pop0); this cluster has no cert-manager, so
+  # tls:true would attach a Secret that never exists and stop traefik serving the
+  # vhost. Matches int/acc/test. (beacon-prod is not deployed yet, but this keeps the
+  # file correct for when it is.)
+  tls: false
 
 # Images for this environment live on its own SpectonCR host.
 image:
