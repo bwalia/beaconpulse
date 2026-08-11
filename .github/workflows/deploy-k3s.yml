@@ -199,10 +199,26 @@ jobs:
 
       - name: Registry login (SpectonCR)
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
+        env:
+          NEBULACR_USERNAME: ${{ secrets.NEBULACR_USERNAME }}
+          NEBULACR_PASSWORD: ${{ secrets.NEBULACR_PASSWORD }}
+          # prod lives on a SEPARATE registry (spectoncr, bare host) whose admin
+          # password differs from int-spectoncr's, so a single shared credential 401s
+          # there. Set NEBULACR_PROD_USERNAME/PASSWORD (the prod registry's push creds)
+          # and prod uses them; every other env keeps the shared credential unchanged.
+          NEBULACR_PROD_USERNAME: ${{ secrets.NEBULACR_PROD_USERNAME }}
+          NEBULACR_PROD_PASSWORD: ${{ secrets.NEBULACR_PROD_PASSWORD }}
         run: |
-          docker login "${{ steps.reg.outputs.registry }}" \
-            -u "${{ secrets.NEBULACR_USERNAME }}" \
-            -p "${{ secrets.NEBULACR_PASSWORD }}"
+          set -euo pipefail
+          if [ "$TARGET_ENV" = "prod" ] && [ -n "${NEBULACR_PROD_USERNAME:-}" ]; then
+            RUSER="$NEBULACR_PROD_USERNAME"; RPASS="$NEBULACR_PROD_PASSWORD"
+            echo "Using prod registry credentials (NEBULACR_PROD_*)"
+          else
+            RUSER="$NEBULACR_USERNAME"; RPASS="$NEBULACR_PASSWORD"
+            [ "$TARGET_ENV" = "prod" ] && echo "::warning::TARGET_ENV=prod but NEBULACR_PROD_USERNAME is unset — falling back to the shared credential, which 401s on the prod registry. Set NEBULACR_PROD_USERNAME/PASSWORD."
+          fi
+          # --password-stdin: keeps the secret out of the process list / logs.
+          printf '%s' "$RPASS" | docker login "${{ steps.reg.outputs.registry }}" -u "$RUSER" --password-stdin
 
       - name: Build & push backend (api + worker share one image)
         if: ${{ env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}

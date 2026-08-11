@@ -105,16 +105,33 @@ if [[ -z "$zone_id" ]]; then
 fi
 
 # ---- find an existing record ------------------------------------------------
-existing="$(cf GET "/zones/${zone_id}/dns_records?type=${RECORD_TYPE}&name=${NAME}")"
-
-# Do NOT reach for `// empty` on proxied/ttl. jq's `//` is the *alternative*
-# operator: it fires on `false` as well as `null`, so `.proxied // empty` yields
-# "" for an unproxied record and the drift check below would rewrite the record on
-# every single deploy. Guard on the array length instead and stringify explicitly.
-rec_id="$(jq -r '.result[0].id? // ""' <<<"$existing")"
-cur_content="$(jq -r '.result[0].content? // ""' <<<"$existing")"
-cur_proxied="$(jq -r 'if (.result | length) > 0 then (.result[0].proxied | tostring) else "" end' <<<"$existing")"
-cur_ttl="$(jq -r 'if (.result | length) > 0 then (.result[0].ttl | tostring) else "" end' <<<"$existing")"
+# A CNAME cannot coexist with an A/AAAA/CNAME at the same name (Cloudflare error
+# 81053) — exactly what an APEX takeover hits: the zone already has a proxied record
+# at e.g. sysops247.com, so filtering by type=CNAME finds nothing, we POST, and
+# Cloudflare rejects the create. So for a CNAME we look up ALL records at the name:
+# reuse an existing CNAME as the update target, and remember any A/AAAA to remove
+# first. MX/TXT/etc. are a different class (a flattened apex CNAME coexists with them)
+# and are deliberately left untouched.
+conflict_ids=""
+if [[ "$RECORD_TYPE" == "CNAME" ]]; then
+  existing="$(cf GET "/zones/${zone_id}/dns_records?name=${NAME}&per_page=100")"
+  conflict_ids="$(jq -r '.result[] | select(.type=="A" or .type=="AAAA") | .id' <<<"$existing")"
+  rec_id="$(jq -r '[.result[] | select(.type=="CNAME")][0].id? // ""' <<<"$existing")"
+  cur_content="$(jq -r '[.result[] | select(.type=="CNAME")][0].content? // ""' <<<"$existing")"
+  cur_proxied="$(jq -r 'if ([.result[]|select(.type=="CNAME")]|length)>0 then ([.result[]|select(.type=="CNAME")][0].proxied|tostring) else "" end' <<<"$existing")"
+  cur_ttl="$(jq -r 'if ([.result[]|select(.type=="CNAME")]|length)>0 then ([.result[]|select(.type=="CNAME")][0].ttl|tostring) else "" end' <<<"$existing")"
+else
+  # Non-CNAME records may legitimately coexist (multiple A, MX, TXT…), so keep the
+  # original precise type+name match.
+  existing="$(cf GET "/zones/${zone_id}/dns_records?type=${RECORD_TYPE}&name=${NAME}")"
+  # Do NOT reach for `// empty` on proxied/ttl. jq's `//` is the *alternative*
+  # operator: it fires on `false` as well as `null`, so `.proxied // empty` yields
+  # "" for an unproxied record and the drift check below would rewrite it every deploy.
+  rec_id="$(jq -r '.result[0].id? // ""' <<<"$existing")"
+  cur_content="$(jq -r '.result[0].content? // ""' <<<"$existing")"
+  cur_proxied="$(jq -r 'if (.result | length) > 0 then (.result[0].proxied | tostring) else "" end' <<<"$existing")"
+  cur_ttl="$(jq -r 'if (.result | length) > 0 then (.result[0].ttl | tostring) else "" end' <<<"$existing")"
+fi
 
 payload="$(jq -nc \
   --arg type "$RECORD_TYPE" \
@@ -132,21 +149,36 @@ else
   action="noop"
 fi
 
-if [[ "$action" == "noop" ]]; then
+# Only truly nothing to do when the record is already correct AND there is no
+# conflicting A/AAAA left to clear.
+if [[ "$action" == "noop" && -z "$conflict_ids" ]]; then
   echo "= ${RECORD_TYPE} ${NAME} -> ${CONTENT} (proxied=${PROXIED}) already correct"
   exit 0
 fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
-  echo "[dry-run] would ${action} ${RECORD_TYPE} ${NAME} -> ${CONTENT} (proxied=${PROXIED}, ttl=${TTL})"
+  [[ -n "$conflict_ids" ]] && echo "[dry-run] would remove conflicting A/AAAA at ${NAME}: $(echo "$conflict_ids" | tr '\n' ' ')"
+  [[ "$action" != "noop" ]] && echo "[dry-run] would ${action} ${RECORD_TYPE} ${NAME} -> ${CONTENT} (proxied=${PROXIED}, ttl=${TTL})"
   [[ "$action" == "update" ]] && echo "[dry-run]   current: ${cur_content} (proxied=${cur_proxied}, ttl=${cur_ttl})"
   exit 0
+fi
+
+# Remove conflicting A/AAAA first, so creating/keeping the CNAME cannot 81053.
+if [[ -n "$conflict_ids" ]]; then
+  while IFS= read -r cid; do
+    [[ -n "$cid" ]] || continue
+    cf DELETE "/zones/${zone_id}/dns_records/${cid}" >/dev/null \
+      && echo "- removed conflicting A/AAAA ${NAME} (${cid})" \
+      || echo "warning: could not remove record ${cid} at ${NAME}" >&2
+  done <<<"$conflict_ids"
 fi
 
 if [[ "$action" == "create" ]]; then
   cf POST "/zones/${zone_id}/dns_records" "$payload" >/dev/null
   echo "+ created ${RECORD_TYPE} ${NAME} -> ${CONTENT} (proxied=${PROXIED})"
-else
+elif [[ "$action" == "update" ]]; then
   cf PUT "/zones/${zone_id}/dns_records/${rec_id}" "$payload" >/dev/null
   echo "~ updated ${RECORD_TYPE} ${NAME} -> ${CONTENT} (was ${cur_content}, proxied=${PROXIED})"
+else
+  echo "= ${RECORD_TYPE} ${NAME} -> ${CONTENT} correct (cleared conflicting A/AAAA)"
 fi
