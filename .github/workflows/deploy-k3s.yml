@@ -205,7 +205,7 @@ jobs:
           # The tunnel is opened by the step below; buildkit runs with host networking
           # so 127.0.0.1 inside the builder is the runner's loopback.
           case "$TARGET_ENV" in
-            prod) REGISTRY="spectoncr.diytaxreturn.co.uk"; PUSH_HOST="127.0.0.1:30502" ;;
+            prod) REGISTRY="spectoncr.diytaxreturn.co.uk"; PUSH_HOST="127.0.0.1:30599" ;;
             *)    REGISTRY="${TARGET_ENV}-spectoncr.diytaxreturn.co.uk"; PUSH_HOST="$REGISTRY" ;;
           esac
 
@@ -224,22 +224,26 @@ jobs:
           echo "Registry for '${TARGET_ENV}': pull=${REGISTRY} push=${PUSH_HOST}"
 
       # The prod push path: an SSH local-forward to cloud001, so the registry is
-      # reached as 127.0.0.1:30502 on the runner. The runner user's key already
-      # authorizes bwalia@cloud001 (same trust as the other self-hosted jobs).
+      # reached as 127.0.0.1:30599 on the runner. The local port is deliberately
+      # NOT 30502: the runner host is itself a k3s node, and kube-proxy's NodePort
+      # iptables rules intercept ALL local traffic to 30502 — loopback included —
+      # DNATing it into the broken cross-network path before the ssh listener ever
+      # sees it (verified: tunnel up, curl 127.0.0.1:30502 → 000; same via 30599 →
+      # 401). The runner user's key already authorizes bwalia@cloud001.
       - name: Open SSH tunnel to the prod registry (cloud001)
         if: ${{ (github.event.inputs.TARGET_ENV || 'int') == 'prod' && (env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy') }}
         run: |
           set -euo pipefail
           # A stale tunnel from a previous job would hold the port — clear it first.
-          pkill -f "30502:127.0.0.1:30502" || true
+          pkill -f "30599:127.0.0.1:30502" || true
           ssh -f -N \
             -o BatchMode=yes \
             -o ExitOnForwardFailure=yes \
             -o StrictHostKeyChecking=accept-new \
             -o ServerAliveInterval=30 \
-            -L 30502:127.0.0.1:30502 \
+            -L 30599:127.0.0.1:30502 \
             bwalia@72.62.211.28
-          echo "Tunnel up: 127.0.0.1:30502 -> cloud001 localhost:30502"
+          echo "Tunnel up: 127.0.0.1:30599 -> cloud001 localhost:30502"
 
       # prod pushes to the tunneled NodePort over plain HTTP (the tunnel itself is
       # encrypted). buildkit refuses http registries unless told they're insecure —
@@ -252,7 +256,7 @@ jobs:
         with:
           driver-opts: network=host
           buildkitd-config-inline: |
-            [registry."127.0.0.1:30502"]
+            [registry."127.0.0.1:30599"]
               http = true
               insecure = true
 
