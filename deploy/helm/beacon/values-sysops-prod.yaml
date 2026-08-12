@@ -18,6 +18,13 @@ extraHosts:
 # (cluster DNS is node-local via the coredns-node DaemonSet; verified 10/10 sub-ms).
 nodeSelector:
   kubernetes.io/hostname: cloud003
+# cloud003 is tainted node-role.kubernetes.io/edge=true:NoSchedule — without this
+# toleration every pod (and its WaitForFirstConsumer PVC) sits Pending forever.
+tolerations:
+  - key: node-role.kubernetes.io/edge
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
 app:
   beaconEnv: production
