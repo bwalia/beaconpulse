@@ -163,10 +163,10 @@ jobs:
     # RUNNER SELECTION IS ARCH- AND NETWORK-DRIVEN:
     #   • non-prod builds run on ubuntu-latest — amd64 (native, matches the k3s
     #     nodes) and the int/acc/test registries answer publicly over HTTPS.
-    #   • prod builds run on the LAN self-hosted runner (labels self-hosted,Linux,X64):
+    #   • prod builds run on the self-hosted Linux runner (labels self-hosted,Linux,X64):
     #     the prod registry's public path (pop1) 499s large blob PUTs, so prod images
-    #     must be pushed to the LAN NodePort 192.168.1.104:30502 — reachable ONLY from a
-    #     runner on the 192.168.1.0/24 LAN. That runner is amd64 Linux, so the build is
+    #     are pushed to the NodePort on cloud001 (72.62.211.28:30502), the node the
+    #     registry pods actually run on. That runner is amd64 Linux, so the build is
     #     still native. Mirrors diy-tax-return-uk/.github/workflows/auto-tag-main.yml.
     # The `deploy` job stays self-hosted regardless: the k3s API and wslproxy control
     # plane don't answer from outside the LAN.
@@ -188,11 +188,18 @@ jobs:
           set -euo pipefail
           # REGISTRY = where the CLUSTER pulls from (the values-file host, HTTPS).
           # PUSH_HOST = where CI pushes to. Same as REGISTRY everywhere except prod,
-          # which pushes to the LAN NodePort (the public path 499s large blob PUTs).
+          # which pushes to the NodePort (the public HTTPS path 499s large blob PUTs).
           # Both map to the SAME registry backend, so the cluster still pulls fine
           # from the hostname. Port map (spectoncr NodePorts): prod=30502.
+          #
+          # The NodePort is addressed on cloud001 (72.62.211.28), NOT a LAN node: the
+          # prod registry pods run on cloud001/cloud002, and the LAN<->cloud pod
+          # network is broken, so LAN NodePorts DNAT to those pods and time out.
+          # cloud001's kube-proxy reaches them locally. Plain-HTTP caveat: this push
+          # (incl. its basic-auth) now crosses the internet, not the LAN — acceptable
+          # stopgap, but a WireGuard route or TLS on the NodePort is the follow-up.
           case "$TARGET_ENV" in
-            prod) REGISTRY="spectoncr.diytaxreturn.co.uk"; PUSH_HOST="192.168.1.104:30502" ;;
+            prod) REGISTRY="spectoncr.diytaxreturn.co.uk"; PUSH_HOST="72.62.211.28:30502" ;;
             *)    REGISTRY="${TARGET_ENV}-spectoncr.diytaxreturn.co.uk"; PUSH_HOST="$REGISTRY" ;;
           esac
 
@@ -210,15 +217,15 @@ jobs:
           echo "push_host=$PUSH_HOST" >> "$GITHUB_OUTPUT"
           echo "Registry for '${TARGET_ENV}': pull=${REGISTRY} push=${PUSH_HOST}"
 
-      # prod pushes to the LAN NodePort over plain HTTP. buildkit refuses http
+      # prod pushes to the cloud001 NodePort over plain HTTP. buildkit refuses http
       # registries unless told they're insecure — do that per-job via a container
       # builder rather than editing the shared runner's docker daemon.
-      - name: Set up Buildx for the prod LAN registry
+      - name: Set up Buildx for the prod NodePort registry
         if: ${{ (github.event.inputs.TARGET_ENV || 'int') == 'prod' && (env.DEPLOYMENT_TYPE == 'build' || env.DEPLOYMENT_TYPE == 'build-and-deploy') }}
         uses: docker/setup-buildx-action@v3
         with:
           buildkitd-config-inline: |
-            [registry."192.168.1.104:30502"]
+            [registry."72.62.211.28:30502"]
               http = true
               insecure = true
 
@@ -241,18 +248,18 @@ jobs:
             RUSER="$NEBULACR_USERNAME"; RPASS="$NEBULACR_PASSWORD"
           fi
           if [ "$TARGET_ENV" = "prod" ]; then
-            # Write the credential straight into docker config for the LAN NodePort host.
+            # Write the credential straight into docker config for the NodePort push host.
             # buildkit uses it for the push token dance; transport is plain HTTP (the
             # config-inline above). We deliberately do NOT touch the shared runner's
             # docker daemon.
             mkdir -p "$HOME/.docker"
             AUTH="$(printf '%s:%s' "$RUSER" "$RPASS" | base64 | tr -d '\n')"
             printf '{"auths":{"%s":{"auth":"%s"}}}\n' "$PUSH_HOST" "$AUTH" >"$HOME/.docker/config.json"
-            # Fail fast (with an actionable message) if the LAN NodePort isn't reachable.
+            # Fail fast (with an actionable message) if the NodePort isn't reachable.
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 -u "$RUSER:$RPASS" "http://$PUSH_HOST/v2/" || echo 000)"
             case "$code" in
-              200|401) echo "prod LAN registry $PUSH_HOST reachable (HTTP $code); cluster pulls from $REG" ;;
-              *) echo "::error::prod LAN registry $PUSH_HOST unreachable (HTTP $code) — is this runner on the 192.168.1.0/24 LAN and is the spectoncr-registry-nodeport (30502) up?"; exit 1 ;;
+              200|401) echo "prod registry $PUSH_HOST reachable (HTTP $code); cluster pulls from $REG" ;;
+              *) echo "::error::prod registry $PUSH_HOST unreachable (HTTP $code) — is cloud001 up and is the spectoncr-registry-nodeport (30502) service healthy?"; exit 1 ;;
             esac
           else
             printf '%s' "$RPASS" | docker login "$REG" -u "$RUSER" --password-stdin
@@ -269,8 +276,8 @@ jobs:
           # --provenance/--sbom are off (BUILDX_FLAGS) so buildx emits a single manifest
           # the registry accepts.
           if [ "$TARGET_ENV" = "prod" ]; then
-            # prod: buildkit pushes straight to the LAN NodePort over HTTP (native amd64
-            # on the LAN runner — no emulation).
+            # prod: buildkit pushes straight to the cloud001 NodePort over HTTP (native
+            # amd64 on the self-hosted Linux runner — no emulation).
             docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --push \
               -f deploy/docker/Dockerfile.backend \
               --build-arg BEACON_VERSION="$SHA" \
