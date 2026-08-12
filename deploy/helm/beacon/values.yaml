@@ -230,6 +230,11 @@ resources:
 nodeSelector:
   kubernetes.io/hostname: debworker00
 
+# Tolerations applied to EVERY Beacon pod, alongside the nodeSelector. Needed when
+# the pinned node carries a taint (the cloud edge nodes are tainted
+# node-role.kubernetes.io/edge=true:NoSchedule). Empty for the LAN worker nodes.
+tolerations: []
+
 # ── Cluster control-plane monitoring (etcd / kube-apiserver) ─────────────────
 # OFF by default, and intended for exactly ONE release per cluster: control-plane
 # health is not per-tenant, so enabling it on every release would scrape the same
