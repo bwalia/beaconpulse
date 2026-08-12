@@ -12,6 +12,10 @@ env: int
 # ALWAYS overridden by the env values file, e.g. int.beaconpulse.net.
 host: int.beaconpulse.net
 
+# Additional hostnames served by the same Ingress (e.g. www alongside an apex).
+# Each entry also gets its CNAME upserted by the deploy workflow's dns job.
+extraHosts: []
+
 # ── Beacon application images (built + pushed by CI to the SpectonCR registry) ─
 # Full refs are composed as <registry>/<namespace>/<name>:<tag>, so the registry
 # host is stated exactly once and cannot drift between the three images.

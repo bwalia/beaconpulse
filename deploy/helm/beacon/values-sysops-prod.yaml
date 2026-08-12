@@ -4,6 +4,10 @@
 # See DEPLOY-A-BRAND.md. Mirrors values-prod.yaml, re-skinned for the SysOps brand.
 env: sysops-prod
 host: sysops247.com
+# www serves the same app as the apex (no redirect): Ingress host rule + TLS SAN
+# via the chart, CNAME via the dns job, edge vhost via the wslproxy job.
+extraHosts:
+  - www.sysops247.com
 
 app:
   beaconEnv: production
