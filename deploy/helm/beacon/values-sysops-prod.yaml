@@ -9,6 +9,16 @@ host: sysops247.com
 extraHosts:
   - www.sysops247.com
 
+# LOW-LATENCY PROD PLACEMENT — everything on cloud003, served by cloud003.
+# cloud003 is a public edge node (77.68.126.63) running traefik-edge on hostPort 80,
+# and the wslproxy sysops-prod-default rule backends straight to it: measured 14ms
+# edge->cloud003 vs ~3s edge->LAN NAT. Pinning ALL pods here (the chart applies this
+# to every component) keeps app<->db<->cache traffic node-local AND sidesteps the
+# broken cloud003<->LAN pod-network path — nothing prod needs lives off this node
+# (cluster DNS is node-local via the coredns-node DaemonSet; verified 10/10 sub-ms).
+nodeSelector:
+  kubernetes.io/hostname: cloud003
+
 app:
   beaconEnv: production
   logLevel: info

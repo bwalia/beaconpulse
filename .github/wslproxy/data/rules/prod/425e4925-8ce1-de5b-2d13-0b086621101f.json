@@ -44,7 +44,6 @@
     "host:rp.workstation.co.uk",
     "host:sentinel.diytaxreturn.co.uk",
     "host:spectoncr-grafana.diytaxreturn.co.uk",
-    "host:sysops247.com",
     "host:test-api.diytaxreturn.co.uk",
     "host:test-gatus.diytaxreturn.co.uk",
     "host:test-grafana.diytaxreturn.co.uk",
@@ -54,8 +53,7 @@
     "host:test-spectoncr.diytaxreturn.co.uk",
     "host:test.diytaxreturn.co.uk",
     "host:test.sysops247.com",
-    "host:vault.diytaxreturn.co.uk",
-    "host:www.sysops247.com"
+    "host:vault.diytaxreturn.co.uk"
   ],
   "priority": 1,
   "name": "aws-k3s1-ingress-klipper-80",
