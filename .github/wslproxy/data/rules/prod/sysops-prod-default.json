@@ -17,12 +17,12 @@
         "mode": "least_conn"
       },
       "is_consul": false,
-      "redirect_uri": "193.237.176.232:8888",
+      "redirect_uri": "77.68.126.63:80",
       "backends": [
         {
-          "address": "193.237.176.232:8888",
+          "address": "77.68.126.63:80",
           "weight": 100,
-          "label": "193.237.176.232:8888-origin"
+          "label": "cloud003-traefik-edge-origin"
         }
       ]
     },
@@ -33,9 +33,6 @@
     }
   },
   "servers": [
-    "host:int.sysops247.com",
-    "host:test.sysops247.com",
-    "host:acc.sysops247.com",
     "host:sysops247.com",
     "host:www.sysops247.com"
   ]
