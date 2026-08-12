@@ -54,7 +54,8 @@
     "host:test-spectoncr.diytaxreturn.co.uk",
     "host:test.diytaxreturn.co.uk",
     "host:test.sysops247.com",
-    "host:vault.diytaxreturn.co.uk"
+    "host:vault.diytaxreturn.co.uk",
+    "host:www.sysops247.com"
   ],
   "priority": 1,
   "name": "aws-k3s1-ingress-klipper-80",

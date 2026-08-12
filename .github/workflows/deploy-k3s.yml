@@ -115,22 +115,30 @@ jobs:
           fi
           [ -f "$VALUES" ] || { echo "::error::no values file '$VALUES' (brand='${BRAND}', env='${TARGET_ENV}')"; exit 1; }
 
-          # Single source of truth: whatever host the chart's Ingress claims.
+          # Single source of truth: whatever hosts the chart's Ingress claims —
+          # the primary `host:` plus any `extraHosts:` entries (e.g. www beside an apex).
           HOST="$(awk '/^host:/{print $2; exit}' "$VALUES")"
           [ -n "$HOST" ] || { echo "::error::no 'host:' in $VALUES"; exit 1; }
+          EXTRA_HOSTS="$(awk '/^extraHosts:/{f=1;next} f && /^[ ]*- /{print $2;next} f{exit}' "$VALUES")"
 
-          # The Cloudflare zone is the registrable apex (last two labels) of the host, so
-          # a brand on any domain works without hardcoding a zone. Beacon keeps its exact
-          # path — the known zone id is passed so no Zone:Read scope is needed for it.
-          ZONE="$(echo "$HOST" | awk -F. '{print $(NF-1)"."$NF}')"
-          export CLOUDFLARE_ZONE="$ZONE"
-          if [ "$ZONE" = "beaconpulse.net" ]; then export CLOUDFLARE_ZONE_ID="$BEACONPULSE_ZONE_ID"; fi
+          for H in $HOST $EXTRA_HOSTS; do
+            # The Cloudflare zone is the registrable apex (last two labels) of the host, so
+            # a brand on any domain works without hardcoding a zone. Beacon keeps its exact
+            # path — the known zone id is passed so no Zone:Read scope is needed for it.
+            ZONE="$(echo "$H" | awk -F. '{print $(NF-1)"."$NF}')"
+            export CLOUDFLARE_ZONE="$ZONE"
+            if [ "$ZONE" = "beaconpulse.net" ]; then
+              export CLOUDFLARE_ZONE_ID="$BEACONPULSE_ZONE_ID"
+            else
+              unset CLOUDFLARE_ZONE_ID
+            fi
 
-          echo "Ensuring ${HOST} (zone ${ZONE}) -> ${DNS_TARGET} (proxied=${DNS_PROXIED})"
-          ./deploy/scripts/cloudflare-dns.sh \
-            --name "$HOST" \
-            --content "$DNS_TARGET" \
-            --proxied "$DNS_PROXIED"
+            echo "Ensuring ${H} (zone ${ZONE}) -> ${DNS_TARGET} (proxied=${DNS_PROXIED})"
+            ./deploy/scripts/cloudflare-dns.sh \
+              --name "$H" \
+              --content "$DNS_TARGET" \
+              --proxied "$DNS_PROXIED"
+          done
 
   # DNS now resolves to the edge, so register the vhost + rule on the WSL Proxy
   # control plane BEFORE helm rolls the app — otherwise the hostname resolves to an

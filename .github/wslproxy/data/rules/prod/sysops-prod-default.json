@@ -36,6 +36,7 @@
     "host:int.sysops247.com",
     "host:test.sysops247.com",
     "host:acc.sysops247.com",
-    "host:sysops247.com"
+    "host:sysops247.com",
+    "host:www.sysops247.com"
   ]
 }

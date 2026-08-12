@@ -15,7 +15,8 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
-    - host: {{ .Values.host }}
+    {{- range prepend (.Values.extraHosts | default list) .Values.host }}
+    - host: {{ . }}
       http:
         paths:
           - path: /
@@ -25,10 +26,13 @@ spec:
                 name: {{ include "beacon.name" "nginx" }}
                 port:
                   number: 80
+    {{- end }}
   {{- if .Values.ingress.tls }}
   tls:
     - hosts:
-        - {{ .Values.host }}
+        {{- range prepend (.Values.extraHosts | default list) .Values.host }}
+        - {{ . }}
+        {{- end }}
       secretName: beacon-tls
   {{- end }}
 {{- end }}
