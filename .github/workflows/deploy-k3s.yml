@@ -309,11 +309,23 @@ jobs:
           if [ "$TARGET_ENV" = "prod" ]; then
             # prod: buildkit pushes to cloud001's NodePort through the SSH tunnel
             # (native amd64 on the self-hosted Linux runner — no emulation).
-            docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --push \
-              -f deploy/docker/Dockerfile.backend \
-              --build-arg BEACON_VERSION="$SHA" \
-              -t "$NS/api:$SHA" -t "$NS/api:latest" \
-              -t "$NS/worker:$SHA" -t "$NS/worker:latest" .
+            # Retried: blob PUTs ride the reliable tunnel, but the registry's token
+            # realm (https://spectoncr…/auth/token) rides the public path across the
+            # flaky LAN<->cloud hop and intermittently returns an HTML error page
+            # ("invalid character '<'"). Retries are near-free — the builder's layer
+            # cache means attempt N only redoes the token dance + push.
+            for attempt in 1 2 3 4 5; do
+              if docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --push \
+                -f deploy/docker/Dockerfile.backend \
+                --build-arg BEACON_VERSION="$SHA" \
+                -t "$NS/api:$SHA" -t "$NS/api:latest" \
+                -t "$NS/worker:$SHA" -t "$NS/worker:latest" .; then
+                break
+              fi
+              [ "$attempt" = 5 ] && { echo "::error::backend push failed after 5 attempts"; exit 1; }
+              echo "push attempt $attempt failed (flaky token endpoint?) — retrying in $((attempt*10))s"
+              sleep $((attempt*10))
+            done
           else
             # non-prod: --load a plain image, assert arch, then docker push to the public host.
             docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
@@ -353,13 +365,22 @@ jobs:
           # (/api/...) through the gateway. No CORS. amd64 is native on both runners
           # (ubuntu-latest for non-prod, the LAN Linux/X64 runner for prod).
           if [ "$TARGET_ENV" = "prod" ]; then
-            docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --push \
-              -f frontend/Dockerfile \
-              --build-arg NEXT_PUBLIC_API_BASE_URL="" \
-              --build-arg NEXT_PUBLIC_BRAND="$BRAND" \
-              --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
-              -t "$NS/$FE_SHA" -t "$NS/$FE_LATEST" \
-              ./frontend
+            # Retried for the same reason as the backend push: the token realm rides
+            # the flaky public path; the layer cache makes retries near-free.
+            for attempt in 1 2 3 4 5; do
+              if docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --push \
+                -f frontend/Dockerfile \
+                --build-arg NEXT_PUBLIC_API_BASE_URL="" \
+                --build-arg NEXT_PUBLIC_BRAND="$BRAND" \
+                --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
+                -t "$NS/$FE_SHA" -t "$NS/$FE_LATEST" \
+                ./frontend; then
+                break
+              fi
+              [ "$attempt" = 5 ] && { echo "::error::frontend push failed after 5 attempts"; exit 1; }
+              echo "push attempt $attempt failed (flaky token endpoint?) — retrying in $((attempt*10))s"
+              sleep $((attempt*10))
+            done
           else
             docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
               -f frontend/Dockerfile \
