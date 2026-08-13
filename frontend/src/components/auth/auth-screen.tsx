@@ -18,6 +18,7 @@ import {
   LockIcon,
 } from "@/components/icons";
 import { GoogleButton } from "@/components/auth/google-button";
+import { OpsapiButton } from "@/components/auth/opsapi-button";
 import { Spotlight } from "@/components/marketing/pointer";
 import { Button, Field } from "@/components/ui";
 import { ApiRequestError } from "@/lib/api";
@@ -234,6 +235,10 @@ const SELLING_POINTS = [
  * Switching tabs still animates client-side and rewrites the URL, so the
  * interaction is unchanged; only the entry point is now static.
  */
+// SSO is opt-in per deployment; when off, the OpsAPI button and its "or" divider
+// stay hidden. Mirrors the OpsapiButton self-hide so the two never disagree.
+const oidcEnabled = process.env.NEXT_PUBLIC_OIDC_ENABLED === "true";
+
 export function AuthScreen({ initialMode }: { initialMode: Mode }) {
   const t = useTranslations("auth");
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -362,12 +367,16 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
             ))}
           </div>
 
-          {/* "Continue with Google" sits above the form in both modes. Self-hides
-              when the brand has no googleClientId; the wrapper is gated on the same
-              value so the "or" divider never appears without a button above it. */}
-          {brand.googleClientId ? (
+          {/* Federated sign-in ("Continue with Google" / with OpsAPI) sits above the
+              form in both modes. Each button self-hides when unconfigured; the block
+              (and its "or" divider) only renders when at least one is available, so
+              the divider never appears without a button above it. */}
+          {brand.googleClientId || oidcEnabled ? (
             <div className="mt-8">
-              <GoogleButton />
+              <div className="flex flex-col items-stretch gap-3">
+                {brand.googleClientId ? <GoogleButton /> : null}
+                <OpsapiButton />
+              </div>
               <div className="mt-6 flex items-center gap-4" aria-hidden>
                 <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                 <span className="text-sm font-medium text-slate-500 dark:text-slate-400">or</span>
