@@ -24,7 +24,11 @@
 # BEACON_WEBHOOK_TOKEN and POSTGRES_PASSWORD before deploying.
 env: prod
 host: beaconpulse.net
-secretsSource: sealed
+# Production secrets come from wslvault via External Secrets Operator (NOT kubeseal).
+# ESO reads kv/beaconpulse/prod/config from the wslvault-backend ClusterSecretStore
+# and materialises the beacon-secrets Secret. Populate the vault with:
+#   deploy/scripts/vault-load-secrets.sh prod
+secretsSource: external
 
 app:
   beaconEnv: production

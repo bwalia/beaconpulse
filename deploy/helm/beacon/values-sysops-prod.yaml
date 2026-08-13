@@ -60,9 +60,12 @@ ingress:
 # sealed-secrets controller decrypts them in-namespace; the committed ciphertext is
 # safe. Regenerate with:  deploy/scripts/seal-secrets.sh sysops-prod
 # The deploy pipeline still copies the nebulacr-login PULL secret from `prod`, but it
-# only copies beacon-secrets for brands that use secretsSource: existing — so this
-# brand's dedicated secret is never overwritten.
-secretsSource: sealed
+# Production secrets come from wslvault via External Secrets Operator (NOT kubeseal).
+# ESO reads kv/beaconpulse/sysops-prod/config from the wslvault-backend
+# ClusterSecretStore. Populate the vault with:
+#   deploy/scripts/vault-load-secrets.sh sysops-prod
+# The deploy pipeline still copies only the nebulacr-login PULL secret for the brand.
+secretsSource: external
 
 image:
   registry: spectoncr.diytaxreturn.co.uk
