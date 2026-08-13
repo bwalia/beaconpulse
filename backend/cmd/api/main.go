@@ -21,15 +21,17 @@ import (
 	"beacon/internal/adapter/googleauth"
 	"beacon/internal/adapter/netprobe"
 	"beacon/internal/adapter/notifier"
+	"beacon/internal/adapter/oidcclient"
 	"beacon/internal/adapter/postgres"
 	"beacon/internal/adapter/promapi"
 	"beacon/internal/adapter/queue"
 	stripeadapter "beacon/internal/adapter/stripe"
 	"beacon/internal/config"
+	"beacon/internal/domain/apikey"
 	"beacon/internal/domain/audit"
 	"beacon/internal/domain/auth"
-	"beacon/internal/domain/apikey"
 	"beacon/internal/domain/billing"
+	"beacon/internal/domain/configsync"
 	"beacon/internal/domain/diagnose"
 	"beacon/internal/domain/heartbeat"
 	"beacon/internal/domain/insight"
@@ -38,7 +40,6 @@ import (
 	"beacon/internal/domain/notification"
 	"beacon/internal/domain/project"
 	"beacon/internal/domain/statuspage"
-	"beacon/internal/domain/configsync"
 	"beacon/internal/platform/cache"
 	"beacon/internal/platform/crypto"
 	"beacon/internal/platform/database"
@@ -219,6 +220,23 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		authSvc = authSvc.WithGoogle(googleauth.New(cfg.Google.ClientIDs))
 		log.Info("google sign-in enabled", "client_ids", len(cfg.Google.ClientIDs))
 	}
+	// "Sign in with <provider>" via generic OIDC (OpsAPI by default). Enabled only
+	// when the client credentials + endpoint URLs are configured; the routes are
+	// otherwise absent and the frontend hides the button.
+	var ssoHandler *rest.SSOHandler
+	if cfg.OIDC.Enabled() {
+		oidcCli := oidcclient.New(oidcclient.Config{
+			ClientID:     cfg.OIDC.ClientID,
+			ClientSecret: cfg.OIDC.ClientSecret,
+			AuthorizeURL: cfg.OIDC.AuthorizeURL,
+			TokenURL:     cfg.OIDC.TokenURL,
+			UserInfoURL:  cfg.OIDC.UserInfoURL,
+			RedirectURL:  cfg.OIDC.RedirectURL,
+			Scopes:       cfg.OIDC.Scopes,
+		})
+		ssoHandler = rest.NewSSOHandler(authSvc, oidcCli, rdb, cfg.OIDC.Provider, cfg.OIDC.PostLoginURL, cfg.IsProduction())
+		log.Info("OIDC sign-in enabled", "provider", cfg.OIDC.Provider)
+	}
 	projectSvc := project.NewService(projectRepo, syncEnqueuer, auditRec)
 	// Tenants choose monitor targets, and Blackbox probes them from inside the cluster,
 	// so where a target may point is a tenant-facing security boundary. Same address
@@ -259,6 +277,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Authenticator:      authn,
 		Health:             health,
 		Auth:               rest.NewAuthHandler(authSvc, validator, cfg.IsProduction()),
+		SSO:                ssoHandler,
 		Project:            rest.NewProjectHandler(projectSvc, validator, authn),
 		Monitor:            rest.NewMonitorHandler(monitorSvc, insightSvc, maintenanceSvc, validator, authn),
 		Notification:       rest.NewNotificationHandler(notifySvc, validator, authn),
