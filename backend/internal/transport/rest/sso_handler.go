@@ -3,6 +3,7 @@ package rest
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -86,12 +87,12 @@ func (h *SSOHandler) Start(w http.ResponseWriter, r *http.Request) {
 func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	if e := q.Get("error"); e != "" {
-		h.redirectError(w, r, e)
+		h.redirectError(w, r, e, nil)
 		return
 	}
 	code, state := q.Get("code"), q.Get("state")
 	if code == "" || state == "" {
-		h.redirectError(w, r, "invalid_request")
+		h.redirectError(w, r, "invalid_request", nil)
 		return
 	}
 
@@ -99,24 +100,24 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	// captured callback URL cannot be replayed.
 	verifier, err := h.rdb.GetDel(r.Context(), oidcStatePrefix+state).Result()
 	if err != nil || verifier == "" {
-		h.redirectError(w, r, "invalid_state")
+		h.redirectError(w, r, "invalid_state", err)
 		return
 	}
 
 	tok, err := h.client.Exchange(r.Context(), code, verifier)
 	if err != nil {
-		h.redirectError(w, r, "exchange_failed")
+		h.redirectError(w, r, "exchange_failed", err)
 		return
 	}
 	id, err := h.client.UserInfo(r.Context(), tok.AccessToken)
 	if err != nil {
-		h.redirectError(w, r, "userinfo_failed")
+		h.redirectError(w, r, "userinfo_failed", err)
 		return
 	}
 
-	res, err := h.svc.LoginWithOIDC(r.Context(), id.Email, id.Name, id.EmailVerified, h.provider, requestMeta(r))
+	res, err := h.svc.LoginWithOIDC(r.Context(), id.Subject, id.Email, id.Name, id.EmailVerified, h.provider, requestMeta(r))
 	if err != nil {
-		h.redirectError(w, r, "login_failed")
+		h.redirectError(w, r, "login_failed", err)
 		return
 	}
 
@@ -131,7 +132,12 @@ func (h *SSOHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, h.postLoginURL+"#"+frag.Encode(), http.StatusFound)
 }
 
-func (h *SSOHandler) redirectError(w http.ResponseWriter, r *http.Request, code string) {
+func (h *SSOHandler) redirectError(w http.ResponseWriter, r *http.Request, code string, cause error) {
+	// Log the real cause server-side; the browser only gets the coarse code
+	// (in the fragment), never the internal error.
+	if cause != nil {
+		slog.ErrorContext(r.Context(), "OIDC sign-in failed", "code", code, "err", cause.Error())
+	}
 	frag := url.Values{}
 	frag.Set("error", code)
 	http.Redirect(w, r, h.postLoginURL+"#"+frag.Encode(), http.StatusFound)

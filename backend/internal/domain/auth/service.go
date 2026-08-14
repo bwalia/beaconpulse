@@ -295,7 +295,7 @@ func (s *Service) registerGoogleUser(ctx context.Context, id *GoogleIdentity, em
 //
 // It is intentionally provider-agnostic so a second SSO provider needs no new
 // service code — only new transport wiring.
-func (s *Service) LoginWithOIDC(ctx context.Context, email, name string, emailVerified bool, provider string, meta RequestMeta) (*AuthResult, error) {
+func (s *Service) LoginWithOIDC(ctx context.Context, subject, email, name string, emailVerified bool, provider string, meta RequestMeta) (*AuthResult, error) {
 	if !emailVerified {
 		return nil, apperror.Forbidden("your " + provider + " account's email is not verified")
 	}
@@ -307,7 +307,7 @@ func (s *Service) LoginWithOIDC(ctx context.Context, email, name string, emailVe
 	user, err := s.users.GetUserByEmail(ctx, email)
 	if err != nil {
 		if apperror.IsCode(err, apperror.CodeNotFound) {
-			return s.registerOIDCUser(ctx, email, name, provider, meta)
+			return s.registerOIDCUser(ctx, subject, email, name, provider, meta)
 		}
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (s *Service) LoginWithOIDC(ctx context.Context, email, name string, emailVe
 
 // registerOIDCUser creates a fresh organization + owner for a first-time SSO
 // sign-in (no password), auto-naming the org from the person's name.
-func (s *Service) registerOIDCUser(ctx context.Context, email, name, provider string, meta RequestMeta) (*AuthResult, error) {
+func (s *Service) registerOIDCUser(ctx context.Context, subject, email, name, provider string, meta RequestMeta) (*AuthResult, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		name = localPart(email)
@@ -340,9 +340,12 @@ func (s *Service) registerOIDCUser(ctx context.Context, email, name, provider st
 	now := s.now().UTC()
 	org := &Organization{ID: uuid.New(), Name: orgName, Slug: orgSlug, CreatedAt: now, UpdatedAt: now}
 	owner := &User{
-		ID:        uuid.New(),
-		OrgID:     org.ID,
-		Email:     email,
+		ID:    uuid.New(),
+		OrgID: org.ID,
+		Email: email,
+		// The provider subject is this account's credential — no password, no
+		// Google. Satisfies ck_users_auth_method and links the identity.
+		OidcSub:   subject,
 		Name:      name,
 		Role:      RoleOwner,
 		IsActive:  true,
