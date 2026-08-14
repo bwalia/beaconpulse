@@ -50,11 +50,15 @@ func NewSSOHandler(svc *auth.Service, client *oidcclient.Client, rdb *redis.Clie
 // Routes mounts the SSO endpoints.
 func (h *SSOHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	// /start is a signup surface (a new email provisions an org), so it carries the
-	// tighter signup limit — the same reasoning as /auth/google.
-	r.With(middleware.RateLimit(signupLimiter, middleware.ByIP, time.Minute)).
+	// /start only INITIATES the flow (mint state + redirect) — it provisions
+	// nothing, and clicking "sign in" a few times is normal, so it takes the
+	// login-tier limit rather than the signup one.
+	r.With(middleware.RateLimit(loginLimiter, middleware.ByIP, 30*time.Second)).
 		Get("/start", h.Start)
-	r.Get("/callback", h.Callback)
+	// /callback is where a first-time email PROVISIONS an org (permanent recurring
+	// cost), so it carries the tighter signup limit — same reasoning as /auth/google.
+	r.With(middleware.RateLimit(signupLimiter, middleware.ByIP, time.Minute)).
+		Get("/callback", h.Callback)
 	return r
 }
 
