@@ -34,6 +34,17 @@ x-backend-env: &backend-env
   # "Sign in with Google": the OAuth 2.0 client id whose ID tokens the API accepts.
   # Set BEACON_GOOGLE_CLIENT_ID in deploy/.env to enable it (empty = disabled).
   BEACON_GOOGLE_CLIENT_ID: ${BEACON_GOOGLE_CLIENT_ID:-}
+  # "Continue with OpsAPI" (generic OIDC). All of client id/secret + the three URLs
+  # must be set to enable the flow (empty = disabled). See deploy/.env.example.
+  BEACON_OIDC_PROVIDER: ${BEACON_OIDC_PROVIDER:-OpsAPI}
+  BEACON_OIDC_CLIENT_ID: ${BEACON_OIDC_CLIENT_ID:-}
+  BEACON_OIDC_CLIENT_SECRET: ${BEACON_OIDC_CLIENT_SECRET:-}
+  BEACON_OIDC_AUTHORIZE_URL: ${BEACON_OIDC_AUTHORIZE_URL:-}
+  BEACON_OIDC_TOKEN_URL: ${BEACON_OIDC_TOKEN_URL:-}
+  BEACON_OIDC_USERINFO_URL: ${BEACON_OIDC_USERINFO_URL:-}
+  BEACON_OIDC_REDIRECT_URL: ${BEACON_OIDC_REDIRECT_URL:-}
+  BEACON_OIDC_POST_LOGIN_URL: ${BEACON_OIDC_POST_LOGIN_URL:-}
+  BEACON_OIDC_SCOPES: ${BEACON_OIDC_SCOPES:-openid,profile,email,offline_access}
   # Must match the credentials in deploy/alertmanager/alertmanager.yml.
   BEACON_WEBHOOK_TOKEN: beacon-dev-webhook-token
   # Base URL used for "open dashboard" links in notification messages.
@@ -206,6 +217,11 @@ services:
         # Same client id as the API above, baked into the bundle so the "Continue with
         # Google" button appears. One value in deploy/.env drives both sides.
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${BEACON_GOOGLE_CLIENT_ID:-}
+        # "Continue with OpsAPI" — set NEXT_PUBLIC_OIDC_ENABLED=true in deploy/.env to
+        # show the button (baked at build). The backend BEACON_OIDC_* below must also
+        # be set for the flow to work.
+        NEXT_PUBLIC_OIDC_ENABLED: ${NEXT_PUBLIC_OIDC_ENABLED:-}
+        NEXT_PUBLIC_OIDC_PROVIDER: ${NEXT_PUBLIC_OIDC_PROVIDER:-OpsAPI}
     environment:
       # Server-side only. The status page is rendered on the server, which cannot
       # use the empty same-origin base above — it needs a real host to fetch from.
