@@ -24,7 +24,11 @@
 # BEACON_WEBHOOK_TOKEN and POSTGRES_PASSWORD before deploying.
 env: prod
 host: beaconpulse.net
-secretsSource: sealed
+# Production secrets come from wslvault via External Secrets Operator (NOT kubeseal).
+# ESO reads kv/beaconpulse/prod/config from the wslvault-backend ClusterSecretStore
+# and materialises the beacon-secrets Secret. Populate the vault with:
+#   deploy/scripts/vault-load-secrets.sh prod
+secretsSource: external
 
 app:
   beaconEnv: production
@@ -64,15 +68,13 @@ ingress:
 
 # Images for this environment live on its own SpectonCR host.
 image:
-  registry: spectoncr.diytaxreturn.co.uk
-  # Same arrangement as int: the namespace already carries a `nebulacr-login`
-  # dockerconfigjson whose auth covers spectoncr.diytaxreturn.co.uk,
-  # so the chart references it rather than minting a second copy of the same
-  # registry credentials. One place to rotate, and no registry password in this
-  # repo's sealed files at all.
-  #
-  # The chart does NOT own this secret. If it is ever absent from the namespace, or
-  # its auth stops covering this host, the symptom is ImagePullBackOff on every pod
-  # rather than a failed deploy — helm has nothing to check here.
-  pullSecret: nebulacr-login
+  # Prod images route through int-spectoncr: the prod registry (spectoncr) lives on
+  # cloud nodes whose network drops ~1/3 of connections, so pushing there is
+  # unreliable. int-spectoncr is LAN-hosted and rock-solid, same registry family.
+  # The deploy job copies int's pull credentials into this namespace as
+  # `beacon-registry-pull` (never touching the shared prod/nebulacr-login).
+  # Revert both this host and the workflow's prod resolution to spectoncr once the
+  # cloud-node network is healthy.
+  registry: int-spectoncr.diytaxreturn.co.uk
+  pullSecret: beacon-registry-pull
   pullSecretCreate: false

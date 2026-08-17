@@ -146,11 +146,12 @@ secretsSource: external
 
 externalSecret:
   refreshInterval: "1m"
-  storeName: vault-backend
+  # wslvault's HashiCorp-KV-v2-compatible mount, via the existing ClusterSecretStore
+  # (spec.provider.vault.path=kv). The store's `path: kv` already names the mount, so
+  # the key here is mount-relative: <prefix>/<env>/<suffix> -> GET /v1/kv/data/beaconpulse/<env>/config.
+  storeName: wslvault-backend
   storeKind: ClusterSecretStore
-  # Vault path — STANDALONE beaconpulse project, not under diytaxreturn.
-  # {{ .Values.env }} is appended: secret/beaconpulse/<env>/config.
-  vaultKeyPrefix: secret/beaconpulse
+  vaultKeyPrefix: beaconpulse
   vaultKeySuffix: config
 
 # Only used when secretsSource=plain (local testing without Vault/sealed).
