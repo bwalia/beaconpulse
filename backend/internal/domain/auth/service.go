@@ -286,6 +286,87 @@ func (s *Service) registerGoogleUser(ctx context.Context, id *GoogleIdentity, em
 	return result, nil
 }
 
+// LoginWithOIDC signs a user in from an external OIDC identity that the transport
+// layer already obtained via the Authorization-Code flow + UserInfo (see
+// internal/adapter/oidcclient). It creates an org + owner on first sight of the
+// email — the same provisioning as Google sign-in, minus the provider-specific
+// subject link (the trusted provider asserts a verified email, which is the join
+// key). `provider` is a display/audit label ("OpsAPI").
+//
+// It is intentionally provider-agnostic so a second SSO provider needs no new
+// service code — only new transport wiring.
+func (s *Service) LoginWithOIDC(ctx context.Context, subject, email, name string, emailVerified bool, provider string, meta RequestMeta) (*AuthResult, error) {
+	if !emailVerified {
+		return nil, apperror.Forbidden("your " + provider + " account's email is not verified")
+	}
+	email = normalizeEmail(email)
+	if email == "" {
+		return nil, apperror.Unauthorized(provider + " did not return an email address")
+	}
+
+	user, err := s.users.GetUserByEmail(ctx, email)
+	if err != nil {
+		if apperror.IsCode(err, apperror.CodeNotFound) {
+			return s.registerOIDCUser(ctx, subject, email, name, provider, meta)
+		}
+		return nil, err
+	}
+	if !user.IsActive {
+		return nil, apperror.Forbidden("this account has been deactivated")
+	}
+
+	result, err := s.issueTokens(ctx, user, meta)
+	if err != nil {
+		return nil, err
+	}
+	_ = s.users.TouchLastLogin(ctx, user.ID) // non-fatal
+	s.audit(ctx, user, audit.ActionUserLogin, "user", user.ID.String(), meta, map[string]any{"via": provider})
+	return result, nil
+}
+
+// registerOIDCUser creates a fresh organization + owner for a first-time SSO
+// sign-in (no password), auto-naming the org from the person's name.
+func (s *Service) registerOIDCUser(ctx context.Context, subject, email, name, provider string, meta RequestMeta) (*AuthResult, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = localPart(email)
+	}
+	orgName := deriveOrgName(name)
+
+	orgSlug, err := s.uniqueOrgSlug(ctx, orgName)
+	if err != nil {
+		return nil, err
+	}
+	now := s.now().UTC()
+	org := &Organization{ID: uuid.New(), Name: orgName, Slug: orgSlug, CreatedAt: now, UpdatedAt: now}
+	owner := &User{
+		ID:    uuid.New(),
+		OrgID: org.ID,
+		Email: email,
+		// The provider subject is this account's credential — no password, no
+		// Google. Satisfies ck_users_auth_method and links the identity.
+		OidcSub:   subject,
+		Name:      name,
+		Role:      RoleOwner,
+		IsActive:  true,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := s.users.CreateOrgAndOwner(ctx, org, owner); err != nil {
+		return nil, err // conflict apperror on a racing duplicate email
+	}
+	result, err := s.issueTokens(ctx, owner, meta)
+	if err != nil {
+		return nil, err
+	}
+	s.audit(ctx, owner, audit.ActionUserRegistered, "user", owner.ID.String(), meta, map[string]any{
+		"org_id": org.ID.String(),
+		"email":  owner.Email,
+		"via":    provider,
+	})
+	return result, nil
+}
+
 // Refresh rotates a refresh token: the presented token is revoked and a new
 // access/refresh pair is issued. Reusing a revoked or expired token fails.
 func (s *Service) Refresh(ctx context.Context, refreshPlaintext string, meta RequestMeta) (*AuthResult, error) {

@@ -21,6 +21,12 @@ ENV NEXT_PUBLIC_BRAND=$NEXT_PUBLIC_BRAND
 # brand (handy for local dev and single-brand deploys).
 ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=""
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
+# "Continue with OpsAPI" (generic OIDC SSO) — baked into the bundle. Must be the
+# string "true" to show the button; the label is cosmetic. Empty = button hidden.
+ARG NEXT_PUBLIC_OIDC_ENABLED=""
+ENV NEXT_PUBLIC_OIDC_ENABLED=$NEXT_PUBLIC_OIDC_ENABLED
+ARG NEXT_PUBLIC_OIDC_PROVIDER="OpsAPI"
+ENV NEXT_PUBLIC_OIDC_PROVIDER=$NEXT_PUBLIC_OIDC_PROVIDER
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

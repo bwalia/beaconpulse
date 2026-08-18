@@ -61,7 +61,10 @@ type User struct {
 	PasswordHash string
 	// GoogleSub is the stable Google (OIDC) subject id when the account is linked to
 	// Google, else empty. Unique across accounts.
-	GoogleSub    string
+	GoogleSub string
+	// OidcSub is the stable subject id from a generic OIDC provider (e.g. OpsAPI)
+	// when the account authenticates that way, else empty. Unique across accounts.
+	OidcSub      string
 	Name         string
 	Role         Role
 	IsActive     bool

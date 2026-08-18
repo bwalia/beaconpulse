@@ -10,8 +10,8 @@ import (
 
 	"beacon/internal/platform/apperror"
 	"beacon/internal/platform/httpx"
-	"beacon/internal/platform/ratelimit"
 	"beacon/internal/platform/metrics"
+	"beacon/internal/platform/ratelimit"
 	"beacon/internal/transport/rest/middleware"
 )
 
@@ -24,8 +24,11 @@ type RouterDeps struct {
 	CORSOrigins   []string
 	Authenticator *middleware.Authenticator
 
-	Health             *HealthHandler
-	Auth               *AuthHandler
+	Health *HealthHandler
+	Auth   *AuthHandler
+	// SSO may be nil when OIDC single sign-on is not configured; the routes are
+	// then not mounted and the frontend hides the button.
+	SSO                *SSOHandler
 	Project            *ProjectHandler
 	Monitor            *MonitorHandler
 	Notification       *NotificationHandler
@@ -36,10 +39,12 @@ type RouterDeps struct {
 	StatusPage         *StatusPageHandler
 	Heartbeat          *HeartbeatHandler
 	StatusPageSettings *StatusPageSettingsHandler
+	// Settings is the platform-global admin surface (pricing, limits, premium access).
+	Settings *SettingsHandler
 	// Diagnose may be nil when AI is not configured; the route is then not mounted.
-	Diagnose           *DiagnoseHandler
-	APIKey             *APIKeyHandler
-	Sync               *SyncHandler
+	Diagnose *DiagnoseHandler
+	APIKey   *APIKeyHandler
+	Sync     *SyncHandler
 }
 
 // NewRouter builds the fully-wired HTTP handler: middleware chain, operational
@@ -124,6 +129,11 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Mount("/ping", d.Heartbeat.Routes())
 
 		api.Mount("/auth", d.Auth.Routes())
+		// "Sign in with <provider>" (OIDC). Mounted as a sibling of /auth only
+		// when configured — absent otherwise. Unauthenticated (it IS the login).
+		if d.SSO != nil {
+			api.Mount("/auth/oidc", d.SSO.Routes())
+		}
 		api.With(d.Authenticator.Require).Get("/me", d.Auth.Me)
 		// Gateway auth_request target: validates the proxy cookie and returns the
 		// tenant org id. Unauthenticated (does its own cookie check).
@@ -146,6 +156,9 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Mount("/billing", d.Billing.Routes())
 		// Owner-facing controls for the public page above (publish / rename).
 		api.Mount("/status-page", d.StatusPageSettings.Routes())
+		// Platform-global settings (pricing, limits, premium access). Platform-operator
+		// gated inside the handler — never a per-tenant control.
+		api.Mount("/settings", d.Settings.Routes())
 		// Machine surface. /api-keys is session-only (a key must not mint keys);
 		// /sync is the declarative endpoint CI calls, and accepts either credential.
 		api.Mount("/api-keys", d.APIKey.Routes())

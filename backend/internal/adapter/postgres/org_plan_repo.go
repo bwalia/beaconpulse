@@ -32,14 +32,21 @@ var _ monitor.OrgPlanReader = (*OrgPlanRepository)(nil)
 // Free's limits. A missing org surfaces as not-found.
 func (r *OrgPlanRepository) Plan(ctx context.Context, orgID uuid.UUID) (plan.Plan, error) {
 	var (
-		p      string
-		status *string
-		credit int64
+		p          string
+		status     *string
+		credit     int64
+		ownerEmail string
 	)
 	err := r.pool.QueryRow(ctx,
-		`SELECT plan, subscription_status, credit_seconds
-		   FROM organizations WHERE id = $1 AND deleted_at IS NULL`, orgID,
-	).Scan(&p, &status, &credit)
+		`SELECT o.plan, o.subscription_status, o.credit_seconds, COALESCE(ow.email, '')
+		   FROM organizations o
+		   LEFT JOIN LATERAL (
+		       SELECT email FROM users
+		        WHERE org_id = o.id AND role = 'owner' AND deleted_at IS NULL
+		        ORDER BY created_at LIMIT 1
+		   ) ow ON true
+		  WHERE o.id = $1 AND o.deleted_at IS NULL`, orgID,
+	).Scan(&p, &status, &credit, &ownerEmail)
 	if err != nil {
 		if isNoRows(err) {
 			return "", apperror.NotFound("organization not found")
@@ -47,5 +54,5 @@ func (r *OrgPlanRepository) Plan(ctx context.Context, orgID uuid.UUID) (plan.Pla
 		return "", apperror.Internal(fmt.Errorf("read org plan: %w", err))
 	}
 	subActive := status != nil && (*status == "active" || *status == "trialing")
-	return plan.Effective(plan.Plan(p), subActive, credit), nil
+	return plan.Resolve(plan.Plan(p), subActive, credit, ownerEmail), nil
 }

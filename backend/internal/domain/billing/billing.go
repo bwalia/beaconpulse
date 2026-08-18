@@ -48,6 +48,9 @@ type State struct {
 	StripeCustomerID   string
 	// CreditSeconds is the remaining pay-as-you-go balance, in monitor-seconds.
 	CreditSeconds int64
+	// OwnerEmail is the org owner's address, checked against the premium allowlist so
+	// a granted account reads as Pro on the billing page just as it does in enforcement.
+	OwnerEmail string
 }
 
 // SubscriptionActive reports whether a paid subscription currently grants its tier.
@@ -57,7 +60,7 @@ func (s State) SubscriptionActive() bool {
 
 // Effective is the plan whose limits actually apply right now.
 func (s State) Effective() plan.Plan {
-	return plan.Effective(s.Plan, s.SubscriptionActive(), s.CreditSeconds)
+	return plan.Resolve(s.Plan, s.SubscriptionActive(), s.CreditSeconds, s.OwnerEmail)
 }
 
 // Actor is the authenticated caller.
@@ -122,26 +125,23 @@ type TopUpInput struct {
 
 // Service implements billing use cases.
 type Service struct {
-	repo                  Repository
-	pay                   Payments // nil when Stripe is not configured
-	auditlog              audit.Recorder
-	monitorHoursPerDollar int
+	repo     Repository
+	pay      Payments // nil when Stripe is not configured
+	auditlog audit.Recorder
 }
 
 // NewService wires the billing service. pay may be nil (Stripe disabled), in which
-// case the checkout methods return a clear "not configured" error.
-func NewService(repo Repository, pay Payments, auditlog audit.Recorder, monitorHoursPerDollar int) *Service {
-	if monitorHoursPerDollar <= 0 {
-		monitorHoursPerDollar = 5
-	}
-	return &Service{repo: repo, pay: pay, auditlog: auditlog, monitorHoursPerDollar: monitorHoursPerDollar}
+// case the checkout methods return a clear "not configured" error. The pay-as-you-go
+// rate is read live from the plan package (operator-tunable), not fixed here.
+func NewService(repo Repository, pay Payments, auditlog audit.Recorder) *Service {
+	return &Service{repo: repo, pay: pay, auditlog: auditlog}
 }
 
 // Catalog returns the subscribable plans for the pricing UI.
 func (s *Service) Catalog() []plan.Info { return plan.Catalog() }
 
-// MonitorHoursPerDollar exposes the pay-as-you-go rate for the UI.
-func (s *Service) MonitorHoursPerDollar() int { return s.monitorHoursPerDollar }
+// MonitorHoursPerDollar exposes the live pay-as-you-go rate for the UI.
+func (s *Service) MonitorHoursPerDollar() int { return plan.HoursPerDollar() }
 
 // Enabled reports whether Stripe is wired up.
 func (s *Service) Enabled() bool { return s.pay != nil }
@@ -316,7 +316,7 @@ func (s *Service) ApplyWebhook(ctx context.Context, ev WebhookEvent) (bool, erro
 		if ev.OrgID == uuid.Nil {
 			return false, nil // no org to credit; ignore rather than error a webhook
 		}
-		addSeconds := ev.AmountCents * int64(s.monitorHoursPerDollar) * 3600 / 100
+		addSeconds := ev.AmountCents * int64(plan.HoursPerDollar()) * 3600 / 100
 		applied, err := s.repo.ApplyTopUp(ctx, ev.OrgID, addSeconds, ev.AmountCents, ev.ID)
 		if err != nil {
 			return false, err

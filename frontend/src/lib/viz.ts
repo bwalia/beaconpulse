@@ -91,6 +91,17 @@ export function fullStamp(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
+/** Compact "just now / 30s / 5m / 2h / 3d ago" from an ISO stamp. Called during
+ *  render on a live-polling page, so it refreshes on the next poll. */
+export function timeAgo(iso: string): string {
+  const secs = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (secs < 5) return "just now";
+  if (secs < 60) return `${Math.floor(secs)}s ago`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
+
 /** Compact duration, e.g. 75s / 8m / 3.5h / 15h. */
 export function humanDuration(seconds: number): string {
   if (seconds < 90) return `${Math.round(seconds)}s`;

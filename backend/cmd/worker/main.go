@@ -27,6 +27,8 @@ import (
 	"beacon/internal/config"
 	"beacon/internal/domain/audit"
 	"beacon/internal/domain/billing"
+	"beacon/internal/domain/plan"
+	"beacon/internal/domain/settings"
 	"beacon/internal/platform/cache"
 	"beacon/internal/platform/database"
 	"beacon/internal/platform/logger"
@@ -98,12 +100,23 @@ func run() error {
 			WebhookSecret: cfg.Billing.StripeWebhookSecret,
 		})
 	}
-	billingSvc := billing.NewService(
-		billingRepo,
-		payments,
-		audit.NewRecorder(postgres.NewAuditRepository(pool)),
-		cfg.Billing.MonitorHoursPerDollar,
-	)
+	auditRec := audit.NewRecorder(postgres.NewAuditRepository(pool))
+	billingSvc := billing.NewService(billingRepo, payments, auditRec)
+
+	// Platform settings: the worker enforces the same operator-tuned limits and rate
+	// as the API (control-plane cap, pay-as-you-go meter). Apply the env baseline, then
+	// load whatever the operator has saved; a scheduled task below re-reads it so live
+	// edits made through the API reach this process too.
+	settingsSvc := settings.NewService(postgres.NewSettingsRepository(pool), auditRec, cfg.PlatformAdminEmails)
+	// Platform operators get Pro automatically; the worker enforces the control-plane
+	// cap, so it needs the same admin list.
+	plan.SetAdmins(cfg.PlatformAdminEmails)
+	base := plan.DefaultConfig()
+	base.HoursPerDollar = cfg.Billing.MonitorHoursPerDollar
+	plan.Apply(base)
+	if err := settingsSvc.Reload(ctx); err != nil {
+		log.Warn("platform settings load failed; using built-in defaults", slog.Any("err", err))
+	}
 	reloader := controlplane.NewReloader(cfg.CtrlPlane.PromReloadURL, cfg.CtrlPlane.BlackboxReloadURL)
 	syncer := controlplane.NewSyncer(
 		monitorRepo,
@@ -191,6 +204,14 @@ func run() error {
 				}
 				return nil
 			},
+		},
+		worker.Task{
+			// Re-read platform settings so pricing/limit/grant edits made live through
+			// the API reach this process, which enforces the monitor cap and the
+			// pay-as-you-go rate. Cheap: one row read.
+			Name:     "platform-settings-reload",
+			Interval: 30 * time.Second,
+			Run:      func(ctx context.Context) error { return settingsSvc.Reload(ctx) },
 		},
 		worker.Task{
 			Name:     "expired-token-cleanup",

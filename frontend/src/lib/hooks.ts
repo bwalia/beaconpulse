@@ -18,6 +18,7 @@ import type {
   MonitorMetrics,
   NotificationChannel,
   Overview,
+  PlatformSettings,
   Project,
   StatusPageSettings,
   SystemInfo,
@@ -325,6 +326,45 @@ export function useMonitorMetrics(id: string | null) {
     queryFn: () => api.get<MonitorMetrics>(`/api/v1/monitors/${id}/metrics`),
     enabled: !!id,
     ...live(30_000),
+  });
+}
+
+// ---- Platform settings (operator-only) ----
+
+// usePlatformSettings reads the global pricing/limits/premium config. 403s for
+// non-operators, so it never retries — the page shows a clear "not authorized" state
+// instead of hammering the endpoint.
+export function usePlatformSettings(enabled = true) {
+  return useQuery({
+    queryKey: ["platform-settings"],
+    queryFn: () => api.get<PlatformSettings>("/api/v1/settings"),
+    enabled,
+    retry: false,
+  });
+}
+
+export interface UpdatePlatformSettingsInput {
+  monitor_hours_per_dollar: number;
+  plans: Array<{
+    plan: string;
+    price_monthly: number;
+    max_monitors: number;
+    min_interval_seconds: number;
+    monthly_diagnoses: number;
+  }>;
+  premium_grants: string[];
+}
+
+export function useUpdatePlatformSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdatePlatformSettingsInput) => api.put<PlatformSettings>("/api/v1/settings", input),
+    onSuccess: (data) => {
+      qc.setQueryData(["platform-settings"], data);
+      // Pricing/limits just changed, so the billing catalog everyone else reads is
+      // now stale — refetch it.
+      qc.invalidateQueries({ queryKey: ["billing"] });
+    },
   });
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"beacon/internal/domain/auth"
+	"beacon/internal/platform/emailmatch"
 	"beacon/internal/platform/httpx"
 	"beacon/internal/transport/rest/middleware"
 	"beacon/internal/platform/validate"
@@ -17,15 +18,17 @@ const proxyCookieName = "beacon_proxy"
 
 // AuthHandler exposes the authentication endpoints.
 type AuthHandler struct {
-	svc           *auth.Service
-	validator     *validate.Validator
-	secureCookies bool
+	svc            *auth.Service
+	validator      *validate.Validator
+	secureCookies  bool
+	platformAdmins []string // emails/domains flagged is_platform_admin to the client
 }
 
 // NewAuthHandler builds an AuthHandler. secureCookies marks the proxy cookie
-// Secure (set true behind HTTPS / in production).
-func NewAuthHandler(svc *auth.Service, v *validate.Validator, secureCookies bool) *AuthHandler {
-	return &AuthHandler{svc: svc, validator: v, secureCookies: secureCookies}
+// Secure (set true behind HTTPS / in production). platformAdmins is the operator
+// allowlist, surfaced to the client so it can show the platform-settings screen.
+func NewAuthHandler(svc *auth.Service, v *validate.Validator, secureCookies bool, platformAdmins []string) *AuthHandler {
+	return &AuthHandler{svc: svc, validator: v, secureCookies: secureCookies, platformAdmins: emailmatch.Normalize(platformAdmins)}
 }
 
 // setProxyCookie stores the gateway proxy-session token as an httpOnly cookie so
@@ -145,31 +148,35 @@ type userResponse struct {
 	Role         string     `json:"role"`
 	IsActive     bool       `json:"is_active"`
 	TwoFAEnabled bool       `json:"twofa_enabled"`
-	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
+	// IsPlatformAdmin is true for operator accounts that may edit platform-global
+	// settings (pricing, limits, premium access). Org role is separate from this.
+	IsPlatformAdmin bool       `json:"is_platform_admin"`
+	LastLoginAt     *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
-func presentUser(u *auth.User) userResponse {
+func (h *AuthHandler) presentUser(u *auth.User) userResponse {
 	return userResponse{
-		ID:           u.ID.String(),
-		OrgID:        u.OrgID.String(),
-		Email:        u.Email,
-		Name:         u.Name,
-		Role:         string(u.Role),
-		IsActive:     u.IsActive,
-		TwoFAEnabled: u.TwoFAEnabled,
-		LastLoginAt:  u.LastLoginAt,
-		CreatedAt:    u.CreatedAt,
+		ID:              u.ID.String(),
+		OrgID:           u.OrgID.String(),
+		Email:           u.Email,
+		Name:            u.Name,
+		Role:            string(u.Role),
+		IsActive:        u.IsActive,
+		TwoFAEnabled:    u.TwoFAEnabled,
+		IsPlatformAdmin: emailmatch.Match(h.platformAdmins, u.Email),
+		LastLoginAt:     u.LastLoginAt,
+		CreatedAt:       u.CreatedAt,
 	}
 }
 
-func presentAuth(res *auth.AuthResult) authResponse {
+func (h *AuthHandler) presentAuth(res *auth.AuthResult) authResponse {
 	return authResponse{
 		AccessToken:  res.AccessToken,
 		RefreshToken: res.RefreshToken,
 		TokenType:    res.TokenType,
 		ExpiresIn:    res.ExpiresIn,
-		User:         presentUser(res.User),
+		User:         h.presentUser(res.User),
 	}
 }
 
@@ -196,7 +203,7 @@ func (h *AuthHandler) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.setProxyCookie(w, res.ProxyToken)
-	httpx.Created(w, presentAuth(res))
+	httpx.Created(w, h.presentAuth(res))
 }
 
 func (h *AuthHandler) login(w http.ResponseWriter, r *http.Request) {
@@ -215,7 +222,7 @@ func (h *AuthHandler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.setProxyCookie(w, res.ProxyToken)
-	httpx.OK(w, presentAuth(res))
+	httpx.OK(w, h.presentAuth(res))
 }
 
 // google signs a user in from a Google ID token, creating an org + owner on first
@@ -236,7 +243,7 @@ func (h *AuthHandler) google(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.setProxyCookie(w, res.ProxyToken)
-	httpx.OK(w, presentAuth(res))
+	httpx.OK(w, h.presentAuth(res))
 }
 
 func (h *AuthHandler) refresh(w http.ResponseWriter, r *http.Request) {
@@ -255,7 +262,7 @@ func (h *AuthHandler) refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.setProxyCookie(w, res.ProxyToken)
-	httpx.OK(w, presentAuth(res))
+	httpx.OK(w, h.presentAuth(res))
 }
 
 func (h *AuthHandler) logout(w http.ResponseWriter, r *http.Request) {
@@ -284,5 +291,5 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, err)
 		return
 	}
-	httpx.OK(w, presentUser(user))
+	httpx.OK(w, h.presentUser(user))
 }

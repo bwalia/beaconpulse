@@ -114,7 +114,7 @@ func TestEffectivePlan(t *testing.T) {
 
 func TestApplyWebhook_TopUpCreditsMonitorSeconds(t *testing.T) {
 	repo := newFakeRepo(State{})
-	svc := NewService(repo, &fakePay{}, noopRecorder{}, 5) // $1 = 5 monitor-hours
+	svc := NewService(repo, &fakePay{}, noopRecorder{}) // $1 = 5 monitor-hours
 	org := uuid.New()
 
 	// $2.00 → 2 × 5 × 3600 = 36000 monitor-seconds.
@@ -143,7 +143,7 @@ func TestApplyWebhook_TopUpCreditsMonitorSeconds(t *testing.T) {
 }
 
 func TestStartTopUp_RejectsBelowMinimumAndNonAdmin(t *testing.T) {
-	svc := NewService(newFakeRepo(State{}), &fakePay{}, noopRecorder{}, 5)
+	svc := NewService(newFakeRepo(State{}), &fakePay{}, noopRecorder{})
 
 	if _, err := svc.StartTopUp(context.Background(), admin(), 50); !apperror.IsCode(err, apperror.CodeValidation) {
 		t.Fatalf("expected validation for < $1, got %v", err)
@@ -155,7 +155,7 @@ func TestStartTopUp_RejectsBelowMinimumAndNonAdmin(t *testing.T) {
 }
 
 func TestBilling_DisabledWithoutStripe(t *testing.T) {
-	svc := NewService(newFakeRepo(State{}), nil, noopRecorder{}, 5) // no payments
+	svc := NewService(newFakeRepo(State{}), nil, noopRecorder{}) // no payments
 	if svc.Enabled() {
 		t.Fatal("Enabled() should be false without a payment provider")
 	}
@@ -165,7 +165,7 @@ func TestBilling_DisabledWithoutStripe(t *testing.T) {
 }
 
 func TestCatalogHasThreePlans(t *testing.T) {
-	svc := NewService(newFakeRepo(State{}), nil, noopRecorder{}, 5)
+	svc := NewService(newFakeRepo(State{}), nil, noopRecorder{})
 	if len(svc.Catalog()) != 3 {
 		t.Fatalf("expected 3 plans, got %d", len(svc.Catalog()))
 	}
@@ -181,7 +181,7 @@ func TestReconcile_CreditsAPaymentTheWebhookNeverDelivered(t *testing.T) {
 	pay := &fakePay{undelivered: []WebhookEvent{
 		{ID: "evt_lost", Kind: KindTopUp, OrgID: org, AmountCents: 500}, // $5
 	}}
-	svc := NewService(repo, pay, noopRecorder{}, 5) // $1 = 5 monitor-hours
+	svc := NewService(repo, pay, noopRecorder{}) // $1 = 5 monitor-hours
 
 	repaired, err := svc.Reconcile(context.Background(), time.Now().Add(-72*time.Hour))
 	if err != nil {
@@ -205,7 +205,7 @@ func TestReconcile_DoesNotDoubleCreditADeliveredPayment(t *testing.T) {
 	org := uuid.New()
 	ev := WebhookEvent{ID: "evt_dup", Kind: KindTopUp, OrgID: org, AmountCents: 500}
 	pay := &fakePay{undelivered: []WebhookEvent{ev}}
-	svc := NewService(repo, pay, noopRecorder{}, 5)
+	svc := NewService(repo, pay, noopRecorder{})
 
 	// The webhook arrives first and credits.
 	if _, err := svc.ApplyWebhook(context.Background(), ev); err != nil {
@@ -246,7 +246,7 @@ func TestReconcile_SurvivesOneBadEvent(t *testing.T) {
 		{ID: "evt_no_org", Kind: KindTopUp, OrgID: uuid.Nil, AmountCents: 500}, // unattributable
 		{ID: "evt_good", Kind: KindTopUp, OrgID: good, AmountCents: 500},
 	}}
-	svc := NewService(repo, pay, noopRecorder{}, 5)
+	svc := NewService(repo, pay, noopRecorder{})
 
 	repaired, err := svc.Reconcile(context.Background(), time.Now().Add(-72*time.Hour))
 	if err != nil {
@@ -263,7 +263,7 @@ func TestReconcile_SurvivesOneBadEvent(t *testing.T) {
 // TestReconcile_NoopWithoutStripe — a deployment that sells nothing must still boot
 // and run every other worker task.
 func TestReconcile_NoopWithoutStripe(t *testing.T) {
-	svc := NewService(newFakeRepo(State{}), nil, noopRecorder{}, 5)
+	svc := NewService(newFakeRepo(State{}), nil, noopRecorder{})
 	repaired, err := svc.Reconcile(context.Background(), time.Now().Add(-72*time.Hour))
 	if err != nil {
 		t.Fatalf("Reconcile without payments should be a no-op, got %v", err)

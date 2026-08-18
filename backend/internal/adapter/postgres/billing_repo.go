@@ -36,9 +36,16 @@ func (r *BillingRepository) State(ctx context.Context, orgID uuid.UUID) (billing
 		custID    *string
 	)
 	err := r.pool.QueryRow(ctx,
-		`SELECT plan, subscription_status, subscription_current_period_end, stripe_customer_id, credit_seconds
-		   FROM organizations WHERE id = $1 AND deleted_at IS NULL`, orgID).
-		Scan(&planStr, &status, &periodEnd, &custID, &st.CreditSeconds)
+		`SELECT o.plan, o.subscription_status, o.subscription_current_period_end, o.stripe_customer_id, o.credit_seconds,
+		        COALESCE(ow.email, '')
+		   FROM organizations o
+		   LEFT JOIN LATERAL (
+		       SELECT email FROM users
+		        WHERE org_id = o.id AND role = 'owner' AND deleted_at IS NULL
+		        ORDER BY created_at LIMIT 1
+		   ) ow ON true
+		  WHERE o.id = $1 AND o.deleted_at IS NULL`, orgID).
+		Scan(&planStr, &status, &periodEnd, &custID, &st.CreditSeconds, &st.OwnerEmail)
 	if err != nil {
 		if isNoRows(err) {
 			return billing.State{}, apperror.NotFound("organization not found")

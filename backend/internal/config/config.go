@@ -38,6 +38,7 @@ type Config struct {
 	AI        AI
 	Billing   Billing
 	Google    Google
+	OIDC      OIDC
 
 	// AllowPrivateMonitorTargets lets tenants point monitors at private, loopback and
 	// link-local addresses.
@@ -61,6 +62,13 @@ type Config struct {
 	// off for a private install where users are known and an internal mail domain may
 	// not resolve from wherever this runs.
 	RequireReachableSignupEmail bool
+
+	// PlatformAdminEmails is the trust root for platform-GLOBAL settings (pricing,
+	// limits, the premium allowlist). Only these accounts may view or change them, so
+	// a tenant org-owner cannot reprice the whole platform. Entries are full emails or
+	// bare domains (e.g. "you@example.com,ops.example.com"). Seeded here in the
+	// environment precisely because it must not itself be editable in-app.
+	PlatformAdminEmails []string
 }
 
 // AI holds optional LLM-based alert enrichment configuration. When Enabled, a
@@ -198,6 +206,42 @@ type Google struct {
 // Enabled reports whether Google sign-in is configured.
 func (g Google) Enabled() bool { return len(g.ClientIDs) > 0 }
 
+// OIDC holds "Sign in with <provider>" via the standard OAuth 2.0 Authorization
+// Code flow against ANY OpenID/OAuth2 provider (OpsAPI, Keycloak, Auth0, …).
+//
+// It is deliberately provider-agnostic: point the four endpoint URLs at any
+// conforming provider and it works, exactly the way you would wire "Sign in with
+// Google" as a generic OAuth client. Beacon is a CONFIDENTIAL client (it holds a
+// secret), so it uses the code flow + PKCE and reads identity from the provider's
+// UserInfo endpoint over TLS — no ID-token signature verification required, which
+// keeps it drop-in for providers that sign ID tokens with a shared secret.
+//
+// Empty client id/secret disables it entirely (endpoint absent, frontend hides
+// the button) — the same graceful-degradation pattern as Google/Stripe/AI.
+type OIDC struct {
+	// Provider is the human label shown on the button ("OpsAPI"). Purely cosmetic.
+	Provider     string
+	ClientID     string
+	ClientSecret string
+	AuthorizeURL string
+	TokenURL     string
+	UserInfoURL  string
+	// RedirectURL is beacon's own callback (must be registered with the provider).
+	RedirectURL string
+	// Scopes requested; must include "openid". Defaults to openid+profile+email.
+	Scopes []string
+	// PostLoginURL is the frontend page the callback hands the session to. The
+	// tokens are delivered in the URL fragment so they never hit a server log.
+	PostLoginURL string
+}
+
+// Enabled reports whether OIDC single sign-on is configured. All of client id,
+// secret and the three endpoint URLs must be present.
+func (o OIDC) Enabled() bool {
+	return o.ClientID != "" && o.ClientSecret != "" &&
+		o.AuthorizeURL != "" && o.TokenURL != "" && o.UserInfoURL != ""
+}
+
 // Crypto holds symmetric-encryption configuration used to protect secrets at
 // rest (e.g. notification credentials).
 type Crypto struct {
@@ -313,14 +357,26 @@ func Load() (Config, error) {
 		Google: Google{
 			ClientIDs: getCSV("BEACON_GOOGLE_CLIENT_ID", nil),
 		},
+		OIDC: OIDC{
+			Provider:     getStr("BEACON_OIDC_PROVIDER", "OpsAPI"),
+			ClientID:     getStr("BEACON_OIDC_CLIENT_ID", ""),
+			ClientSecret: getStr("BEACON_OIDC_CLIENT_SECRET", ""),
+			AuthorizeURL: getStr("BEACON_OIDC_AUTHORIZE_URL", ""),
+			TokenURL:     getStr("BEACON_OIDC_TOKEN_URL", ""),
+			UserInfoURL:  getStr("BEACON_OIDC_USERINFO_URL", ""),
+			RedirectURL:  getStr("BEACON_OIDC_REDIRECT_URL", ""),
+			Scopes:       getCSV("BEACON_OIDC_SCOPES", []string{"openid", "profile", "email"}),
+			PostLoginURL: getStr("BEACON_OIDC_POST_LOGIN_URL", "http://localhost:3000/login/callback"),
+		},
 		AllowPrivateMonitorTargets:  getBool("BEACON_ALLOW_PRIVATE_MONITOR_TARGETS", false, add),
 		RequireReachableSignupEmail: getBool("BEACON_REQUIRE_REACHABLE_SIGNUP_EMAIL", true, add),
+		PlatformAdminEmails:         getCSV("BEACON_PLATFORM_ADMIN_EMAILS", nil),
 		AI: AI{
-			Enabled: getBool("BEACON_AI_ENABLED", false, add),
-			BaseURL: strings.TrimRight(getStr("BEACON_AI_BASE_URL", ""), "/"),
-			Model:   getStr("BEACON_AI_MODEL", ""),
-			APIKey:  getStr("BEACON_AI_API_KEY", ""),
-			Timeout: getDur("BEACON_AI_TIMEOUT", 20*time.Second, add),
+			Enabled:              getBool("BEACON_AI_ENABLED", false, add),
+			BaseURL:              strings.TrimRight(getStr("BEACON_AI_BASE_URL", ""), "/"),
+			Model:                getStr("BEACON_AI_MODEL", ""),
+			APIKey:               getStr("BEACON_AI_API_KEY", ""),
+			Timeout:              getDur("BEACON_AI_TIMEOUT", 20*time.Second, add),
 			DiagnoseAllowPrivate: getBool("BEACON_AI_DIAGNOSE_ALLOW_PRIVATE", false, add),
 			DiagnoseCostSeconds:  int64(getInt("BEACON_AI_DIAGNOSE_COST_SECONDS", 5*60, add)),
 		},

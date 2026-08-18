@@ -46,10 +46,10 @@ func (r *UserRepository) CreateOrgAndOwner(ctx context.Context, org *auth.Organi
 	}
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO users (id, org_id, email, password_hash, google_sub, name, role, is_active, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		`INSERT INTO users (id, org_id, email, password_hash, google_sub, oidc_sub, name, role, is_active, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		owner.ID, owner.OrgID, owner.Email, nullString(owner.PasswordHash), nullString(owner.GoogleSub),
-		owner.Name, string(owner.Role), owner.IsActive, owner.CreatedAt, owner.UpdatedAt,
+		nullString(owner.OidcSub), owner.Name, string(owner.Role), owner.IsActive, owner.CreatedAt, owner.UpdatedAt,
 	); err != nil {
 		if c, ok := isUniqueViolation(err); ok && c == "ux_users_email" {
 			return apperror.Conflict("an account with that email already exists")
@@ -63,23 +63,24 @@ func (r *UserRepository) CreateOrgAndOwner(ctx context.Context, org *auth.Organi
 	return nil
 }
 
-const userColumns = `id, org_id, email, password_hash, google_sub, name, role, is_active,
+const userColumns = `id, org_id, email, password_hash, google_sub, oidc_sub, name, role, is_active,
 	twofa_enabled, last_login_at, created_at, updated_at`
 
 func scanUser(row pgx.Row) (*auth.User, error) {
 	var u auth.User
 	var role string
-	// password_hash and google_sub are nullable (an account has one or the other, or
-	// both), so scan through NullString and flatten a NULL to "".
-	var passwordHash, googleSub sql.NullString
+	// password_hash, google_sub and oidc_sub are nullable (an account has one or
+	// more), so scan through NullString and flatten a NULL to "".
+	var passwordHash, googleSub, oidcSub sql.NullString
 	if err := row.Scan(
-		&u.ID, &u.OrgID, &u.Email, &passwordHash, &googleSub, &u.Name, &role, &u.IsActive,
+		&u.ID, &u.OrgID, &u.Email, &passwordHash, &googleSub, &oidcSub, &u.Name, &role, &u.IsActive,
 		&u.TwoFAEnabled, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
 	u.PasswordHash = passwordHash.String
 	u.GoogleSub = googleSub.String
+	u.OidcSub = oidcSub.String
 	u.Role = auth.Role(role)
 	return &u, nil
 }
