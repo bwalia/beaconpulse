@@ -62,6 +62,13 @@ type Config struct {
 	// off for a private install where users are known and an internal mail domain may
 	// not resolve from wherever this runs.
 	RequireReachableSignupEmail bool
+
+	// PlatformAdminEmails is the trust root for platform-GLOBAL settings (pricing,
+	// limits, the premium allowlist). Only these accounts may view or change them, so
+	// a tenant org-owner cannot reprice the whole platform. Entries are full emails or
+	// bare domains (e.g. "you@example.com,ops.example.com"). Seeded here in the
+	// environment precisely because it must not itself be editable in-app.
+	PlatformAdminEmails []string
 }
 
 // AI holds optional LLM-based alert enrichment configuration. When Enabled, a
@@ -363,6 +370,7 @@ func Load() (Config, error) {
 		},
 		AllowPrivateMonitorTargets:  getBool("BEACON_ALLOW_PRIVATE_MONITOR_TARGETS", false, add),
 		RequireReachableSignupEmail: getBool("BEACON_REQUIRE_REACHABLE_SIGNUP_EMAIL", true, add),
+		PlatformAdminEmails:         getCSV("BEACON_PLATFORM_ADMIN_EMAILS", nil),
 		AI: AI{
 			Enabled:              getBool("BEACON_AI_ENABLED", false, add),
 			BaseURL:              strings.TrimRight(getStr("BEACON_AI_BASE_URL", ""), "/"),

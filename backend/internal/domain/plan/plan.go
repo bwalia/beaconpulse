@@ -1,11 +1,22 @@
 // Package plan defines subscription plans and their resource limits. Limits are
 // enforced when tenants create or update monitors so that one organization
-// cannot overload the shared monitoring engines (Prometheus/Blackbox). Values
-// live here in code — not the database — so they can be tuned without a
-// migration; the organization row only stores which plan it is on.
+// cannot overload the shared monitoring engines (Prometheus/Blackbox).
+//
+// Values are OPERATOR-TUNABLE at runtime: a platform operator edits pricing, limits,
+// the pay-as-you-go rate and the premium allowlist from the admin settings page, and
+// those land here via Apply. The built-in defaults below are the fallback (and the
+// seed for a fresh install). The active configuration is held in one atomically
+// swapped snapshot — lock-free to read on the hot enforcement paths, single-writer on
+// change — rather than scattered globals; the settings service is that single writer.
 package plan
 
-import "time"
+import (
+	"fmt"
+	"sync/atomic"
+	"time"
+
+	"beacon/internal/platform/emailmatch"
+)
 
 // Plan identifies a subscription tier.
 type Plan string
@@ -49,22 +60,151 @@ type Limits struct {
 	MonthlyDiagnoses int
 }
 
-// registry maps each plan to its limits. Tune here, no migration needed.
+// defaultLimits is the built-in per-tier caps: the fallback when nothing is
+// configured, and the seed a fresh install writes to the DB on first start.
 //
 // Diagnosis quotas track each tier's monitor cap rather than its price: the number of
 // times you need to ask why something broke follows how much you are watching, not
 // what you paid. Generous enough that a normal team never meets the ceiling, low
 // enough that one subscriber cannot consume unbounded GPU for a flat fee.
-var registry = map[Plan]Limits{
+var defaultLimits = map[Plan]Limits{
 	Free:       {MaxMonitors: 10, MinIntervalSeconds: 60, MonthlyDiagnoses: 0},
 	Starter:    {MaxMonitors: 50, MinIntervalSeconds: 30, MonthlyDiagnoses: 100},
 	Pro:        {MaxMonitors: 500, MinIntervalSeconds: 10, MonthlyDiagnoses: 1000},
 	PayAsYouGo: {MaxMonitors: 500, MinIntervalSeconds: 30, MonthlyDiagnoses: 0},
 }
 
+// defaultPrices is the built-in monthly USD price of each subscribable tier.
+var defaultPrices = map[Plan]int{Free: 0, Starter: 19, Pro: 79}
+
+// featureTail is the non-numeric marketing copy for each tier. The monitor-count and
+// interval bullets are generated from the live limits (so they never disagree with the
+// caps actually applied); these are appended after them.
+var featureTail = map[Plan][]string{
+	Free:    {"Telegram alerts", "Community support"},
+	Starter: {"All alert channels", "Email support"},
+	Pro:     {"Priority alerting", "Priority support"},
+}
+
+// Config is the live, operator-tunable plan configuration: per-tier limits and price,
+// the pay-as-you-go rate ($1 buys this many monitor-hours), and the premium
+// email/domain allowlist (matching accounts get Pro free).
+type Config struct {
+	Limits         map[Plan]Limits
+	Prices         map[Plan]int
+	HoursPerDollar int
+	Grants         []string
+}
+
+// live holds the active configuration. Read lock-free via atomic.Load on every
+// enforcement path; replaced wholesale by Apply. Never mutate a loaded Config.
+var live atomic.Pointer[Config]
+
+// admins is the platform-operator allowlist (env-seeded), held separately from the
+// DB-driven Config so a settings reload never clobbers it. Platform operators get Pro
+// for their own org automatically — it is theirs to run — without having to add
+// themselves to the premium grant list.
+var admins atomic.Pointer[[]string]
+
+func init() {
+	c := DefaultConfig()
+	live.Store(&c)
+	empty := []string{}
+	admins.Store(&empty)
+}
+
+// DefaultConfig returns a fresh copy of the built-in configuration.
+func DefaultConfig() Config {
+	lim := make(map[Plan]Limits, len(defaultLimits))
+	for k, v := range defaultLimits {
+		lim[k] = v
+	}
+	prices := make(map[Plan]int, len(defaultPrices))
+	for k, v := range defaultPrices {
+		prices[k] = v
+	}
+	return Config{Limits: lim, Prices: prices, HoursPerDollar: 5}
+}
+
+// Apply installs c as the live configuration, filling any missing tier/price from the
+// defaults (so a partial config never zeroes a cap) and normalizing the grant list.
+// Single-writer: called at startup and whenever platform settings change.
+func Apply(c Config) {
+	d := DefaultConfig()
+	if c.Limits == nil {
+		c.Limits = map[Plan]Limits{}
+	}
+	for p, l := range d.Limits {
+		if _, ok := c.Limits[p]; !ok {
+			c.Limits[p] = l
+		}
+	}
+	if c.Prices == nil {
+		c.Prices = map[Plan]int{}
+	}
+	for p, pr := range d.Prices {
+		if _, ok := c.Prices[p]; !ok {
+			c.Prices[p] = pr
+		}
+	}
+	if c.HoursPerDollar <= 0 {
+		c.HoursPerDollar = d.HoursPerDollar
+	}
+	c.Grants = emailmatch.Normalize(c.Grants)
+	live.Store(&c)
+}
+
+// Snapshot returns a deep copy of the live configuration, safe for the caller to read
+// or mutate. Used by the settings service to present what is currently applied.
+func Snapshot() Config {
+	c := live.Load()
+	lim := make(map[Plan]Limits, len(c.Limits))
+	for k, v := range c.Limits {
+		lim[k] = v
+	}
+	prices := make(map[Plan]int, len(c.Prices))
+	for k, v := range c.Prices {
+		prices[k] = v
+	}
+	return Config{
+		Limits:         lim,
+		Prices:         prices,
+		HoursPerDollar: c.HoursPerDollar,
+		Grants:         append([]string(nil), c.Grants...),
+	}
+}
+
+// HoursPerDollar is the live pay-as-you-go rate: $1 buys this many monitor-hours.
+func HoursPerDollar() int { return live.Load().HoursPerDollar }
+
+// PriceOf returns the live monthly USD price of a tier.
+func PriceOf(p Plan) int { return live.Load().Prices[p] }
+
+// IsGranted reports whether email is on the premium allowlist (exact address or
+// domain/subdomain). Such accounts get Pro free, bypassing billing.
+func IsGranted(email string) bool { return emailmatch.Match(live.Load().Grants, email) }
+
+// SetAdmins installs the platform-operator allowlist (env-seeded). Called once at
+// startup by each binary; independent of the DB-driven config, so a settings reload
+// leaves it untouched.
+func SetAdmins(list []string) {
+	n := emailmatch.Normalize(list)
+	admins.Store(&n)
+}
+
+// IsAdmin reports whether email is a platform operator. Operators get Pro for their
+// own org automatically (see Resolve), on top of being able to edit platform settings.
+func IsAdmin(email string) bool {
+	p := admins.Load()
+	if p == nil {
+		return false
+	}
+	return emailmatch.Match(*p, email)
+}
+
 // Valid reports whether p is a known plan.
 func (p Plan) Valid() bool {
-	_, ok := registry[p]
+	_, ok := defaultLimits[p]
 	return ok
 }
 
@@ -87,13 +227,26 @@ func Effective(subscribed Plan, subscriptionActive bool, creditSeconds int64) Pl
 	return Free
 }
 
-// LimitsFor returns the limits for a plan, falling back to Free for unknown
+// Resolve is Effective plus the two free-Pro paths: an org whose owner email is a
+// platform operator, or is on the premium allowlist, gets Pro regardless of
+// subscription or credit. This is the one place both grants are applied, so
+// enforcement (monitor create, control-plane cap) and the billing page all agree on
+// who is premium — and only those owners are, never every user.
+func Resolve(subscribed Plan, subscriptionActive bool, creditSeconds int64, ownerEmail string) Plan {
+	if IsAdmin(ownerEmail) || IsGranted(ownerEmail) {
+		return Pro
+	}
+	return Effective(subscribed, subscriptionActive, creditSeconds)
+}
+
+// LimitsFor returns the live limits for a plan, falling back to Free for unknown
 // values (defensive: an unexpected DB value must never grant unlimited access).
 func LimitsFor(p Plan) Limits {
-	if l, ok := registry[p]; ok {
+	c := live.Load()
+	if l, ok := c.Limits[p]; ok {
 		return l
 	}
-	return registry[Free]
+	return c.Limits[Free]
 }
 
 // Info is the customer-facing description of a plan, used by the billing/pricing
@@ -106,17 +259,29 @@ type Info struct {
 	Features     []string
 }
 
-// Catalog returns the ordered list of purchasable plans for the pricing page.
+// Catalog returns the ordered list of purchasable plans for the pricing page, built
+// from the LIVE configuration so an operator's price/limit changes show immediately.
 func Catalog() []Info {
-	return []Info{
-		{Free, "Free", 0, registry[Free], []string{
-			"10 monitors", "60s minimum interval", "Telegram alerts", "Community support",
-		}},
-		{Starter, "Starter", 19, registry[Starter], []string{
-			"50 monitors", "30s minimum interval", "All alert channels", "Email support",
-		}},
-		{Pro, "Pro", 79, registry[Pro], []string{
-			"500 monitors", "10s minimum interval", "Priority alerting", "Priority support",
-		}},
+	c := live.Load()
+	names := map[Plan]string{Free: "Free", Starter: "Starter", Pro: "Pro"}
+	out := make([]Info, 0, 3)
+	for _, p := range []Plan{Free, Starter, Pro} {
+		l := c.Limits[p]
+		out = append(out, Info{
+			Plan:         p,
+			Name:         names[p],
+			PriceMonthly: c.Prices[p],
+			Limits:       l,
+			Features:     features(p, l),
+		})
 	}
+	return out
+}
+
+func features(p Plan, l Limits) []string {
+	out := []string{
+		fmt.Sprintf("%d monitors", l.MaxMonitors),
+		fmt.Sprintf("%ds minimum interval", l.MinIntervalSeconds),
+	}
+	return append(out, featureTail[p]...)
 }

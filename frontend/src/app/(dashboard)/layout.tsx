@@ -19,6 +19,7 @@ import {
   CreditCardIcon,
   DashboardIcon,
   FolderIcon,
+  GaugeIcon,
   GlobeIcon,
   LockIcon,
   SettingsIcon,
@@ -26,7 +27,14 @@ import {
   WrenchIcon,
 } from "@/components/icons";
 
-type NavItem = { href: string; key: string; Icon: (p: { className?: string }) => React.ReactElement };
+type NavItem = {
+  href: string;
+  key: string;
+  Icon: (p: { className?: string }) => React.ReactElement;
+  // label overrides the i18n lookup for items outside the translated sidebar set
+  // (the operator-only Platform screen), so a new key needn't be added to every locale.
+  label?: string;
+};
 
 const baseNav: NavItem[] = [
   { href: "/dashboard", key: "dashboard", Icon: DashboardIcon },
@@ -44,6 +52,11 @@ const baseNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { href: "/api-keys", key: "apiKeys", Icon: LockIcon },
   { href: "/system", key: "system", Icon: SettingsIcon },
+];
+// Platform-operator surface: pricing, limits and premium access are GLOBAL (they
+// affect every tenant), so this is gated on is_platform_admin, not the org role.
+const platformNav: NavItem[] = [
+  { href: "/platform", key: "platform", label: "Platform", Icon: GaugeIcon },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -67,7 +80,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <ConfirmProvider>
     <div className="flex min-h-screen">
-      <aside className="hidden w-64 flex-shrink-0 border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 md:block">
+      <aside className="sticky top-0 hidden h-screen w-64 flex-shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 md:block">
         <div className="mb-6 flex items-center gap-2.5 px-2">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-white">
             <BeaconMark className="h-5 w-5" />
@@ -75,7 +88,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <span className="text-xl font-bold tracking-tight">{brand.name}</span>
         </div>
         <nav className="space-y-1">
-          {[...baseNav, ...(user.role === "owner" || user.role === "admin" ? adminNav : [])].map((item) => {
+          {[
+            ...baseNav,
+            ...(user.role === "owner" || user.role === "admin" ? adminNav : []),
+            ...(user.is_platform_admin ? platformNav : []),
+          ].map((item) => {
             const active = pathname === item.href;
             return (
               <Link
@@ -92,7 +109,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-brand-600 dark:bg-brand-400" aria-hidden />
                 )}
                 <item.Icon className="h-5 w-5 shrink-0" />
-                {t(item.key)}
+                {item.label ?? t(item.key)}
               </Link>
             );
           })}

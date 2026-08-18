@@ -8,6 +8,9 @@ export interface User {
   role: string;
   is_active: boolean;
   twofa_enabled: boolean;
+  /** Operator account that may edit platform-global settings (pricing, limits,
+   *  premium access). Distinct from org role. */
+  is_platform_admin?: boolean;
   last_login_at?: string;
   created_at: string;
 }
@@ -132,6 +135,28 @@ export interface PlanInfo {
   features: string[];
   /** Whether this tier can be subscribed to right now (Stripe price configured). */
   subscribable: boolean;
+}
+
+// ---- Platform settings (operator-only) ----
+// Pricing, limits and premium access, editable live from the admin page. Mirrors
+// GET/PUT /api/v1/settings. Global — not per-tenant.
+
+export interface PlanSetting {
+  plan: string;
+  name: string;
+  price_monthly: number;
+  max_monitors: number;
+  min_interval_seconds: number;
+  monthly_diagnoses: number;
+}
+
+export interface PlatformSettings {
+  /** Pay-as-you-go rate: $1 buys this many monitor-hours of credit. */
+  monitor_hours_per_dollar: number;
+  plans: PlanSetting[];
+  /** Emails and/or bare domains granted the Pro tier for free. */
+  premium_grants: string[];
+  updated_at?: string;
 }
 
 export interface BillingInfo {

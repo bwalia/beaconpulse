@@ -39,6 +39,8 @@ type RouterDeps struct {
 	StatusPage         *StatusPageHandler
 	Heartbeat          *HeartbeatHandler
 	StatusPageSettings *StatusPageSettingsHandler
+	// Settings is the platform-global admin surface (pricing, limits, premium access).
+	Settings *SettingsHandler
 	// Diagnose may be nil when AI is not configured; the route is then not mounted.
 	Diagnose *DiagnoseHandler
 	APIKey   *APIKeyHandler
@@ -154,6 +156,9 @@ func NewRouter(d RouterDeps) http.Handler {
 		api.Mount("/billing", d.Billing.Routes())
 		// Owner-facing controls for the public page above (publish / rename).
 		api.Mount("/status-page", d.StatusPageSettings.Routes())
+		// Platform-global settings (pricing, limits, premium access). Platform-operator
+		// gated inside the handler — never a per-tenant control.
+		api.Mount("/settings", d.Settings.Routes())
 		// Machine surface. /api-keys is session-only (a key must not mint keys);
 		// /sync is the declarative endpoint CI calls, and accepts either credential.
 		api.Mount("/api-keys", d.APIKey.Routes())

@@ -66,9 +66,20 @@ x-backend-env: &backend-env
   STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
   STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
   STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+  # Only the SEED value: once the Platform screen has been saved once, the database
+  # value wins and this is ignored.
   BEACON_BILLING_MONITOR_HOURS_PER_DOLLAR: ${BEACON_BILLING_MONITOR_HOURS_PER_DOLLAR:-5}
   BEACON_BILLING_SUCCESS_URL: http://localhost:${BEACON_GATEWAY_PORT:-8090}/billing?checkout=success
   BEACON_BILLING_CANCEL_URL: http://localhost:${BEACON_GATEWAY_PORT:-8090}/billing?checkout=cancel
+  # Platform operators — full emails or bare domains, comma-separated (e.g.
+  # "you@example.com,workstation.co.uk"). Only these accounts may open the in-app
+  # Platform screen to edit pricing, plan limits and the premium allowlist, which are
+  # global. This is the trust root, so it lives here and cannot be changed in-app.
+  BEACON_PLATFORM_ADMIN_EMAILS: ${BEACON_PLATFORM_ADMIN_EMAILS:-}
+  # Reject signups from disposable/no-MX email domains. Default on. Set false on a
+  # private/local install where you deliberately sign up with a throwaway address
+  # (e.g. a yopmail operator account).
+  BEACON_REQUIRE_REACHABLE_SIGNUP_EMAIL: ${BEACON_REQUIRE_REACHABLE_SIGNUP_EMAIL:-true}
 
 services:
   postgres:

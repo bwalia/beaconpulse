@@ -277,7 +277,14 @@ func (r *MonitorRepository) ListAllEnabled(ctx context.Context) ([]monitor.Monit
 // org falls back to Free's 10. Limit values stay in the plan package.
 func (r *MonitorRepository) EffectivePlans(ctx context.Context) (map[uuid.UUID]plan.Plan, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, plan, subscription_status, credit_seconds FROM organizations WHERE deleted_at IS NULL`)
+		`SELECT o.id, o.plan, o.subscription_status, o.credit_seconds, COALESCE(ow.email, '')
+		   FROM organizations o
+		   LEFT JOIN LATERAL (
+		       SELECT email FROM users
+		        WHERE org_id = o.id AND role = 'owner' AND deleted_at IS NULL
+		        ORDER BY created_at LIMIT 1
+		   ) ow ON true
+		  WHERE o.deleted_at IS NULL`)
 	if err != nil {
 		return nil, apperror.Internal(fmt.Errorf("list org plans: %w", err))
 	}
@@ -285,16 +292,17 @@ func (r *MonitorRepository) EffectivePlans(ctx context.Context) (map[uuid.UUID]p
 	out := map[uuid.UUID]plan.Plan{}
 	for rows.Next() {
 		var (
-			id     uuid.UUID
-			p      string
-			status *string
-			credit int64
+			id         uuid.UUID
+			p          string
+			status     *string
+			credit     int64
+			ownerEmail string
 		)
-		if err := rows.Scan(&id, &p, &status, &credit); err != nil {
+		if err := rows.Scan(&id, &p, &status, &credit, &ownerEmail); err != nil {
 			return nil, apperror.Internal(fmt.Errorf("scan org plan: %w", err))
 		}
 		active := status != nil && (*status == "active" || *status == "trialing")
-		out[id] = plan.Effective(plan.Plan(p), active, credit)
+		out[id] = plan.Resolve(plan.Plan(p), active, credit, ownerEmail)
 	}
 	return out, rows.Err()
 }

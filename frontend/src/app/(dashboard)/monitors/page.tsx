@@ -11,7 +11,9 @@ import {
   useCreateMonitor,
   useDeleteMonitor,
   useMonitorMetrics,
+  useMonitors,
   useMonitorsPage,
+  useOverview,
   useProjects,
   useSetMonitorEnabled,
   useUpdateMonitor,
@@ -27,17 +29,29 @@ import {
   PageHeader,
   Select,
   Skeleton,
-  StatusBadge,
   Textarea,
 } from "@/components/ui";
-import { ActivityIcon, CheckCircleIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
+import { ActivityIcon, CheckCircleIcon, ClockIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
 import { useConfirm } from "@/components/confirm";
 import { isFailing, useDiagnoseControl } from "@/components/diagnose-panel";
+import { STATUS_LABEL, StatusPill, StripLegend, TONE_COLOR, UptimeStrip, statusOf } from "@/components/uptime";
 import { Pagination, SearchInput } from "@/components/table-controls";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
-import type { MetricPoint, Monitor } from "@/lib/types";
+import { timeAgo } from "@/lib/viz";
+import type { MetricPoint, Monitor, MonitorUptime } from "@/lib/types";
 
 const PAGE_SIZE = 20;
+
+type StatusCounts = { all: number; up: number; down: number; degraded: number; paused: number; unknown: number };
+
+// countByStatus tallies the org's monitors by their effective status, for the
+// filter/summary bar. Sourced from the org-wide monitor list (not the current
+// page), so the numbers describe the whole fleet the way the dashboard does.
+function countByStatus(monitors: Monitor[]): StatusCounts {
+  const c: StatusCounts = { all: monitors.length, up: 0, down: 0, degraded: 0, paused: 0, unknown: 0 };
+  for (const m of monitors) c[statusOf(m)]++;
+  return c;
+}
 
 const schema = z.object({
   project_id: z.string().uuid("Select a project"),
@@ -220,6 +234,12 @@ export default function MonitorsPage() {
     status: status || undefined,
   });
   const { data: usage } = useUsage();
+  // The paginated endpoint returns one page of monitors and no history. For each
+  // row's uptime strip we join against the org overview (all monitors, 24h) by id —
+  // the same rollup the dashboard reads — and for the fleet summary we count the
+  // whole org's monitors (the cached list the dashboard already loads).
+  const { data: overview } = useOverview(24);
+  const { data: fleet } = useMonitors();
   const [showForm, setShowForm] = useState(false);
   const [metricsFor, setMetricsFor] = useState<Monitor | null>(null);
   const [editing, setEditing] = useState<Monitor | null>(null);
@@ -228,6 +248,10 @@ export default function MonitorsPage() {
   const total = data?.pagination.total ?? 0;
   const filtering = search !== "" || status !== "";
   const stagger = useStaggerVariants(0.03);
+
+  const histById = new Map<string, MonitorUptime>();
+  (overview?.monitors ?? []).forEach((m) => histById.set(m.monitor_id, m));
+  const counts = countByStatus(fleet?.data ?? []);
 
   const atLimit = usage ? usage.monitors_used >= usage.monitors_limit : false;
   const pct = usage ? Math.min(100, Math.round((usage.monitors_used / usage.monitors_limit) * 100)) : 0;
@@ -281,36 +305,28 @@ export default function MonitorsPage() {
 
       {showForm && <CreateMonitorForm onDone={() => setShowForm(false)} />}
 
-      {/* Toolbar: server-side search + status filter. */}
+      {/* Toolbar: a status filter that doubles as a fleet summary, plus search. */}
       {(total > 0 || filtering) && !isLoading && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <SearchInput
-            value={searchInput}
-            onChange={setSearchInput}
-            placeholder="Search by name or target…"
-            label="Search monitors"
-          />
-          <select
-            value={status}
-            onChange={(e) => changeStatus(e.target.value)}
-            aria-label="Filter by status"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:w-44"
-          >
-            <option value="">All statuses</option>
-            <option value="up">Up</option>
-            <option value="down">Down</option>
-            <option value="degraded">Degraded</option>
-            <option value="paused">Paused</option>
-            <option value="unknown">Unknown</option>
-          </select>
+        <div className="space-y-3">
+          <StatusFilterBar counts={counts} active={status} onChange={changeStatus} />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <SearchInput
+              value={searchInput}
+              onChange={setSearchInput}
+              placeholder="Search by name or target…"
+              label="Search monitors"
+            />
+            <div className="hidden sm:flex sm:shrink-0 sm:items-center">
+              <StripLegend />
+            </div>
+          </div>
         </div>
       )}
 
       {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-11 w-full rounded-t-xl" />
+        <div className="grid gap-3">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-14 w-full" />
+            <Skeleton key={i} className="h-40 w-full rounded-xl" />
           ))}
         </div>
       ) : total === 0 ? (
@@ -342,36 +358,25 @@ export default function MonitorsPage() {
         </EmptyState>
       ) : (
         <>
-          <Card className="overflow-x-auto p-0">
-            <table className="w-full text-[15px]">
-              <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
-                <tr>
-                  <th scope="col" className="px-4 py-3 font-semibold">Status</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Name</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Type</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Target</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Interval</th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <motion.tbody
-                key={page}
-                initial="hidden"
-                animate="show"
-                variants={stagger}
-                className={isPlaceholderData ? "opacity-60 transition-opacity duration-200" : "transition-opacity duration-200"}
-              >
-                {rows.map((m) => (
-                  <MonitorRow
-                    key={m.id}
-                    monitor={m}
-                    onMetrics={() => setMetricsFor(m)}
-                    onEdit={() => setEditing(m)}
-                  />
-                ))}
-              </motion.tbody>
-            </table>
-          </Card>
+          <motion.div
+            key={page}
+            initial="hidden"
+            animate="show"
+            variants={stagger}
+            className={`grid gap-3 ${
+              isPlaceholderData ? "opacity-60 transition-opacity duration-200" : "transition-opacity duration-200"
+            }`}
+          >
+            {rows.map((m) => (
+              <MonitorCard
+                key={m.id}
+                monitor={m}
+                hist={histById.get(m.id)}
+                onMetrics={() => setMetricsFor(m)}
+                onEdit={() => setEditing(m)}
+              />
+            ))}
+          </motion.div>
 
           <Pagination
             page={page}
@@ -390,12 +395,66 @@ export default function MonitorsPage() {
   );
 }
 
-function MonitorRow({
+// StatusFilterBar is the fleet summary and the status filter in one: each chip
+// shows how many monitors are in that state and, clicked, filters the list to it.
+// Zero-count states hide themselves (unless active) so the bar stays uncluttered.
+function StatusFilterBar({
+  counts,
+  active,
+  onChange,
+}: {
+  counts: StatusCounts;
+  active: string;
+  onChange: (next: string) => void;
+}) {
+  const chips: { key: keyof StatusCounts; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "up", label: "Up" },
+    { key: "down", label: "Down" },
+    { key: "degraded", label: "Degraded" },
+    { key: "paused", label: "Paused" },
+    { key: "unknown", label: "Unknown" },
+  ];
+  return (
+    <div role="group" aria-label="Filter by status" className="flex flex-wrap items-center gap-2">
+      {chips.map(({ key, label }) => {
+        const value = key === "all" ? "" : key;
+        const isActive = active === value;
+        if (key !== "all" && counts[key] === 0 && !isActive) return null;
+        const tone = key === "all" ? null : STATUS_LABEL[key]?.tone;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(value)}
+            aria-pressed={isActive}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 motion-reduce:transition-none ${
+              isActive
+                ? "border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-300"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            }`}
+          >
+            {tone && <span className="h-2 w-2 rounded-full" style={{ background: TONE_COLOR[tone] }} aria-hidden />}
+            {label}
+            <span className="tabular-nums text-xs text-slate-500 dark:text-slate-400">{counts[key]}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// MonitorCard is one monitor as a rich card: identity, headline uptime/response,
+// the 24h uptime strip that is the product's whole point, and the management
+// actions. `hist` is that monitor's slice of the org overview, joined by id.
+function MonitorCard({
   monitor,
+  hist,
   onMetrics,
   onEdit,
 }: {
   monitor: Monitor;
+  hist?: MonitorUptime;
   onMetrics: () => void;
   onEdit: () => void;
 }) {
@@ -405,59 +464,86 @@ function MonitorRow({
   const reveal = useRevealVariants();
   const diagnose = useDiagnoseControl(monitor.id);
 
-  const target =
-    monitor.type === "heartbeat" && monitor.ping_url ? monitor.ping_url : monitor.target;
+  const status = statusOf(monitor);
+  const isDown = status === "down";
+  // A heartbeat has no probe target; show its ping URL instead, so the owner can
+  // retrieve it any time.
+  const target = monitor.type === "heartbeat" && monitor.ping_url ? monitor.ping_url : monitor.target;
+
+  const pts = hist?.points ?? [];
+  const passed = pts.filter((p) => p.v === 1).length;
+  const uptimePct = pts.length ? Math.round((passed / pts.length) * 1000) / 10 : null;
+  const respMs = hist?.avg_response_ms ?? 0;
 
   return (
-    <>
-    <motion.tr
+    <motion.article
       variants={reveal}
-      className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50 motion-reduce:transition-none dark:border-slate-800/60 dark:hover:bg-slate-800/40"
+      className={`rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md motion-reduce:transition-none dark:bg-slate-900 ${
+        isDown ? "border-red-200 dark:border-red-900/60" : "border-slate-200 dark:border-slate-800"
+      }`}
     >
-      <td className="px-4 py-3.5 align-top">
-        <div className="flex flex-col items-start gap-1">
-          <StatusBadge status={monitor.enabled ? monitor.last_status : "paused"} />
-          {monitor.in_maintenance && (
-            <span
-              title="Under an active maintenance window — alerts are suppressed"
-              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+      {/* Identity + headline metrics */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <StatusPill status={status} />
+            <button
+              onClick={onMetrics}
+              className="truncate rounded text-left font-semibold text-slate-900 hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-white dark:hover:text-brand-400"
             >
-              <WrenchIcon className="h-3 w-3" />
-              Maintenance
+              {monitor.name}
+            </button>
+            <span className="rounded border border-slate-200 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:text-slate-300">
+              {monitor.type}
             </span>
-          )}
+            {monitor.in_maintenance && (
+              <span
+                title="Under an active maintenance window — alerts are suppressed"
+                className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+              >
+                <WrenchIcon className="h-3 w-3" />
+                Maintenance
+              </span>
+            )}
+          </div>
+          <p title={target} className="mt-1 truncate font-mono text-xs text-slate-500 dark:text-slate-400">
+            {target}
+          </p>
         </div>
-      </td>
-      <td className="px-4 py-3.5">
-        <button
-          onClick={onMetrics}
-          className="rounded text-left font-medium text-slate-900 hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-white dark:hover:text-brand-400"
-        >
-          {monitor.name}
-        </button>
-      </td>
-      <td className="px-4 py-3.5">
-        <span className="inline-block rounded border border-slate-200 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-slate-600 dark:border-slate-700 dark:text-slate-300">
-          {monitor.type}
+        <div className="flex shrink-0 items-center gap-6 text-right">
+          <div>
+            <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
+              {uptimePct != null ? `${uptimePct}%` : "—"}
+            </p>
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">uptime 24h</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
+              {respMs ? `${Math.round(respMs)}ms` : "—"}
+            </p>
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">avg resp</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Uptime history — the strip is the visible proof that we're probing this. */}
+      <div className="mt-3">
+        <UptimeStrip points={pts} uptimePct={uptimePct} winShort="24h" />
+        <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span>24h ago</span>
+          <span>now</span>
+        </div>
+      </div>
+
+      {/* Meta + actions. Safe actions recede; the destructive one keeps its danger
+          colour but is separated and de-emphasised. */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <ClockIcon className="h-3.5 w-3.5" />
+          {monitor.last_checked_at ? `Checked ${timeAgo(monitor.last_checked_at)}` : "Awaiting first check"}
+          {` · every ${monitor.interval_seconds}s`}
         </span>
-      </td>
-      <td className="px-4 py-3.5">
-        {/* A heartbeat has no probe target; show its ping URL instead, so the
-            owner can retrieve it any time. Truncate long values with the full
-            string on hover. */}
-        <span
-          title={target}
-          className="block max-w-[22rem] truncate font-mono text-sm text-slate-700 dark:text-slate-300 lg:max-w-[32rem]"
-        >
-          {target}
-        </span>
-      </td>
-      <td className="px-4 py-3.5 tabular-nums text-slate-700 dark:text-slate-300">{monitor.interval_seconds}s</td>
-      <td className="px-4 py-3">
-        {/* Safe actions recede; the destructive one keeps its danger colour but is
-            separated and de-emphasised, so `Delete` isn't the loudest thing on the
-            page six times over. */}
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center gap-1">
           {isFailing(monitor) && (
             <Button
               size="sm"
@@ -505,18 +591,10 @@ function MonitorRow({
             Delete
           </Button>
         </div>
-      </td>
-    </motion.tr>
-      {diagnose.panel && (
-        <tr>
-          {/* Spans the table so the diagnosis reads as part of this monitor's row
-              rather than as a new column of anything. */}
-          <td colSpan={7} className="px-4 pb-4 pt-0">
-            {diagnose.panel}
-          </td>
-        </tr>
-      )}
-    </>
+      </div>
+
+      {diagnose.panel}
+    </motion.article>
   );
 }
 
