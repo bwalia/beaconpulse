@@ -175,7 +175,7 @@ export function GoogleButton() {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="relative rounded-lg focus-within:ring-2 focus-within:ring-brand-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-950">
+      <div ref={wrapperRef} className="relative rounded-lg focus-within:ring-2 focus-within:ring-brand-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-950">
         {/* What the user sees. Decorative: the real (overlaid) Google button owns
             the interaction and the accessible name. */}
         <div aria-hidden className={socialButtonClass}>
