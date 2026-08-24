@@ -5,6 +5,18 @@ single-node k3s the RWO volumes are shared by pods on the same node. The global
 nodeSelector (values.yaml) pins every pod to one node, so RWO stays valid on
 multi-node clusters too; for true multi-node spread switch storage.className to an
 RWX provisioner (NFS/Longhorn) and drop the nodeSelector.
+
+Create-once, never re-apply. Each PVC is guarded by a `lookup`: it renders only
+when it does NOT already exist, and carries `helm.sh/resource-policy: keep` so Helm
+never prunes the ones a later upgrade stops rendering. PVCs are effectively
+immutable, so re-applying them every upgrade achieved nothing except re-triggering
+the cluster's PVC admission webhooks (e.g. Longhorn's, which has failurePolicy=Fail
+on ALL PVCs cluster-wide). With this guard an upgrade touches no existing volume, so
+a degraded PVC webhook can't block Beacon deploys — only a first install, which must
+create the volumes, still needs the webhook up. Trade-off: a size change here is NOT
+picked up on existing PVCs (resize manually with `kubectl edit pvc`); local-path
+cannot online-resize anyway. `lookup` returns empty during `helm template`/dry-run,
+so all PVCs render there for validation, which is fine.
 */}}
 {{- $vols := list
   (dict "name" "beacon-postgres-data" "size" .Values.storage.postgres)
@@ -15,6 +27,7 @@ RWX provisioner (NFS/Longhorn) and drop the nodeSelector.
   (dict "name" "beacon-blackbox-config" "size" .Values.storage.blackboxConfig)
 }}
 {{- range $v := $vols }}
+{{- if not (lookup "v1" "PersistentVolumeClaim" $.Release.Namespace $v.name) }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -22,10 +35,13 @@ metadata:
   name: {{ $v.name }}
   labels:
     {{- include "beacon.labels" $ | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   accessModes: ["ReadWriteOnce"]
   storageClassName: {{ $.Values.storage.className }}
   resources:
     requests:
       storage: {{ $v.size }}
+{{- end }}
 {{- end }}
