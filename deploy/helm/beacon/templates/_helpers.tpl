@@ -116,6 +116,10 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
   value: "{{ include "beacon.name" "blackbox" }}:9115"
 - name: BEACON_DNS_RESOLVER
   value: {{ .Values.app.dnsResolver | quote }}
+# Platform operators (global): CSV of emails/domains who get /platform + auto-Pro.
+# Non-secret (emails), set per-env in values; empty leaves the operator surface locked.
+- name: BEACON_PLATFORM_ADMIN_EMAILS
+  value: {{ join "," (.Values.app.platformAdminEmails | default list) | quote }}
 # "Sign in with Google" — the OAuth client id(s) whose ID tokens this API accepts.
 # It is public (it ships in the browser bundle), but it reaches the cluster from git,
 # so it travels through the sealed beacon-secrets like every other from-git value —
@@ -127,6 +131,33 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
       name: beacon-secrets
       key: BEACON_GOOGLE_CLIENT_ID
       optional: true
+{{- if .Values.oidc.enabled }}
+# OpsAPI / OIDC single sign-on. Rendered only when oidc.enabled. Client secret comes
+# from beacon-secrets (Vault); everything else is non-secret config. Absent secret or
+# URLs => the API's Enabled() check fails and the SSO routes simply don't mount.
+- name: BEACON_OIDC_PROVIDER
+  value: {{ .Values.oidc.provider | quote }}
+- name: BEACON_OIDC_CLIENT_ID
+  value: {{ .Values.oidc.clientId | quote }}
+- name: BEACON_OIDC_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: beacon-secrets
+      key: BEACON_OIDC_CLIENT_SECRET
+      optional: true
+- name: BEACON_OIDC_AUTHORIZE_URL
+  value: {{ .Values.oidc.authorizeURL | quote }}
+- name: BEACON_OIDC_TOKEN_URL
+  value: {{ .Values.oidc.tokenURL | quote }}
+- name: BEACON_OIDC_USERINFO_URL
+  value: {{ .Values.oidc.userinfoURL | quote }}
+- name: BEACON_OIDC_SCOPES
+  value: {{ .Values.oidc.scopes | quote }}
+- name: BEACON_OIDC_REDIRECT_URL
+  value: {{ .Values.oidc.redirectURL | default (printf "%s/api/v1/auth/oidc/callback" (include "beacon.baseURL" .)) | quote }}
+- name: BEACON_OIDC_POST_LOGIN_URL
+  value: {{ .Values.oidc.postLoginURL | default (printf "%s/login/callback" (include "beacon.baseURL" .)) | quote }}
+{{- end }}
 - name: BEACON_AI_ENABLED
   value: {{ .Values.ai.enabled | quote }}
 {{- if .Values.ai.enabled }}

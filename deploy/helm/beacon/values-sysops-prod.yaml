@@ -30,6 +30,10 @@ app:
   beaconEnv: production
   logLevel: info
   promRetention: 30d
+  # Platform operator(s): global /platform surface + auto-Pro. Must match the address
+  # you actually sign into sysops247.com with (Google sign-in uses your Google email).
+  platformAdminEmails:
+    - tenthmatrix.mailer@gmail.com
   replicas:
     api: 2
     frontend: 2

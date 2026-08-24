@@ -73,6 +73,13 @@ app:
   # secretKeyRef. Nothing to set here.
   # Prometheus TSDB retention.
   promRetention: 15d
+  # BEACON_PLATFORM_ADMIN_EMAILS — operators who get the global /platform surface
+  # (edit pricing/limits/premium grants) AND auto-Pro for their own org. GLOBAL, not
+  # per-tenant, so it is a deploy-time value set per environment, NOT self-service.
+  # These are emails, not credentials, so they live here (git/values) rather than in
+  # Vault. A bare domain grants every user at that domain; "user@host" is one address.
+  # Empty = no operator (the /platform page stays locked for everyone). Set per env.
+  platformAdminEmails: []
   replicas:
     api: 1
     frontend: 1
@@ -83,6 +90,27 @@ ai:
   baseURL: ""      # e.g. https://ollama.workstation.co.uk
   model: ""        # e.g. qwen3:30b-a3b
   timeout: 20s
+
+# ── OpsAPI / OIDC single sign-on (non-secret parts; client secret from Vault) ──
+# "Continue with <provider>" via the OAuth2 code flow. OFF by default; the backend
+# endpoint self-hides until clientId/secret + the three URLs are all present.
+# To ENABLE in an environment you need THREE things, not just enabled:true —
+#   1. set enabled:true + provider + clientId + the three URLs here,
+#   2. put BEACON_OIDC_CLIENT_SECRET in that env's beacon-secrets (Vault),
+#   3. rebuild the frontend with NEXT_PUBLIC_OIDC_ENABLED=true (a BUILD-time flag,
+#      set in the deploy workflow) — otherwise the button never renders.
+# redirectURL/postLoginURL default to https://<host>/api/v1/auth/oidc/callback and
+# https://<host>/login/callback; override only if the provider needs a different one.
+oidc:
+  enabled: false
+  provider: OpsAPI
+  clientId: ""
+  authorizeURL: ""
+  tokenURL: ""
+  userinfoURL: ""
+  scopes: "openid,profile,email"
+  redirectURL: ""
+  postLoginURL: ""
 
 # ── Postgres (in-cluster) ──────────────────────────────────────────────────
 postgres:

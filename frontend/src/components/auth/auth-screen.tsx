@@ -241,17 +241,28 @@ const oidcEnabled = process.env.NEXT_PUBLIC_OIDC_ENABLED === "true";
 
 export function AuthScreen({ initialMode }: { initialMode: Mode }) {
   const t = useTranslations("auth");
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>(initialMode);
   const groupId = useId();
 
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.07);
 
+  // Already signed in? Login/register have nothing to offer — send them to the app.
+  // Mirrors the dashboard layout's inverse guard so the two routes stay consistent.
+  useEffect(() => {
+    if (!loading && user) router.replace("/dashboard");
+  }, [loading, user, router]);
+
   // Keep the URL honest as the user switches, without a navigation (which would
   // re-mount the form and lose anything they had typed).
   useEffect(() => {
     window.history.replaceState(null, "", mode === "register" ? "/register" : "/login");
   }, [mode]);
+
+  // Don't flash the form to a signed-in user while the redirect above fires.
+  if (!loading && user) return null;
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
