@@ -1,0 +1,21 @@
+# Xcode project is generated from project.yml by XcodeGen — never commit it.
+*.xcodeproj
+*.xcworkspace
+
+# Generated entitlements (XcodeGen writes these from project.yml).
+Brands/**/*.entitlements
+
+# Build output & derived data
+build/
+DerivedData/
+.build/
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+
+# Local secret overrides — never commit real client ids / URLs here.
+Brands/**/*.local.xcconfig
+
+# macOS
+.DS_Store

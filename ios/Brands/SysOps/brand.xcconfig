@@ -1,0 +1,22 @@
+// SysOps 24/7 brand configuration.
+//
+// Every value here is brand-specific and consumed via Info.plist ($(KEY)) or the
+// build. Duplicate this folder for a new brand and change these values — no Swift
+// changes. Do NOT hardcode any of these in code; read them through AppConfig.
+
+PRODUCT_BUNDLE_IDENTIFIER = com.sysops247.app
+PRODUCT_NAME = SysOps 247
+BRAND_DISPLAY_NAME = SysOps 24/7
+
+// API base URL. The `/$()/` splits the `//` so xcconfig does not treat it as a
+// comment — the value resolves to a normal https URL.
+API_BASE_URL = https:/$()/api.sysops247.com
+
+// Google Sign-In: the iOS OAuth client id (NOT the web client id) from Google
+// Cloud Console, and its reversed form for the URL scheme. Fill both in before
+// enabling Google sign-in; email/password works without them.
+GOOGLE_CLIENT_ID = REPLACE_WITH_GOOGLE_IOS_CLIENT_ID
+GOOGLE_REVERSED_CLIENT_ID = REPLACE_WITH_REVERSED_GOOGLE_IOS_CLIENT_ID
+
+// Brand accent colour (hex, no #). Drives the app tint via AppConfig.
+BRAND_ACCENT_HEX = 1D64E8

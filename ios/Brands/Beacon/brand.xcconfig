@@ -1,0 +1,13 @@
+// Beacon brand configuration. Second brand, same code — proof that branding is
+// pure configuration. See Brands/SysOps/brand.xcconfig for field docs.
+
+PRODUCT_BUNDLE_IDENTIFIER = com.beacon.app
+PRODUCT_NAME = Beacon
+BRAND_DISPLAY_NAME = Beacon
+
+API_BASE_URL = https:/$()/api.beaconpulse.net
+
+GOOGLE_CLIENT_ID = REPLACE_WITH_GOOGLE_IOS_CLIENT_ID
+GOOGLE_REVERSED_CLIENT_ID = REPLACE_WITH_REVERSED_GOOGLE_IOS_CLIENT_ID
+
+BRAND_ACCENT_HEX = 0E8B9A
