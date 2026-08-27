@@ -55,11 +55,67 @@ enum MonitorStatus: String {
     case up, down, degraded, paused, unknown
 }
 
-/// The 24h metrics summary for one monitor (GET /api/v1/monitors/{id}/metrics).
+/// A single time-series sample: timestamp + value. Shared by overview and
+/// per-monitor metrics.
+struct MetricPoint: Decodable, Identifiable {
+    let t: Date
+    let v: Double
+    var id: Date { t }
+}
+
+/// The 24h metrics for one monitor (GET /api/v1/monitors/{id}/metrics).
 struct MonitorMetrics: Decodable {
     let uptimePercent: Double
     let responseMsAvg: Double?
     let responseMsCurrent: Double?
+    let up: [MetricPoint]?
+    let responseMs: [MetricPoint]?
+}
+
+/// The org-wide dashboard (GET /api/v1/overview?hours=1|6|24|168|720).
+struct Overview: Decodable {
+    let windowHours: Int
+    let uptimePercent: Double
+    let avgResponseMs: Double
+    let uptimeSeries: [MetricPoint]
+    let responseSeries: [MetricPoint]
+    let monitors: [MonitorUptime]
+}
+
+/// A per-monitor row within the overview.
+struct MonitorUptime: Decodable, Identifiable {
+    let monitorId: String
+    let monitorName: String
+    let target: String
+    let avgResponseMs: Double
+    let points: [MetricPoint]
+    var id: String { monitorId }
+}
+
+/// A currently-firing alert (GET /api/v1/alerts).
+struct ActiveAlert: Decodable, Identifiable {
+    let name: String
+    let severity: String
+    let monitorId: String
+    let monitorName: String
+    let monitorType: String
+    let target: String
+    let since: Date?
+    let inMaintenance: Bool
+
+    /// Alerts aren't uniquely keyed server-side; combine the rule and monitor.
+    var id: String { "\(name):\(monitorId)" }
+}
+
+/// A project (GET /api/v1/projects). Hashable so it can drive value-based
+/// navigation into its filtered monitor list.
+struct Project: Decodable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let slug: String
+    let description: String
+    let environment: String
+    let isActive: Bool
 }
 
 // MARK: - Request bodies

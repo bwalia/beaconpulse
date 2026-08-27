@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 /// Loads one monitor plus its 24h metrics. Fetched by id so the same screen works
@@ -86,6 +87,17 @@ struct MonitorDetailView: View {
                     LabeledContent("Uptime", value: String(format: "%.2f%%", metrics.uptimePercent))
                     if let avg = metrics.responseMsAvg {
                         LabeledContent("Avg response", value: String(format: "%.0f ms", avg))
+                    }
+                }
+                if let series = metrics.responseMs, !series.isEmpty {
+                    Section("Response time") {
+                        Chart(series) { point in
+                            LineMark(x: .value("Time", point.t), y: .value("ms", point.v))
+                                .interpolationMethod(.catmullRom)
+                                .foregroundStyle(AppConfig.current.accentColor)
+                        }
+                        .frame(height: 160)
+                        .padding(.vertical, 8)
                     }
                 }
             }

@@ -13,13 +13,19 @@ final class MonitorsStore {
 
     private(set) var state: ViewState = .loading
     @ObservationIgnored private let client: APIClient
+    @ObservationIgnored private let projectID: String?
 
-    init(client: APIClient) { self.client = client }
+    init(client: APIClient, projectID: String? = nil) {
+        self.client = client
+        self.projectID = projectID
+    }
 
     func load() async {
         do {
+            var query = ["limit": "100"]
+            if let projectID { query["project_id"] = projectID }
             let page = try await client.send(
-                .init(path: "/api/v1/monitors", query: ["limit": "100"]),
+                .init(path: "/api/v1/monitors", query: query),
                 as: Paginated<Monitor>.self)
             state = page.data.isEmpty ? .empty : .loaded(page.data)
         } catch {
@@ -29,6 +35,9 @@ final class MonitorsStore {
 }
 
 struct MonitorsListView: View {
+    /// When set, only this project's monitors are shown.
+    var projectID: String? = nil
+
     @Environment(AppContainer.self) private var container
     @State private var store: MonitorsStore?
 
@@ -63,7 +72,7 @@ struct MonitorsListView: View {
             }
         }
         .task {
-            if store == nil { store = MonitorsStore(client: container.apiClient) }
+            if store == nil { store = MonitorsStore(client: container.apiClient, projectID: projectID) }
             await store?.load()
         }
     }
