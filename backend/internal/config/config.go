@@ -38,6 +38,7 @@ type Config struct {
 	AI        AI
 	Billing   Billing
 	Google    Google
+	Apple     Apple
 	OIDC      OIDC
 	Push      Push
 
@@ -206,6 +207,19 @@ type Google struct {
 
 // Enabled reports whether Google sign-in is configured.
 func (g Google) Enabled() bool { return len(g.ClientIDs) > 0 }
+
+// Apple holds "Sign in with Apple" configuration. Apple sign-in is OpenID
+// Connect: the app sends Apple's signed identity token and the API verifies it
+// directly (no client secret). Empty ClientIDs disables it (the endpoint 403s).
+type Apple struct {
+	// ClientIDs are the accepted identity-token audiences — the app bundle id, one
+	// per white-label brand (the same value as BEACON_APNS_TOPIC). Comma-separated
+	// in BEACON_APPLE_CLIENT_ID so one API can accept tokens from every brand's app.
+	ClientIDs []string
+}
+
+// Enabled reports whether Apple sign-in is configured.
+func (a Apple) Enabled() bool { return len(a.ClientIDs) > 0 }
 
 // OIDC holds "Sign in with <provider>" via the standard OAuth 2.0 Authorization
 // Code flow against ANY OpenID/OAuth2 provider (OpsAPI, Keycloak, Auth0, …).
@@ -383,6 +397,9 @@ func Load() (Config, error) {
 		},
 		Google: Google{
 			ClientIDs: getCSV("BEACON_GOOGLE_CLIENT_ID", nil),
+		},
+		Apple: Apple{
+			ClientIDs: getCSV("BEACON_APPLE_CLIENT_ID", nil),
 		},
 		Push: Push{
 			APNsKeyP8:      getStr("BEACON_APNS_KEY_P8", ""),

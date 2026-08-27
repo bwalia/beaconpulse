@@ -39,6 +39,23 @@ type GoogleVerifier interface {
 	Verify(ctx context.Context, idToken string) (*GoogleIdentity, error)
 }
 
+// AppleIdentity is the verified result of a "Sign in with Apple" identity token.
+// Apple's token carries no name (only the subject + email), so provisioning
+// derives a display name from the email — see registerOIDCUser.
+type AppleIdentity struct {
+	Subject       string // the stable Apple user id ("sub")
+	Email         string // may be a private-relay address if the user hid their email
+	EmailVerified bool
+}
+
+// AppleVerifier validates an Apple-issued identity token (signature against
+// Apple's public keys, issuer, expiry, and audience — the app bundle id) and
+// returns the identity. Implemented in internal/adapter/appleauth; a nil verifier
+// disables Apple sign-in.
+type AppleVerifier interface {
+	Verify(ctx context.Context, identityToken string) (*AppleIdentity, error)
+}
+
 // RefreshTokenRepository persists hashed refresh tokens.
 type RefreshTokenRepository interface {
 	Create(ctx context.Context, t *RefreshToken) error

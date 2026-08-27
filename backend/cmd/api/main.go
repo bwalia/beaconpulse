@@ -19,6 +19,7 @@ import (
 
 	"beacon/internal/adapter/ai"
 	"beacon/internal/adapter/apns"
+	"beacon/internal/adapter/appleauth"
 	"beacon/internal/adapter/googleauth"
 	"beacon/internal/adapter/netprobe"
 	"beacon/internal/adapter/notifier"
@@ -277,6 +278,12 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	if cfg.Google.Enabled() {
 		authSvc = authSvc.WithGoogle(googleauth.New(cfg.Google.ClientIDs))
 		log.Info("google sign-in enabled", "client_ids", len(cfg.Google.ClientIDs))
+	}
+	// "Sign in with Apple" (OpenID Connect). Enabled only when a bundle-id audience
+	// is configured; the endpoint otherwise 403s and the app hides the button.
+	if cfg.Apple.Enabled() {
+		authSvc = authSvc.WithApple(appleauth.New(cfg.Apple.ClientIDs))
+		log.Info("apple sign-in enabled", "client_ids", len(cfg.Apple.ClientIDs))
 	}
 	// "Sign in with <provider>" via generic OIDC (OpsAPI by default). Enabled only
 	// when the client credentials + endpoint URLs are configured; the routes are
