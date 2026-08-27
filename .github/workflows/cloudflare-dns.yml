@@ -18,9 +18,9 @@ on:
         required: true
         type: string
       RECORD_CONTENT:
-        description: "Record value, e.g. pop0.wslproxy.com"
+        description: "Record value, e.g. lon1.pop0.uk"
         required: true
-        default: "pop0.wslproxy.com"
+        default: "lon1.pop0.uk"
         type: string
       RECORD_TYPE:
         description: "Record type"

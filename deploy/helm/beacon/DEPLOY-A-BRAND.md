@@ -32,7 +32,7 @@ them, go to **Actions → "Beacon Build/Push … Deploy to K3S" → Run workflow
 
 That single run does everything, no manual step:
 
-1. **DNS** — upserts `int.sysops247.com → pop0.wslproxy.com` in Cloudflare. The zone id is
+1. **DNS** — upserts `int.sysops247.com → lon1.pop0.uk` in Cloudflare. The zone id is
    resolved from the host's apex (`sysops247.com`), so no new secret is needed.
 2. **wslproxy** — registers + activates the `int.sysops247.com` vhost from the committed
    `.github/wslproxy/data/{servers,rules}/prod/` files (edge TLS via Let's Encrypt).
