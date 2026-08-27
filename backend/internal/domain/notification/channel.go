@@ -24,6 +24,10 @@ const (
 	TypeEmail    ChannelType = "email"
 	TypeWebhook  ChannelType = "webhook"
 	TypeTeams    ChannelType = "teams"
+	// TypeAPNs delivers to Apple devices via push. Unlike the others it holds no
+	// per-channel secret: the signing key is platform config and the destinations
+	// are the org's registered device tokens, looked up at send time.
+	TypeAPNs ChannelType = "apns"
 )
 
 // SupportedTypes are the channel types with a working Notifier today. Others are
@@ -38,6 +42,7 @@ var SupportedTypes = map[ChannelType]bool{
 	TypeSlack:    true,
 	TypeEmail:    true,
 	TypeWebhook:  true,
+	TypeAPNs:     true,
 }
 
 // Channel is a configured delivery destination for an organization.

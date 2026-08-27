@@ -119,6 +119,22 @@ func (r *NotificationRepository) ListEnabledByOrg(ctx context.Context, orgID uui
 		 WHERE org_id=$1 AND enabled=TRUE AND deleted_at IS NULL`, orgID)
 }
 
+// FindByType returns the org's non-deleted channel of a given type, or nil when
+// none exists.
+func (r *NotificationRepository) FindByType(ctx context.Context, orgID uuid.UUID, t notification.ChannelType) (*notification.Channel, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT `+channelColumns+` FROM notification_channels
+		 WHERE org_id=$1 AND type=$2 AND deleted_at IS NULL LIMIT 1`, orgID, string(t))
+	c, err := scanChannel(row)
+	if err != nil {
+		if isNoRows(err) {
+			return nil, nil
+		}
+		return nil, apperror.Internal(fmt.Errorf("find channel by type: %w", err))
+	}
+	return c, nil
+}
+
 func (r *NotificationRepository) query(ctx context.Context, sql string, args ...any) ([]notification.Channel, error) {
 	rows, err := r.pool.Query(ctx, sql, args...)
 	if err != nil {

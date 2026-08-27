@@ -23,13 +23,21 @@ type Repository interface {
 	// ListEnabledByOrg returns the enabled channels for one org, used when
 	// dispatching an alert.
 	ListEnabledByOrg(ctx context.Context, orgID uuid.UUID) ([]Channel, error)
+	// FindByType returns the org's channel of a given type, or nil if none
+	// exists. Used to make channel activation idempotent (see
+	// Service.EnsureAPNsChannel).
+	FindByType(ctx context.Context, orgID uuid.UUID, t ChannelType) (*Channel, error)
 }
 
 // Decrypted is a channel with its secret decrypted, handed to a Notifier at
 // send time. It lives only in memory for the duration of a send.
 type Decrypted struct {
-	Type   ChannelType
-	Name   string
+	Type ChannelType
+	Name string
+	// OrgID is the owning organization. Most notifiers ignore it (their
+	// destination is the channel's own secret), but a fan-out channel like APNs
+	// needs it to look up the org's registered device tokens at send time.
+	OrgID  uuid.UUID
 	Config map[string]string
 	Secret string
 }
