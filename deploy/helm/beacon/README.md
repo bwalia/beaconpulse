@@ -135,7 +135,7 @@ DNS is automated. The `dns` job in `.github/workflows/deploy-k3s.yml` runs befor
 `helm upgrade` and upserts a CNAME in Cloudflare:
 
 ```
-<host from values-<env>.yaml>  CNAME  pop0.wslproxy.com   (proxied=false)
+<host from values-<env>.yaml>  CNAME  lon1.pop0.uk   (proxied=false)
 ```
 
 It reads the hostname straight out of the environment's values file, so the record
@@ -162,5 +162,5 @@ For one-off records (previews, TXT challenges) use the manual
 ```sh
 CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ZONE=beaconpulse.net \
   ./deploy/scripts/cloudflare-dns.sh --name preview.beaconpulse.net \
-    --content pop0.wslproxy.com --dry-run
+    --content lon1.pop0.uk --dry-run
 ```

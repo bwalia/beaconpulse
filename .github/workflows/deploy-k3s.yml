@@ -83,8 +83,8 @@ env:
   # same IP as the prod-our control plane we register the vhost on). pop0 then
   # applies the beaconpulse-prod-default rule, which proxies to the k3s1 Traefik
   # ingress at 13.42.188.136:80, which routes to the beacon pods on debworker00.
-  #   browser -> pop0.wslproxy.com -> 13.42.188.136:80 (traefik) -> beacon-nginx
-  DNS_TARGET: pop0.wslproxy.com
+  #   browser -> lon1.pop0.uk -> 13.42.188.136:80 (traefik) -> beacon-nginx
+  DNS_TARGET: lon1.pop0.uk
   DNS_PROXIED: "false" # DNS-only: cert-manager solves HTTP-01 and wslproxy terminates TLS
 
 jobs:
