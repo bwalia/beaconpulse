@@ -22,6 +22,10 @@ on:
         required: true
         default: "lon1.pop0.uk"
         type: string
+      ZONE:
+        description: "Zone apex override for names the derivation below gets wrong (direct .uk registrations like cognoai.uk, unknown two-label suffixes like workstation.co.th)"
+        required: false
+        type: string
       RECORD_TYPE:
         description: "Record type"
         required: true
@@ -64,11 +68,14 @@ jobs:
           # Registrable apex: last two labels, or last THREE when the TLD is a
           # two-label public suffix (co.uk, org.uk, ...) — "last two" alone
           # derived the zone of grafana.workstation.co.uk as "co.uk".
-          ZONE="$(echo "${{ inputs.RECORD_NAME }}" | awk -F. '{
-            if ($NF=="uk" || $NF=="au" || $NF=="nz" || $NF=="jp" || $NF=="br")
-              print $(NF-2)"."$(NF-1)"."$NF;
-            else
-              print $(NF-1)"."$NF }')"
+          ZONE="${{ inputs.ZONE }}"
+          if [ -z "$ZONE" ]; then
+            ZONE="$(echo "${{ inputs.RECORD_NAME }}" | awk -F. '{
+              if ($NF=="uk" || $NF=="au" || $NF=="nz" || $NF=="jp" || $NF=="br")
+                print $(NF-2)"."$(NF-1)"."$NF;
+              else
+                print $(NF-1)"."$NF }')"
+          fi
           export CLOUDFLARE_ZONE="$ZONE"
           if [ "$ZONE" = "beaconpulse.net" ]; then export CLOUDFLARE_ZONE_ID="$BEACONPULSE_ZONE_ID"; fi
           echo "Upserting ${{ inputs.RECORD_NAME }} (zone ${ZONE})"
