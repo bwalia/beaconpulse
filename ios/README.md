@@ -1,0 +1,92 @@
+# Beacon iOS
+
+A native SwiftUI iPhone/iPad client for the Beacon monitoring platform. One
+codebase ships any brand (SysOps 24/7, Beacon, …) — branding is **pure
+configuration**, not code.
+
+This is **Phase 1**: app foundation + the alert loop (auth, monitors list/detail,
+push registration and deep-link). Later phases add the overview dashboard,
+full CRUD, and App Store polish.
+
+## Requirements
+
+- Xcode 15+ (iOS 17 SDK), a physical device for push testing
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
+- A paid Apple Developer account (for push, Sign in with Apple, and distribution)
+
+## Setup
+
+```sh
+cd ios
+xcodegen generate        # builds Beacon.xcodeproj from project.yml
+open Beacon.xcodeproj
+```
+
+Then in Xcode:
+1. Pick the **SysOps** (or **Beacon**) scheme.
+2. Signing & Capabilities → select your Team. The **Push Notifications** and
+   **Sign in with Apple** capabilities come from the generated entitlements.
+3. Run on a device (push does not work in the simulator).
+
+Before Google sign-in or a real API works, fill in the brand config (below).
+
+## Brands = configuration
+
+Every brand is a folder under `Brands/<Brand>/` plus a two-line target entry in
+`project.yml`. **No Swift changes.** All brand/environment values live in the
+brand's `brand.xcconfig`, are injected into `Info.plist`, and are read once by
+`AppConfig` — nothing is hardcoded in feature code.
+
+| Setting | Where | Notes |
+|---|---|---|
+| `PRODUCT_BUNDLE_IDENTIFIER` | `brand.xcconfig` | Must match the App ID and the backend `BEACON_APNS_TOPIC` |
+| `API_BASE_URL` | `brand.xcconfig` | e.g. `https://api.sysops247.com` (the `/$()/` keeps xcconfig from eating the `//`) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_REVERSED_CLIENT_ID` | `brand.xcconfig` | iOS OAuth client from Google Cloud; leave the `REPLACE_WITH…` placeholder to disable Google |
+| `BRAND_DISPLAY_NAME` / `BRAND_ACCENT_HEX` | `brand.xcconfig` | App name + tint |
+
+**Add a brand:** copy `Brands/SysOps/` to `Brands/<New>/`, edit its values, add a
+target in `project.yml` with `templateAttributes: { brand: <New> }`, re-run
+`xcodegen generate`, drop in an `Assets.xcassets` with the app icon.
+
+## Architecture
+
+- **SwiftUI + `@Observable`** stores (MVVM). Views are thin; state lives in stores.
+- **`APIClient`** — the single HTTP entry point. async/await, bearer auth via an
+  injected `AuthProviding`, one transparent refresh-and-retry on `401`, typed
+  `APIError`, snake_case/RFC3339 decoding. No view builds URLs.
+- **`SessionStore`** — source of truth for auth; tokens in the **Keychain**;
+  coalesced token refresh; conforms to `AuthProviding`.
+- **`PushManager` + `AppDelegate`** — request permission, register with APNs, send
+  the token to `POST /api/v1/devices`, drop it on sign-out, deep-link a tapped
+  alert to its monitor via the `monitor_id` in the payload.
+- **`AppContainer`** — composition root; builds the graph once.
+
+## Push notifications
+
+The device side registers; the **server** pushes (Beacon's Go `apns` notifier,
+Phase 0). For pushes to arrive:
+- Backend has `BEACON_APNS_*` set and `BEACON_APNS_TOPIC` == this brand's bundle id.
+- The build's `aps-environment` entitlement is `development` here. **TestFlight and
+  App Store builds use the _production_ APNs environment** — set `aps-environment`
+  to `production` for distribution (a Release-config entitlements override), and
+  `BEACON_APNS_PRODUCTION=true` on the backend.
+
+## ⚠️ One paired backend task: Sign in with Apple
+
+Apple's App Store rule 4.8 means offering Google requires offering Sign in with
+Apple. The app implements the Apple flow and calls **`POST /api/v1/auth/apple`**
+with the identity token — **that endpoint does not exist yet.** It mirrors the
+existing Google verifier (verify Apple's JWT against Apple's public keys, then
+sign in / provision). Until it's added, the Apple button will fail;
+**email/password and Google work today.**
+
+## Tests
+
+`Cmd-U` under the **SysOps** scheme. `Tests/APIClientTests.swift` covers decoding,
+the error envelope, rate-limit parsing, and the 401→refresh→retry path via a
+mock `URLProtocol` (no network).
+
+## Not yet (later phases)
+
+Overview dashboard + charts, active alerts, projects/maintenance/status, full
+monitor CRUD, iPad split-view polish, and App Store metadata.

@@ -9,8 +9,8 @@ import (
 	"beacon/internal/domain/auth"
 	"beacon/internal/platform/emailmatch"
 	"beacon/internal/platform/httpx"
-	"beacon/internal/transport/rest/middleware"
 	"beacon/internal/platform/validate"
+	"beacon/internal/transport/rest/middleware"
 )
 
 // proxyCookieName is the httpOnly cookie holding the gateway proxy-session token.
@@ -104,6 +104,9 @@ func (h *AuthHandler) Routes() chi.Router {
 	// on the tighter signup bucket rather than the login one.
 	r.With(middleware.RateLimit(signupLimiter, middleware.ByIP, time.Minute)).
 		Post("/google", h.google)
+	// Sign in with Apple, like Google, doubles as signup — same tighter bucket.
+	r.With(middleware.RateLimit(signupLimiter, middleware.ByIP, time.Minute)).
+		Post("/apple", h.apple)
 	r.Post("/refresh", h.refresh)
 	r.Post("/logout", h.logout)
 	return r
@@ -132,6 +135,11 @@ type googleRequest struct {
 	IDToken string `json:"id_token" validate:"required"`
 }
 
+type appleRequest struct {
+	// IdentityToken is the JWT returned by Sign in with Apple on the device.
+	IdentityToken string `json:"identity_token" validate:"required"`
+}
+
 type authResponse struct {
 	AccessToken  string       `json:"access_token"`
 	RefreshToken string       `json:"refresh_token"`
@@ -141,13 +149,13 @@ type authResponse struct {
 }
 
 type userResponse struct {
-	ID           string     `json:"id"`
-	OrgID        string     `json:"org_id"`
-	Email        string     `json:"email"`
-	Name         string     `json:"name"`
-	Role         string     `json:"role"`
-	IsActive     bool       `json:"is_active"`
-	TwoFAEnabled bool       `json:"twofa_enabled"`
+	ID           string `json:"id"`
+	OrgID        string `json:"org_id"`
+	Email        string `json:"email"`
+	Name         string `json:"name"`
+	Role         string `json:"role"`
+	IsActive     bool   `json:"is_active"`
+	TwoFAEnabled bool   `json:"twofa_enabled"`
 	// IsPlatformAdmin is true for operator accounts that may edit platform-global
 	// settings (pricing, limits, premium access). Org role is separate from this.
 	IsPlatformAdmin bool       `json:"is_platform_admin"`
@@ -238,6 +246,27 @@ func (h *AuthHandler) google(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := h.svc.LoginWithGoogle(r.Context(), req.IDToken, requestMeta(r))
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	h.setProxyCookie(w, res.ProxyToken)
+	httpx.OK(w, h.presentAuth(res))
+}
+
+// apple signs a user in from an Apple identity token, creating an org + owner on
+// first sight of the email. It returns the same session response as login.
+func (h *AuthHandler) apple(w http.ResponseWriter, r *http.Request) {
+	var req appleRequest
+	if err := httpx.DecodeJSON(w, r, &req, maxBodyBytes); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	if err := h.validator.Struct(req); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	res, err := h.svc.LoginWithApple(r.Context(), req.IdentityToken, requestMeta(r))
 	if err != nil {
 		httpx.Error(w, r, err)
 		return

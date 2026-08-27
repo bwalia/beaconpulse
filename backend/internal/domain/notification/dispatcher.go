@@ -180,6 +180,7 @@ func (d *Dispatcher) render(ctx context.Context, ev AlertEvent) Message {
 		Title:        title,
 		MonitorName:  ev.MonitorName,
 		MonitorType:  ev.MonitorType,
+		MonitorID:    ev.MonitorID,
 		Target:       ev.Target,
 		Project:      project,
 		Environment:  environment,
@@ -218,7 +219,7 @@ func (d *Dispatcher) recordSuppressed(ctx context.Context, ev AlertEvent) {
 
 // decryptChannel decrypts a channel's secret into a Decrypted value for sending.
 func decryptChannel(cipher *crypto.Cipher, ch *Channel) (Decrypted, error) {
-	dec := Decrypted{Type: ch.Type, Name: ch.Name, Config: ch.Config}
+	dec := Decrypted{Type: ch.Type, Name: ch.Name, OrgID: ch.OrgID, Config: ch.Config}
 	if ch.SecretEncrypted != "" {
 		secret, err := cipher.DecryptString(ch.SecretEncrypted)
 		if err != nil {

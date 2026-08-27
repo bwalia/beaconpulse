@@ -45,6 +45,8 @@ type RouterDeps struct {
 	Diagnose *DiagnoseHandler
 	APIKey   *APIKeyHandler
 	Sync     *SyncHandler
+	// Device registers a mobile device's push token. Session-only, like API keys.
+	Device *DeviceHandler
 }
 
 // NewRouter builds the fully-wired HTTP handler: middleware chain, operational
@@ -163,6 +165,9 @@ func NewRouter(d RouterDeps) http.Handler {
 		// /sync is the declarative endpoint CI calls, and accepts either credential.
 		api.Mount("/api-keys", d.APIKey.Routes())
 		api.Mount("/sync", d.Sync.Routes())
+		// Mobile push-token registration. Session-only (a device belongs to a
+		// signed-in person, not to a machine key).
+		api.Mount("/devices", d.Device.Routes())
 		// Alertmanager webhook: no JWT (Alertmanager can't present one); guarded
 		// by a shared secret inside the handler.
 		api.Post("/alerts/webhook", d.Alert.Webhook)

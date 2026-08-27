@@ -38,7 +38,9 @@ type Config struct {
 	AI        AI
 	Billing   Billing
 	Google    Google
+	Apple     Apple
 	OIDC      OIDC
+	Push      Push
 
 	// AllowPrivateMonitorTargets lets tenants point monitors at private, loopback and
 	// link-local addresses.
@@ -206,6 +208,19 @@ type Google struct {
 // Enabled reports whether Google sign-in is configured.
 func (g Google) Enabled() bool { return len(g.ClientIDs) > 0 }
 
+// Apple holds "Sign in with Apple" configuration. Apple sign-in is OpenID
+// Connect: the app sends Apple's signed identity token and the API verifies it
+// directly (no client secret). Empty ClientIDs disables it (the endpoint 403s).
+type Apple struct {
+	// ClientIDs are the accepted identity-token audiences — the app bundle id, one
+	// per white-label brand (the same value as BEACON_APNS_TOPIC). Comma-separated
+	// in BEACON_APPLE_CLIENT_ID so one API can accept tokens from every brand's app.
+	ClientIDs []string
+}
+
+// Enabled reports whether Apple sign-in is configured.
+func (a Apple) Enabled() bool { return len(a.ClientIDs) > 0 }
+
 // OIDC holds "Sign in with <provider>" via the standard OAuth 2.0 Authorization
 // Code flow against ANY OpenID/OAuth2 provider (OpsAPI, Keycloak, Auth0, …).
 //
@@ -240,6 +255,32 @@ type OIDC struct {
 func (o OIDC) Enabled() bool {
 	return o.ClientID != "" && o.ClientSecret != "" &&
 		o.AuthorizeURL != "" && o.TokenURL != "" && o.UserInfoURL != ""
+}
+
+// Push holds Apple Push Notification service (APNs) configuration. Empty key
+// material disables push entirely (the apns notifier is not registered and the
+// channel silently never delivers) — the same graceful-degradation pattern as
+// Google/Stripe/AI. The signing key is platform-wide: one first-party app, one
+// .p8, shared by every org this deployment serves. A white-label build under a
+// different brand sets a different BEACON_APNS_TOPIC (its bundle id) and, if it
+// ships as a separate Apple app, its own key — all by environment, no code change.
+type Push struct {
+	// APNsKeyP8 is the PEM contents of the Apple .p8 signing key (not a file path).
+	APNsKeyP8 string
+	// APNsKeyID identifies the signing key in Apple's developer portal.
+	APNsKeyID string
+	// APNsTeamID is the Apple Developer Team ID (the provider-token issuer).
+	APNsTeamID string
+	// APNsTopic is the app bundle id, sent as the apns-topic header.
+	APNsTopic string
+	// APNsProduction selects the APNs host: true → api.push.apple.com,
+	// false → the sandbox (which a development build's device tokens are valid for).
+	APNsProduction bool
+}
+
+// Enabled reports whether APNs push is configured.
+func (p Push) Enabled() bool {
+	return p.APNsKeyP8 != "" && p.APNsKeyID != "" && p.APNsTeamID != "" && p.APNsTopic != ""
 }
 
 // Crypto holds symmetric-encryption configuration used to protect secrets at
@@ -357,6 +398,16 @@ func Load() (Config, error) {
 		Google: Google{
 			ClientIDs: getCSV("BEACON_GOOGLE_CLIENT_ID", nil),
 		},
+		Apple: Apple{
+			ClientIDs: getCSV("BEACON_APPLE_CLIENT_ID", nil),
+		},
+		Push: Push{
+			APNsKeyP8:      getStr("BEACON_APNS_KEY_P8", ""),
+			APNsKeyID:      getStr("BEACON_APNS_KEY_ID", ""),
+			APNsTeamID:     getStr("BEACON_APNS_TEAM_ID", ""),
+			APNsTopic:      getStr("BEACON_APNS_TOPIC", ""),
+			APNsProduction: getBool("BEACON_APNS_PRODUCTION", false, add),
+		},
 		OIDC: OIDC{
 			Provider:     getStr("BEACON_OIDC_PROVIDER", "OpsAPI"),
 			ClientID:     getStr("BEACON_OIDC_CLIENT_ID", ""),
@@ -419,6 +470,18 @@ func Load() (Config, error) {
 		if cfg.AI.Model == "" {
 			add("BEACON_AI_MODEL is required when BEACON_AI_ENABLED=true")
 		}
+	}
+	// APNs push is all-or-nothing. A half-set config (a key but no topic) would
+	// look enabled but silently never deliver — exactly the 3 a.m. failure the
+	// rest of this file exists to prevent.
+	apnsSet := 0
+	for _, v := range []string{cfg.Push.APNsKeyP8, cfg.Push.APNsKeyID, cfg.Push.APNsTeamID, cfg.Push.APNsTopic} {
+		if v != "" {
+			apnsSet++
+		}
+	}
+	if apnsSet > 0 && apnsSet < 4 {
+		add("APNs push is partially configured: set all of BEACON_APNS_KEY_P8, BEACON_APNS_KEY_ID, BEACON_APNS_TEAM_ID and BEACON_APNS_TOPIC, or none")
 	}
 
 	if len(errs) > 0 {

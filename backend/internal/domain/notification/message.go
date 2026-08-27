@@ -48,12 +48,15 @@ func (e AlertEvent) Duration(now time.Time) time.Duration {
 // Message is the fully-rendered, channel-agnostic content a Notifier formats and
 // sends. It carries every field the brief requires for a rich alert.
 type Message struct {
-	Status       AlertStatus
-	Severity     string
-	Title        string
-	MonitorName  string
-	MonitorType  string
-	Target       string
+	Status      AlertStatus
+	Severity    string
+	Title       string
+	MonitorName string
+	MonitorType string
+	// MonitorID lets a push notification deep-link to the monitor. Empty for a
+	// test message. Text channels ignore it.
+	MonitorID string
+	Target    string
 	Project      string
 	Environment  string
 	Description  string

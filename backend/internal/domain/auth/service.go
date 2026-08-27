@@ -55,7 +55,9 @@ type Service struct {
 	emailPolicy *EmailPolicy
 	// google verifies Google ID tokens. Nil disables "Sign in with Google".
 	google GoogleVerifier
-	now    func() time.Time
+	// apple verifies Apple identity tokens. Nil disables "Sign in with Apple".
+	apple AppleVerifier
+	now   func() time.Time
 }
 
 // WithEmailPolicy vets the address a signup is made with. See emailpolicy.go for why
@@ -68,6 +70,12 @@ func (s *Service) WithEmailPolicy(p *EmailPolicy) *Service {
 // WithGoogle enables "Sign in with Google" using the given ID-token verifier.
 func (s *Service) WithGoogle(v GoogleVerifier) *Service {
 	s.google = v
+	return s
+}
+
+// WithApple enables "Sign in with Apple" using the given identity-token verifier.
+func (s *Service) WithApple(v AppleVerifier) *Service {
+	s.apple = v
 	return s
 }
 
@@ -284,6 +292,22 @@ func (s *Service) registerGoogleUser(ctx context.Context, id *GoogleIdentity, em
 		"via":    "google",
 	})
 	return result, nil
+}
+
+// LoginWithApple verifies an Apple identity token and signs the user in, creating
+// an org + owner on first sight of the email. "Sign in with Apple" is OpenID
+// Connect, so this reuses the generic OIDC provisioning: the verified Apple
+// subject becomes the account's oidc_sub. Apple's token carries no name, so
+// registerOIDCUser derives one from the email.
+func (s *Service) LoginWithApple(ctx context.Context, identityToken string, meta RequestMeta) (*AuthResult, error) {
+	if s.apple == nil {
+		return nil, apperror.Forbidden("Apple sign-in is not enabled")
+	}
+	id, err := s.apple.Verify(ctx, identityToken)
+	if err != nil {
+		return nil, apperror.Unauthorized("invalid Apple sign-in")
+	}
+	return s.LoginWithOIDC(ctx, id.Subject, id.Email, "", id.EmailVerified, "apple", meta)
 }
 
 // LoginWithOIDC signs a user in from an external OIDC identity that the transport

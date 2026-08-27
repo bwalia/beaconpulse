@@ -61,6 +61,14 @@ func (f *fakeChannelRepo) SoftDelete(_ context.Context, _, id, _ uuid.UUID) erro
 	delete(f.channels, id)
 	return nil
 }
+func (f *fakeChannelRepo) FindByType(_ context.Context, orgID uuid.UUID, t ChannelType) (*Channel, error) {
+	for _, c := range f.channels {
+		if c.OrgID == orgID && c.Type == t {
+			return c, nil
+		}
+	}
+	return nil, nil
+}
 
 type fakeNotifier struct {
 	called bool
@@ -122,6 +130,46 @@ func TestCreateRejectsUnsupportedType(t *testing.T) {
 	})
 	if !apperror.IsCode(err, apperror.CodeValidation) {
 		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestEnsureAPNsChannelIsIdempotentAndRespectsMuting(t *testing.T) {
+	repo := newFakeChannelRepo()
+	cipher, err := crypto.NewCipher(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := NewService(repo, cipher, map[ChannelType]Notifier{}, noopRecorder{}, "http://dash")
+	orgID := uuid.New()
+	ctx := context.Background()
+
+	// First device registration creates an enabled channel.
+	if err := svc.EnsureAPNsChannel(ctx, orgID); err != nil {
+		t.Fatalf("first EnsureAPNsChannel: %v", err)
+	}
+	ch, _ := repo.FindByType(ctx, orgID, TypeAPNs)
+	if ch == nil || !ch.Enabled {
+		t.Fatalf("expected an enabled apns channel, got %+v", ch)
+	}
+
+	// The user then mutes push.
+	ch.Enabled = false
+
+	// A later registration must neither re-enable it nor create a duplicate.
+	if err := svc.EnsureAPNsChannel(ctx, orgID); err != nil {
+		t.Fatalf("second EnsureAPNsChannel: %v", err)
+	}
+	if again, _ := repo.FindByType(ctx, orgID, TypeAPNs); again.Enabled {
+		t.Error("a muted push channel must not be re-enabled on re-registration")
+	}
+	n := 0
+	for _, c := range repo.channels {
+		if c.OrgID == orgID && c.Type == TypeAPNs {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("expected exactly one apns channel, got %d", n)
 	}
 }
 

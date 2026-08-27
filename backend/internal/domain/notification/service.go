@@ -96,6 +96,33 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Cha
 	return ch, nil
 }
 
+// EnsureAPNsChannel turns an org's Apple Push channel on the first time a device
+// registers, so installing the app and allowing notifications is all it takes to
+// start receiving alerts. It only CREATES a missing channel — it never re-enables
+// one the org has deliberately switched off, so a user who muted push stays muted.
+// Idempotent and safe to call on every device registration.
+func (s *Service) EnsureAPNsChannel(ctx context.Context, orgID uuid.UUID) error {
+	existing, err := s.repo.FindByType(ctx, orgID, TypeAPNs)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return nil
+	}
+	now := s.now().UTC()
+	ch := &Channel{
+		ID:        uuid.New(),
+		OrgID:     orgID,
+		Name:      "Apple Push",
+		Type:      TypeAPNs,
+		Enabled:   true,
+		Config:    map[string]string{},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	return s.repo.Create(ctx, ch)
+}
+
 // List returns a paginated page of the org's channels plus the total count.
 func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Channel, int, error) {
 	return s.repo.List(ctx, actor.OrgID, f)

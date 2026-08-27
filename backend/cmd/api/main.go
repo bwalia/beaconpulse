@@ -18,6 +18,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"beacon/internal/adapter/ai"
+	"beacon/internal/adapter/apns"
+	"beacon/internal/adapter/appleauth"
 	"beacon/internal/adapter/googleauth"
 	"beacon/internal/adapter/netprobe"
 	"beacon/internal/adapter/notifier"
@@ -32,6 +34,7 @@ import (
 	"beacon/internal/domain/auth"
 	"beacon/internal/domain/billing"
 	"beacon/internal/domain/configsync"
+	"beacon/internal/domain/device"
 	"beacon/internal/domain/diagnose"
 	"beacon/internal/domain/heartbeat"
 	"beacon/internal/domain/insight"
@@ -131,6 +134,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	heartbeatRepo := postgres.NewHeartbeatRepository(pool)
 	statusPageSettingsRepo := postgres.NewStatusPageSettingsRepository(pool)
 	settingsRepo := postgres.NewSettingsRepository(pool)
+	deviceRepo := postgres.NewDeviceRepository(pool)
 
 	// Cross-cutting.
 	auditRec := audit.NewRecorder(auditRepo)
@@ -181,8 +185,33 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		notification.TypeEmail:    notifier.NewEmailNotifier(),
 		notification.TypeWebhook:  notifier.NewWebhookNotifier(tenantHTTP),
 	}
+	// Apple Push (APNs): registered only when the platform signing key is set, so
+	// a deployment without an iOS app behaves exactly as before. The signing key is
+	// platform-wide (one first-party app); destinations are the org's device tokens.
+	if cfg.Push.Enabled() {
+		key, err := apns.ParseP8Key([]byte(cfg.Push.APNsKeyP8))
+		if err != nil {
+			return nil, fmt.Errorf("apple push: %w", err)
+		}
+		apnsClient, err := apns.New(apns.Config{
+			PrivateKey: key,
+			KeyID:      cfg.Push.APNsKeyID,
+			TeamID:     cfg.Push.APNsTeamID,
+			Topic:      cfg.Push.APNsTopic,
+			Production: cfg.Push.APNsProduction,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("apple push: %w", err)
+		}
+		notifierRegistry[notification.TypeAPNs] = notifier.NewAPNsNotifier(apnsClient, deviceRepo)
+		log.Info("apple push (APNs) enabled",
+			slog.String("topic", cfg.Push.APNsTopic), slog.Bool("production", cfg.Push.APNsProduction))
+	}
 	projectLookup := postgres.NewProjectLookupAdapter(projectRepo)
 	notifySvc := notification.NewService(notificationRepo, cipher, notifierRegistry, auditRec, cfg.Notify.DashboardURL)
+	// Device registration auto-enables the org's Apple Push channel via notifySvc;
+	// a nil activator would just skip that convenience.
+	deviceSvc := device.NewService(deviceRepo, notifySvc)
 	// Maintenance windows both CRUD (below) and suppress alerts: the same service
 	// is the Dispatcher's suppression checker, so planned downtime never pages.
 	maintenanceSvc := maintenance.NewService(maintenanceRepo, auditRec)
@@ -249,6 +278,12 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	if cfg.Google.Enabled() {
 		authSvc = authSvc.WithGoogle(googleauth.New(cfg.Google.ClientIDs))
 		log.Info("google sign-in enabled", "client_ids", len(cfg.Google.ClientIDs))
+	}
+	// "Sign in with Apple" (OpenID Connect). Enabled only when a bundle-id audience
+	// is configured; the endpoint otherwise 403s and the app hides the button.
+	if cfg.Apple.Enabled() {
+		authSvc = authSvc.WithApple(appleauth.New(cfg.Apple.ClientIDs))
+		log.Info("apple sign-in enabled", "client_ids", len(cfg.Apple.ClientIDs))
 	}
 	// "Sign in with <provider>" via generic OIDC (OpsAPI by default). Enabled only
 	// when the client credentials + endpoint URLs are configured; the routes are
@@ -322,6 +357,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Diagnose:           diagnoseHandler,
 		APIKey:             rest.NewAPIKeyHandler(apiKeySvc, validator, authn),
 		Sync:               rest.NewSyncHandler(syncSvc, validator, authn, rest.SyncLimiter()),
+		Device:             rest.NewDeviceHandler(deviceSvc, validator, authn),
 	}), nil
 }
 
