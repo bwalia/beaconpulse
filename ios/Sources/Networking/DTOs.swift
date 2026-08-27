@@ -35,19 +35,69 @@ struct Paginated<T: Decodable>: Decodable {
     }
 }
 
-/// A monitored resource, as returned by GET /api/v1/monitors.
+/// Type-specific probe settings. Every field is optional and encodes only when
+/// set (synthesized `encodeIfPresent`), so editing a monitor round-trips whatever
+/// was configured on the web instead of wiping it.
+struct MonitorSettings: Codable, Equatable {
+    var method: String? = nil
+    var validStatusCodes: [Int]? = nil
+    var bodyKeyword: String? = nil
+    var bodyNotKeyword: String? = nil
+    var followRedirects: Bool? = nil
+    var headers: [String: String]? = nil
+    var skipTlsVerify: Bool? = nil
+    var sslExpiryWarningDays: Int? = nil
+    var responseTimeWarningMs: Int? = nil
+    var alertSensitivity: String? = nil
+    var dnsQueryName: String? = nil
+    var dnsQueryType: String? = nil
+    var dnsExpectedIps: [String]? = nil
+
+    static let empty = MonitorSettings()
+}
+
+/// A monitored resource, as returned by GET /api/v1/monitors. Decodes the full
+/// record (not just the list view) so the same model drives the edit form.
 struct Monitor: Decodable, Identifiable, Equatable {
     let id: String
     let name: String
     let type: String
     let target: String
     let enabled: Bool
+    let intervalSeconds: Int
+    let timeoutSeconds: Int
+    let graceSeconds: Int?
+    let settings: MonitorSettings
     let lastStatus: String
     let lastCheckedAt: Date?
     let projectId: String?
+    let pingUrl: String?
 
     /// The health state as a UI-facing status.
     var status: MonitorStatus { MonitorStatus(rawValue: lastStatus) ?? .unknown }
+}
+
+/// The monitor types the API accepts.
+enum MonitorKind: String, CaseIterable, Identifiable {
+    case http, https, ssl, tcp, icmp, dns, heartbeat
+    var id: String { rawValue }
+    /// A heartbeat is pinged by the customer's job, so it has no probe target.
+    var needsTarget: Bool { self != .heartbeat }
+}
+
+/// A notification channel (GET /api/v1/notification-channels). The secret is never
+/// returned — only `hasSecret`.
+struct Channel: Decodable, Identifiable, Equatable {
+    let id: String
+    let name: String
+    let type: String
+    let enabled: Bool
+    let config: [String: String]
+    let hasSecret: Bool
+
+    /// The Apple Push channel is created and managed automatically; the app only
+    /// toggles it, never edits config/secret.
+    var isManaged: Bool { type == "apns" }
 }
 
 /// The health states a monitor can be in, decoupled from the wire string.
@@ -141,6 +191,48 @@ struct RefreshRequest: Encodable {
 
 struct LogoutRequest: Encodable {
     let refreshToken: String
+}
+
+/// Body for POST /api/v1/monitors.
+struct CreateMonitorBody: Encodable {
+    let projectId: String
+    let name: String
+    let type: String
+    let target: String
+    let enabled: Bool
+    let intervalSeconds: Int
+    let timeoutSeconds: Int
+    let graceSeconds: Int?
+    let settings: MonitorSettings
+}
+
+/// Body for PATCH /api/v1/monitors/{id}. Type is immutable server-side, so it is
+/// absent. `settings` is the full round-tripped object to avoid clobbering.
+struct UpdateMonitorBody: Encodable {
+    let name: String
+    let target: String?
+    let enabled: Bool
+    let intervalSeconds: Int
+    let timeoutSeconds: Int
+    let settings: MonitorSettings
+}
+
+/// Body for POST /api/v1/notification-channels.
+struct CreateChannelBody: Encodable {
+    let name: String
+    let type: String
+    let enabled: Bool
+    let config: [String: String]
+    let secret: String
+}
+
+/// Body for PATCH /api/v1/notification-channels/{id}. A nil `secret` leaves the
+/// stored credential unchanged.
+struct UpdateChannelBody: Encodable {
+    let name: String?
+    let enabled: Bool?
+    let config: [String: String]?
+    let secret: String?
 }
 
 struct RegisterDeviceRequest: Encodable {

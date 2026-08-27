@@ -38,7 +38,11 @@ final class MonitorDetailStore {
 struct MonitorDetailView: View {
     let monitorID: String
     @Environment(AppContainer.self) private var container
+    @Environment(\.dismiss) private var dismiss
     @State private var store: MonitorDetailStore?
+    @State private var showingEdit = false
+    @State private var showingDeleteConfirm = false
+    @State private var actionError: String?
 
     var body: some View {
         Group {
@@ -59,6 +63,66 @@ struct MonitorDetailView: View {
                 store = MonitorDetailStore(client: container.apiClient, monitorID: monitorID)
             }
             await store?.load()
+        }
+        .toolbar {
+            if let monitor {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button { showingEdit = true } label: { Label("Edit", systemImage: "pencil") }
+                        Button {
+                            Task { await setEnabled(monitor, !monitor.enabled) }
+                        } label: {
+                            Label(monitor.enabled ? "Pause" : "Resume",
+                                  systemImage: monitor.enabled ? "pause" : "play")
+                        }
+                        Divider()
+                        Button(role: .destructive) { showingDeleteConfirm = true } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingEdit) {
+            if let monitor {
+                MonitorFormView(mode: .edit(monitor)) { Task { await store?.load() } }
+            }
+        }
+        .confirmationDialog("Delete this monitor?", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await deleteMonitor() } }
+        } message: {
+            Text("This can’t be undone.")
+        }
+        .alert("Action failed", isPresented: .constant(actionError != nil)) {
+            Button("OK") { actionError = nil }
+        } message: {
+            Text(actionError ?? "")
+        }
+    }
+
+    private var monitor: Monitor? {
+        if case let .loaded(monitor, _)? = store?.state { return monitor }
+        return nil
+    }
+
+    private func setEnabled(_ monitor: Monitor, _ enabled: Bool) async {
+        do {
+            try await container.monitors.setEnabled(id: monitor.id, enabled)
+            await store?.load()
+        } catch {
+            actionError = (error as? APIError)?.errorDescription ?? "Couldn’t update the monitor."
+        }
+    }
+
+    private func deleteMonitor() async {
+        guard let monitor else { return }
+        do {
+            try await container.monitors.delete(id: monitor.id)
+            dismiss()
+        } catch {
+            actionError = (error as? APIError)?.errorDescription ?? "Couldn’t delete the monitor."
         }
     }
 

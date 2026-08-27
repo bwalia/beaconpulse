@@ -40,6 +40,7 @@ struct MonitorsListView: View {
 
     @Environment(AppContainer.self) private var container
     @State private var store: MonitorsStore?
+    @State private var showingCreate = false
 
     var body: some View {
         Group {
@@ -74,6 +75,19 @@ struct MonitorsListView: View {
         .task {
             if store == nil { store = MonitorsStore(client: container.apiClient, projectID: projectID) }
             await store?.load()
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingCreate = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add monitor")
+            }
+        }
+        .sheet(isPresented: $showingCreate) {
+            MonitorFormView(mode: .create) { Task { await store?.load() } }
         }
     }
 }
