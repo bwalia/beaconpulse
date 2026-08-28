@@ -42,6 +42,7 @@ struct MonitorsListView: View {
     @State private var store: MonitorsStore?
     @State private var showingCreate = false
     @State private var search = ""
+    @State private var actionError: String?
 
     var body: some View {
         Group {
@@ -72,6 +73,22 @@ struct MonitorsListView: View {
                         NavigationLink(value: monitor.id) {
                             MonitorRow(monitor: monitor)
                         }
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                Task { await setEnabled(monitor, !monitor.enabled) }
+                            } label: {
+                                Label(monitor.enabled ? "Pause" : "Resume",
+                                      systemImage: monitor.enabled ? "pause" : "play")
+                            }
+                            .tint(monitor.enabled ? .orange : .green)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                Task { await deleteMonitor(monitor) }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
                     .listStyle(.plain)
                     .refreshable { await store?.load() }
@@ -95,6 +112,30 @@ struct MonitorsListView: View {
         }
         .sheet(isPresented: $showingCreate) {
             MonitorFormView(mode: .create) { Task { await store?.load() } }
+        }
+        .alert("Action failed",
+               isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
+            Button("OK") { actionError = nil }
+        } message: {
+            Text(actionError ?? "")
+        }
+    }
+
+    private func setEnabled(_ monitor: Monitor, _ enabled: Bool) async {
+        do {
+            try await container.monitors.setEnabled(id: monitor.id, enabled)
+            await store?.load()
+        } catch {
+            actionError = (error as? APIError)?.errorDescription ?? "Couldn’t update the monitor."
+        }
+    }
+
+    private func deleteMonitor(_ monitor: Monitor) async {
+        do {
+            try await container.monitors.delete(id: monitor.id)
+            await store?.load()
+        } catch {
+            actionError = (error as? APIError)?.errorDescription ?? "Couldn’t delete the monitor."
         }
     }
 
