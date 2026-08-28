@@ -13,6 +13,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @State private var showingSignUp = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -20,9 +21,17 @@ struct LoginView: View {
             header
             emailPasswordForm
             thirdPartyButtons
+            signUpPrompt
             Spacer()
         }
         .padding(24)
+        .sheet(isPresented: $showingSignUp) { RegisterView() }
+    }
+
+    private var signUpPrompt: some View {
+        Button("New here? Create an account") { showingSignUp = true }
+            .font(.subheadline)
+            .disabled(isSubmitting)
     }
 
     private var header: some View {

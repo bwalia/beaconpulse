@@ -72,6 +72,7 @@ struct Monitor: Decodable, Identifiable, Equatable {
     let lastCheckedAt: Date?
     let projectId: String?
     let pingUrl: String?
+    let lastPingAt: Date?
 
     /// The health state as a UI-facing status.
     var status: MonitorStatus { MonitorStatus(rawValue: lastStatus) ?? .unknown }
@@ -98,6 +99,19 @@ struct Channel: Decodable, Identifiable, Equatable {
     /// The Apple Push channel is created and managed automatically; the app only
     /// toggles it, never edits config/secret.
     var isManaged: Bool { type == "apns" }
+}
+
+/// A maintenance window (GET /api/v1/maintenance-windows). While active, alerts
+/// for the covered monitors are suppressed. `scope` is org | project | monitor.
+struct MaintenanceWindow: Decodable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let description: String
+    let startsAt: Date
+    let endsAt: Date
+    let scope: String
+    let scopeIds: [String]
+    let active: Bool
 }
 
 /// The health states a monitor can be in, decoupled from the wire string.
@@ -175,6 +189,15 @@ struct LoginRequest: Encodable {
     let password: String
 }
 
+/// Body for POST /api/v1/auth/register — creates an organization and its owner in
+/// one step. `orgName` maps to `org_name` via convertToSnakeCase.
+struct RegisterRequest: Encodable {
+    let orgName: String
+    let name: String
+    let email: String
+    let password: String
+}
+
 struct GoogleSignInRequest: Encodable {
     /// Maps to `id_token` via convertToSnakeCase.
     let idToken: String
@@ -233,6 +256,26 @@ struct UpdateChannelBody: Encodable {
     let enabled: Bool?
     let config: [String: String]?
     let secret: String?
+}
+
+/// Body for POST /api/v1/maintenance-windows.
+struct CreateWindowBody: Encodable {
+    let title: String
+    let description: String
+    let startsAt: Date
+    let endsAt: Date
+    let scope: String
+    let scopeIds: [String]
+}
+
+/// Body for PATCH /api/v1/maintenance-windows/{id}.
+struct UpdateWindowBody: Encodable {
+    let title: String?
+    let description: String?
+    let startsAt: Date?
+    let endsAt: Date?
+    let scope: String?
+    let scopeIds: [String]?
 }
 
 struct RegisterDeviceRequest: Encodable {

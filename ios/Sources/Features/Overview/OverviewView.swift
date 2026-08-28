@@ -119,6 +119,7 @@ struct OverviewView: View {
                 }
                 .frame(height: 150)
                 .chartYAxis { AxisMarks(position: .leading) }
+                .accessibilityLabel("\(title) trend over the selected window")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

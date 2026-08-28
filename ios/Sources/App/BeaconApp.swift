@@ -31,6 +31,7 @@ final class AppContainer {
     let push: PushManager
     let monitors: MonitorService
     let channels: ChannelService
+    let maintenance: MaintenanceService
 
     init() {
         let config = AppConfig.current
@@ -45,6 +46,7 @@ final class AppContainer {
         self.push = PushManager(client: apiClient, session: session)
         self.monitors = MonitorService(client: apiClient)
         self.channels = ChannelService(client: apiClient)
+        self.maintenance = MaintenanceService(client: apiClient)
 
         // Configure Google Sign-In only when this brand ships a client id.
         if let clientID = config.googleClientID {

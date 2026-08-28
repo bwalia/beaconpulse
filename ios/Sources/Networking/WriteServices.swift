@@ -50,3 +50,27 @@ struct ChannelService {
         try await client.send(.init(method: "POST", path: "/api/v1/notification-channels/\(id)/test"))
     }
 }
+
+/// Maintenance-window operations. An active window suppresses alerts for the
+/// monitors it covers.
+struct MaintenanceService {
+    let client: APIClient
+
+    func list() async throws -> [MaintenanceWindow] {
+        try await client.send(
+            .init(path: "/api/v1/maintenance-windows", query: ["limit": "200"]),
+            as: Paginated<MaintenanceWindow>.self).data
+    }
+
+    func create(_ body: CreateWindowBody) async throws -> MaintenanceWindow {
+        try await client.send(.init(method: "POST", path: "/api/v1/maintenance-windows", body: body), as: MaintenanceWindow.self)
+    }
+
+    func update(id: String, _ body: UpdateWindowBody) async throws -> MaintenanceWindow {
+        try await client.send(.init(method: "PATCH", path: "/api/v1/maintenance-windows/\(id)", body: body), as: MaintenanceWindow.self)
+    }
+
+    func delete(id: String) async throws {
+        try await client.send(.init(method: "DELETE", path: "/api/v1/maintenance-windows/\(id)"))
+    }
+}
