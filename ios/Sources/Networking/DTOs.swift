@@ -188,6 +188,15 @@ struct LoginRequest: Encodable {
     let password: String
 }
 
+/// Body for POST /api/v1/auth/register — creates an organization and its owner in
+/// one step. `orgName` maps to `org_name` via convertToSnakeCase.
+struct RegisterRequest: Encodable {
+    let orgName: String
+    let name: String
+    let email: String
+    let password: String
+}
+
 struct GoogleSignInRequest: Encodable {
     /// Maps to `id_token` via convertToSnakeCase.
     let idToken: String

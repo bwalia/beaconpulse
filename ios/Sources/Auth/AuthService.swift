@@ -14,6 +14,15 @@ struct AuthService {
             as: AuthResponse.self)
     }
 
+    /// Creates an organization + owner and signs the new user in.
+    func register(orgName: String, name: String, email: String, password: String) async throws -> AuthResponse {
+        try await client.send(
+            .init(method: "POST", path: "/api/v1/auth/register",
+                  body: RegisterRequest(orgName: orgName, name: name, email: email, password: password),
+                  authenticated: false),
+            as: AuthResponse.self)
+    }
+
     func signInWithGoogle(idToken: String) async throws -> AuthResponse {
         try await client.send(
             .init(method: "POST", path: "/api/v1/auth/google",
