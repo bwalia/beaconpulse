@@ -72,6 +72,7 @@ struct Monitor: Decodable, Identifiable, Equatable {
     let lastCheckedAt: Date?
     let projectId: String?
     let pingUrl: String?
+    let lastPingAt: Date?
 
     /// The health state as a UI-facing status.
     var status: MonitorStatus { MonitorStatus(rawValue: lastStatus) ?? .unknown }

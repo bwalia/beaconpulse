@@ -1,5 +1,6 @@
 import Charts
 import SwiftUI
+import UIKit
 
 /// Loads one monitor plus its 24h metrics. Fetched by id so the same screen works
 /// from a list tap and from a push-notification deep-link.
@@ -48,7 +49,7 @@ struct MonitorDetailView: View {
         Group {
             switch store?.state {
             case .loading, .none:
-                ProgressView()
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             case let .failed(message):
                 ContentUnavailableView("Couldn’t load", systemImage: "exclamationmark.triangle",
                                        description: Text(message))
@@ -96,7 +97,8 @@ struct MonitorDetailView: View {
         } message: {
             Text("This can’t be undone.")
         }
-        .alert("Action failed", isPresented: .constant(actionError != nil)) {
+        .alert("Action failed",
+               isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
             Button("OK") { actionError = nil }
         } message: {
             Text(actionError ?? "")
@@ -142,9 +144,21 @@ struct MonitorDetailView: View {
                         Text(monitor.status.rawValue.capitalized)
                     }
                 }
-                LabeledContent("Target", value: monitor.target)
+                if monitor.type != "heartbeat" {
+                    LabeledContent("Target", value: monitor.target)
+                }
                 LabeledContent("Type", value: monitor.type.uppercased())
                 LabeledContent("Enabled", value: monitor.enabled ? "Yes" : "No")
+                LabeledContent("Interval", value: "\(monitor.intervalSeconds)s")
+                LabeledContent("Timeout", value: "\(monitor.timeoutSeconds)s")
+                if let lastChecked = monitor.lastCheckedAt {
+                    LabeledContent("Last checked",
+                                   value: lastChecked.formatted(.relative(presentation: .named)))
+                }
+            }
+
+            if monitor.type == "heartbeat", let ping = monitor.pingUrl {
+                heartbeatSection(ping, lastPingAt: monitor.lastPingAt)
             }
 
             if let metrics {
@@ -167,6 +181,31 @@ struct MonitorDetailView: View {
                     }
                 }
             }
+        }
+        .refreshable { await store?.load() }
+    }
+
+    /// The heartbeat ping URL is stored relative (e.g. "/api/v1/ping/<token>");
+    /// resolve it against the API base so the value shown is the full URL the
+    /// customer's job should call, with a one-tap copy.
+    @ViewBuilder
+    private func heartbeatSection(_ pingURL: String, lastPingAt: Date?) -> some View {
+        let full = URL(string: pingURL, relativeTo: AppConfig.current.apiBaseURL)?.absoluteString ?? pingURL
+        Section("Heartbeat") {
+            LabeledContent("Ping URL") {
+                Button {
+                    UIPasteboard.general.string = full
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+                .accessibilityLabel("Copy ping URL")
+            }
+            Text(full)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            LabeledContent("Last ping",
+                           value: lastPingAt?.formatted(.relative(presentation: .named)) ?? "Never")
         }
     }
 }
