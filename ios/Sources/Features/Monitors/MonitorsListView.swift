@@ -41,6 +41,7 @@ struct MonitorsListView: View {
     @Environment(AppContainer.self) private var container
     @State private var store: MonitorsStore?
     @State private var showingCreate = false
+    @State private var search = ""
 
     var body: some View {
         Group {
@@ -63,15 +64,21 @@ struct MonitorsListView: View {
                 }
 
             case let .loaded(monitors):
-                List(monitors) { monitor in
-                    NavigationLink(value: monitor.id) {
-                        MonitorRow(monitor: monitor)
+                let shown = filtered(monitors)
+                if shown.isEmpty {
+                    ContentUnavailableView.search(text: search)
+                } else {
+                    List(shown) { monitor in
+                        NavigationLink(value: monitor.id) {
+                            MonitorRow(monitor: monitor)
+                        }
                     }
+                    .listStyle(.plain)
+                    .refreshable { await store?.load() }
                 }
-                .listStyle(.plain)
-                .refreshable { await store?.load() }
             }
         }
+        .searchable(text: $search, prompt: "Search monitors")
         .task {
             if store == nil { store = MonitorsStore(client: container.apiClient, projectID: projectID) }
             await store?.load()
@@ -88,6 +95,17 @@ struct MonitorsListView: View {
         }
         .sheet(isPresented: $showingCreate) {
             MonitorFormView(mode: .create) { Task { await store?.load() } }
+        }
+    }
+
+    /// Filters the loaded page by name or target. Client-side: the list is one
+    /// page, so this avoids a round-trip per keystroke.
+    private func filtered(_ monitors: [Monitor]) -> [Monitor] {
+        let query = search.trimmed
+        guard !query.isEmpty else { return monitors }
+        return monitors.filter {
+            $0.name.localizedCaseInsensitiveContains(query)
+                || $0.target.localizedCaseInsensitiveContains(query)
         }
     }
 }

@@ -100,6 +100,19 @@ struct Channel: Decodable, Identifiable, Equatable {
     var isManaged: Bool { type == "apns" }
 }
 
+/// A maintenance window (GET /api/v1/maintenance-windows). While active, alerts
+/// for the covered monitors are suppressed. `scope` is org | project | monitor.
+struct MaintenanceWindow: Decodable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let description: String
+    let startsAt: Date
+    let endsAt: Date
+    let scope: String
+    let scopeIds: [String]
+    let active: Bool
+}
+
 /// The health states a monitor can be in, decoupled from the wire string.
 enum MonitorStatus: String {
     case up, down, degraded, paused, unknown
@@ -233,6 +246,26 @@ struct UpdateChannelBody: Encodable {
     let enabled: Bool?
     let config: [String: String]?
     let secret: String?
+}
+
+/// Body for POST /api/v1/maintenance-windows.
+struct CreateWindowBody: Encodable {
+    let title: String
+    let description: String
+    let startsAt: Date
+    let endsAt: Date
+    let scope: String
+    let scopeIds: [String]
+}
+
+/// Body for PATCH /api/v1/maintenance-windows/{id}.
+struct UpdateWindowBody: Encodable {
+    let title: String?
+    let description: String?
+    let startsAt: Date?
+    let endsAt: Date?
+    let scope: String?
+    let scopeIds: [String]?
 }
 
 struct RegisterDeviceRequest: Encodable {

@@ -14,6 +14,10 @@ final class PushManager: NSObject {
     /// it to deep-link, then clears it.
     var pendingMonitorID: String?
 
+    /// The system notification permission, surfaced in Settings so a user who
+    /// denied it understands why no alerts arrive.
+    var authorizationStatus: UNAuthorizationStatus = .notDetermined
+
     @ObservationIgnored private let client: APIClient
     @ObservationIgnored private weak var session: SessionStore?
     @ObservationIgnored private var lastRegisteredToken: String?
@@ -30,8 +34,15 @@ final class PushManager: NSObject {
     func requestAuthorizationAndRegister() async {
         let center = UNUserNotificationCenter.current()
         let granted = (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) ?? false
+        authorizationStatus = await center.notificationSettings().authorizationStatus
         guard granted else { return }
         UIApplication.shared.registerForRemoteNotifications()
+    }
+
+    /// Re-reads the current permission (e.g. when Settings appears, in case the
+    /// user changed it in the iOS Settings app).
+    func refreshAuthorizationStatus() async {
+        authorizationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 
     /// Called by the AppDelegate with the raw APNs token. Sends it to the backend
