@@ -141,6 +141,7 @@ struct ChannelRow: View {
             Spacer()
             Toggle("", isOn: Binding(get: { channel.enabled }, set: { value in Task { await onToggle(value) } }))
                 .labelsHidden()
+                .accessibilityLabel("\(channel.name), notifications")
         }
         .padding(.vertical, 2)
     }

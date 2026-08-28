@@ -81,6 +81,7 @@ struct MonitorDetailView: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
+                            .accessibilityLabel("More actions")
                     }
                 }
             }
@@ -162,6 +163,7 @@ struct MonitorDetailView: View {
                         }
                         .frame(height: 160)
                         .padding(.vertical, 8)
+                        .accessibilityLabel("Response time over the last 24 hours")
                     }
                 }
             }
