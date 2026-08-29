@@ -71,14 +71,38 @@ Phase 0). For pushes to arrive:
   to `production` for distribution (a Release-config entitlements override), and
   `BEACON_APNS_PRODUCTION=true` on the backend.
 
-## ⚠️ One paired backend task: Sign in with Apple
+## Sign in with Apple
 
 Apple's App Store rule 4.8 means offering Google requires offering Sign in with
-Apple. The app implements the Apple flow and calls **`POST /api/v1/auth/apple`**
-with the identity token — **that endpoint does not exist yet.** It mirrors the
-existing Google verifier (verify Apple's JWT against Apple's public keys, then
-sign in / provision). Until it's added, the Apple button will fail;
-**email/password and Google work today.**
+Apple. The app calls **`POST /api/v1/auth/apple`** with the identity token; the
+backend verifies it against Apple's JWKS (set `BEACON_APPLE_CLIENT_ID` to the
+bundle id). The Sign in with Apple capability is enabled on the
+`com.sysops247.app` App ID (as a primary app).
+
+## Release (TestFlight / App Store)
+
+`.github/workflows/ios-release.yml` builds, signs, and uploads the **SysOps**
+brand on every push to `main` that touches `ios/**` (TestFlight, internal
+testers). `workflow_dispatch` offers a marketing-version override and a
+`target=app_store` option that submits the last build for review.
+
+It runs on the self-hosted Mac Studio runner and mirrors the Ring Promoter
+pipeline: signing material (App Store Connect API key, team id) comes from
+HashiCorp Vault at `secret/beaconpulse/ios` via `ci/load-ios-vault-secrets.sh`;
+fastlane `cert`/`sigh` reuse the team's Apple Distribution certificate from a
+persistent shared keychain and force-regenerate the App Store profile. The
+workflow regenerates the project with XcodeGen and flips `aps-environment` to
+`production` (TestFlight and the App Store deliver over production APNs) before
+archiving. Build numbers come from TestFlight (`latest + 1`); the marketing
+version is `MARKETING_VERSION` in `project.yml`.
+
+Local rehearsal (uses your Vault token; never commits secrets):
+
+```sh
+cd ios && bundle install
+eval "$(VAULT_TOKEN_FILE=$HOME/.secrets/acc-vault/login-token.json ./ci/load-ios-vault-secrets.sh)"
+bundle exec fastlane ios ci_build_number   # needs VERSION_NAME set
+```
 
 ## Tests
 

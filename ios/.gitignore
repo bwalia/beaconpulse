@@ -17,5 +17,14 @@ Package.resolved
 # Local secret overrides — never commit real client ids / URLs here.
 Brands/**/*.local.xcconfig
 
+# fastlane output (report.xml/README.md are regenerated every run; certs and
+# profiles land here when RUNNER_TEMP is unset) + local Vault secret files.
+fastlane/report.xml
+fastlane/README.md
+fastlane/*.cer
+fastlane/*.p12
+*.mobileprovision
+.ios-secrets/
+
 # macOS
 .DS_Store

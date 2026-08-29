@@ -14,9 +14,9 @@ brands (SysOps 24/7, Beacon) — **brand is always configuration, never hardcode
 
 ## iOS app — current status
 
-Work is on branch **`feat/ios-apns-push`** (committed, not yet PR'd/merged).
-White-label SwiftUI app + a server-push (APNs) path so monitor alerts reach the
-phone instead of Telegram. Build plan artifact:
+All merged to `main` (PRs #75–#77). White-label SwiftUI app + a server-push
+(APNs) path so monitor alerts reach the phone instead of Telegram. Build plan
+artifact:
 https://claude.ai/code/artifact/46a5bfe8-19eb-4bc7-a2ef-0091bf3d3c0d
 
 Done:
@@ -41,30 +41,32 @@ Next: **Phase 4 — ship** (iPad split-view polish, empty/error/loading states,
 accessibility, TestFlight → App Store). Deferred (lower value): maintenance-window
 CRUD, platform settings screen. Billing stays web-only (Apple IAP rules).
 
-Verification note: the app's SwiftUI/Charts/GoogleSignIn code has **only been
-type-checked/parsed against the macOS SDK here — it has never been built in Xcode.**
-The first device build is the real test.
+Verification note: the app now **builds clean against the iOS SDK** (Release,
+`xcodebuild` on this Mac) and exports a signed App Store IPA via the fastlane
+lanes. It has still never been run on a physical device — that's the next test.
 
-## ⚠️ Tasks that need the Apple Developer account (do these on this Mac)
+## Apple Developer account state (mostly DONE)
 
-These were blocked on the machine without the account. Do them here, then set the
-backend secrets below.
+Apple team id `PAS2QUVJHC`. Done: App ID `com.sysops247.app` registered with
+**Push Notifications + Sign in with Apple** (primary app) enabled; App Store
+Connect app record **SysOps247** (app id `6806569966`) exists; APNs auth key
+`7294JN7U4Y` created and stored in Vault at **`secret/beaconpulse/apns`**
+(ready-made `BEACON_APNS_*` values — the `.p8` is a one-time download, treat
+Vault as the source of truth); Google iOS OAuth client id set in
+`ios/Brands/SysOps/brand.xcconfig`.
 
-1. **App ID** — register bundle id `com.sysops247.app` (Identifiers → +). Enable
-   **Push Notifications** and **Sign in with Apple** capabilities.
-2. **APNs Auth Key (.p8)** — Keys → +, tick *Apple Push Notifications service*. Download
-   the `.p8` (one time!) and note the **Key ID**. The **Team ID** is under Membership.
-   → these become the backend `BEACON_APNS_*` secrets.
-3. **Sign in with Apple** — needs *no separate key* for a native app: the capability on
-   the App ID + the entitlement (already in `ios/project.yml`) is enough. The backend
-   only needs the bundle id as the token audience (`BEACON_APPLE_CLIENT_ID`).
-4. **Google iOS OAuth client id** (Google Cloud Console, *not* Apple) — create an iOS
-   OAuth client, put the client id + its reversed form in
-   `ios/Brands/SysOps/brand.xcconfig` (`GOOGLE_CLIENT_ID`, `GOOGLE_REVERSED_CLIENT_ID`).
-   Leave the `REPLACE_WITH…` placeholder to keep Google sign-in disabled.
-5. **Xcode signing** — open the project (below), select your Team on each app target.
-6. **App Store Connect** — create the app record, then TestFlight (internal testers),
-   later App Store (privacy labels, screenshots, a review demo account).
+Still manual: TestFlight internal testers, App Store metadata (privacy labels,
+screenshots, review demo account).
+
+## iOS release pipeline (TestFlight on push to main)
+
+`.github/workflows/ios-release.yml` + `ios/fastlane/` — every push to `main`
+touching `ios/**` builds, signs, and uploads the SysOps brand to TestFlight
+(internal). `workflow_dispatch` adds a version override and `target=app_store`
+to submit for review. Runs on the self-hosted Mac Studio runner
+(`hh193-beacon`); signing uses the App Store Connect API key from Vault
+`secret/beaconpulse/ios` and the shared team keychain (mirrors ring-promoter's
+pipeline — see `ios/README.md` → Release).
 
 ## Backend env / secrets to set (sealed secrets per deployment)
 
