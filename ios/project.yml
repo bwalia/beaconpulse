@@ -34,6 +34,7 @@ targetTemplates:
     platform: iOS
     sources:
       - path: Sources
+      - path: Brands/${brand}/Assets.xcassets
     configFiles:
       Debug: Brands/${brand}/brand.xcconfig
       Release: Brands/${brand}/brand.xcconfig

@@ -15,8 +15,8 @@ API_BASE_URL = https:/$()/sysops247.com
 // Google Sign-In: the iOS OAuth client id (NOT the web client id) from Google
 // Cloud Console, and its reversed form for the URL scheme. Fill both in before
 // enabling Google sign-in; email/password works without them.
-GOOGLE_CLIENT_ID = REPLACE_WITH_GOOGLE_IOS_CLIENT_ID
-GOOGLE_REVERSED_CLIENT_ID = REPLACE_WITH_REVERSED_GOOGLE_IOS_CLIENT_ID
+GOOGLE_CLIENT_ID = 325734158501-9aic9mkka0n3hmdhfm4l4kbfklsd6esm.apps.googleusercontent.com
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.325734158501-9aic9mkka0n3hmdhfm4l4kbfklsd6esm
 
 // Brand accent colour (hex, no #). Drives the app tint via AppConfig.
 BRAND_ACCENT_HEX = 1D64E8
