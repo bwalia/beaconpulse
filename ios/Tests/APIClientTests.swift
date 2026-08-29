@@ -65,7 +65,8 @@ final class APIClientTests: XCTestCase {
         MockURLProtocol.handler = { req in
             self.ok(req, """
             {"data":[{"id":"1","name":"api","type":"https","target":"https://x",
-            "enabled":true,"last_status":"up","last_checked_at":null,"project_id":null}],
+            "enabled":true,"interval_seconds":60,"timeout_seconds":10,"settings":{},
+            "last_status":"up","last_checked_at":null,"project_id":null}],
             "pagination":{"total":1,"limit":100,"offset":0}}
             """)
         }
@@ -116,6 +117,7 @@ final class APIClientTests: XCTestCase {
             }
             return self.ok(req, """
             {"id":"1","name":"api","type":"https","target":"t","enabled":true,
+            "interval_seconds":60,"timeout_seconds":10,"settings":{},
             "last_status":"up","last_checked_at":null,"project_id":null}
             """)
         }

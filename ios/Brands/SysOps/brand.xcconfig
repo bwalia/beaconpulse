@@ -5,7 +5,7 @@
 // changes. Do NOT hardcode any of these in code; read them through AppConfig.
 
 PRODUCT_BUNDLE_IDENTIFIER = com.sysops247.app
-PRODUCT_NAME = SysOps 247
+PRODUCT_NAME = SysOps
 BRAND_DISPLAY_NAME = SysOps 24/7
 
 // API base URL. The `/$()/` splits the `//` so xcconfig does not treat it as a
