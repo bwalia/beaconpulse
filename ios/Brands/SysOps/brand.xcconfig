@@ -10,7 +10,7 @@ BRAND_DISPLAY_NAME = SysOps 24/7
 
 // API base URL. The `/$()/` splits the `//` so xcconfig does not treat it as a
 // comment — the value resolves to a normal https URL.
-API_BASE_URL = https:/$()/api.sysops247.com
+API_BASE_URL = https:/$()/sysops247.com
 
 // Google Sign-In: the iOS OAuth client id (NOT the web client id) from Google
 // Cloud Console, and its reversed form for the URL scheme. Fill both in before
