@@ -142,6 +142,22 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :aps-environment production" \
             "Brands/${{ matrix.brand.dir }}/${{ matrix.brand.dir }}.entitlements"
 
+          # A brand with no Google iOS client leaves GOOGLE_REVERSED_CLIENT_ID as the
+          # REPLACE_WITH_… placeholder. That still gets substituted into
+          # CFBundleURLSchemes, and altool rejects the upload:
+          #   "URL schemes ... need to begin with an alphabetic character, and be
+          #    comprised of alphanumeric characters, the period, the hyphen or the
+          #    plus sign only" (90158) — underscores are not legal.
+          # The app already disables Google sign-in for a placeholder (AppConfig
+          # treats a REPLACE_WITH prefix as nil), so the scheme is dead weight in that
+          # case: drop the whole CFBundleURLTypes array rather than ship an invalid one.
+          plist="Brands/${{ matrix.brand.dir }}/Info.plist"
+          xcconfig="Brands/${{ matrix.brand.dir }}/brand.xcconfig"
+          if grep -qE '^ *GOOGLE_REVERSED_CLIENT_ID *= *REPLACE_WITH' "$xcconfig"; then
+            echo "No Google iOS client for ${{ matrix.brand.dir }} — removing CFBundleURLTypes"
+            /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" "$plist" 2>/dev/null || true
+          fi
+
       - name: Resolve marketing version
         env:
           INPUT_VERSION: ${{ inputs.version }}

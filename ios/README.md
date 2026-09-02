@@ -41,7 +41,7 @@ brand's `brand.xcconfig`, are injected into `Info.plist`, and are read once by
 |---|---|---|
 | `PRODUCT_BUNDLE_IDENTIFIER` | `brand.xcconfig` | Must match the App ID and the backend `BEACON_APNS_TOPIC` |
 | `API_BASE_URL` | `brand.xcconfig` | e.g. `https://api.sysops247.com` (the `/$()/` keeps xcconfig from eating the `//`) |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_REVERSED_CLIENT_ID` | `brand.xcconfig` | iOS OAuth client from Google Cloud; leave the `REPLACE_WITH…` placeholder to disable Google |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_REVERSED_CLIENT_ID` | `brand.xcconfig` | iOS OAuth client from Google Cloud; leave the `REPLACE_WITH…` placeholder to disable Google. The release workflow then strips `CFBundleURLTypes` before archiving — altool rejects an upload whose URL scheme contains underscores (error 90158), and the app hides the Google button for a placeholder anyway |
 | `BRAND_DISPLAY_NAME` / `BRAND_ACCENT_HEX` | `brand.xcconfig` | App name + tint |
 
 **Add a brand:** copy `Brands/SysOps/` to `Brands/<New>/`, edit its values, render a
