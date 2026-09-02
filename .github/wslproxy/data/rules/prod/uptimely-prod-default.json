@@ -1,0 +1,39 @@
+{
+  "id": "uptimely-prod-default",
+  "name": "uptimely-prod-default",
+  "profile_id": "prod",
+  "priority": 1,
+  "rules_tags": [
+    "uptimely",
+    "prod"
+  ],
+  "match": {
+    "response": {
+      "strip_path": false,
+      "auto_redirect_https": false,
+      "code": 305,
+      "allow": true,
+      "routing": {
+        "mode": "least_conn"
+      },
+      "is_consul": false,
+      "redirect_uri": "vpnhh.workstation.co.uk:8888",
+      "backends": [
+        {
+          "address": "vpnhh.workstation.co.uk:8888",
+          "weight": 100,
+          "label": "k3s1 traefik ingress entry (klipper) \u2014 routes by Host to beacon-nginx in the uptimely-prod namespace. Same target beaconpulse-prod-default uses."
+        }
+      ]
+    },
+    "rules": {
+      "path_key": "starts_with",
+      "path": "/",
+      "jwt_token_validation": "equals"
+    }
+  },
+  "servers": [
+    "host:uptimely.org",
+    "host:www.uptimely.org"
+  ]
+}

@@ -61,14 +61,38 @@ Result: `https://int.sysops247.com` serving the green SysOps 24/7 dashboard.
 3. Run the workflow with `BRAND=sysops`. The chart never hardcodes a domain — `host` is
    the only knob.
 
-## Add a THIRD brand
+## Uptimely (amber) — the third brand, on uptimely.org
 
-1. `frontend/src/brand/<brand>.ts` (copy `sysops.ts`; change name, ramp, mark) and register
-   it in `src/brand/index.ts`.
+Built exactly by the recipe below. Environments:
+
+| Env | Host | Namespace | Secrets |
+|---|---|---|---|
+| int  | `int.uptimely.org` | `uptimely-int`  | copied from `int` (`existing`) |
+| prod | `uptimely.org` (+ `www`) | `uptimely-prod` | dedicated, from wslvault (`external`) |
+
+Deploy with **BRAND** = `uptimely`, **TARGET_ENV** = `int` or `prod`.
+
+**Before the first `prod` deploy**, populate its dedicated secrets — ESO reads
+`kv/beaconpulse/uptimely-prod/config`, and an ExternalSecret that never resolves fails
+*quietly* (helm goes green, pods come up with no `POSTGRES_PASSWORD`):
+
+    deploy/scripts/vault-load-secrets.sh uptimely-prod
+
+Unlike SysOps, uptimely-prod is **not** pinned to cloud003 — a second full production
+stack on that single edge node risks exhausting it, so Uptimely takes beaconpulse.net's
+path through the k3s1 traefik ingress instead. See values-uptimely-prod.yaml.
+
+## Add a FOURTH brand
+
+1. `frontend/src/brand/<brand>.ts` (copy `uptimely.ts`; change name, ramp, mark) and
+   register it in `src/brand/index.ts`.
 2. Add `BRAND: <brand>` to the workflow's choice list.
-3. Add `values-<brand>-int.yaml` (copy the SysOps overlay; change `host`) and the wslproxy
-   vhost JSON.
+3. Add `values-<brand>-int.yaml` (copy the Uptimely overlay; change `host`) and the
+   wslproxy vhost JSON — a server file per host, plus a `<brand>-prod-default` rule for
+   the apex; for `int`, add the host to the shared `aws-k3s1-ingress-klipper-80` rule's
+   `servers` list instead.
 4. Run the workflow with `BRAND=<brand>`.
+5. For the iOS app, see `ios/README.md` → "Add a brand".
 
 ## Colour / theme
 

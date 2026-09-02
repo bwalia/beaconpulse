@@ -1,3 +1,13 @@
-app_identifier("com.sysops247.app")
+# Resolved per brand from $BRAND, mirroring the BRANDS table in the Fastfile. The
+# Appfile is loaded in its own context, so the table cannot be shared — keep the two
+# in step when adding a brand. An unset BRAND resolves to sysops, the original default.
+app_identifier(
+  {
+    "sysops" => "com.sysops247.app",
+    "uptimely" => "org.uptimely.app",
+  }.fetch(ENV["BRAND"].to_s.empty? ? "sysops" : ENV["BRAND"].downcase) do |key|
+    UI.user_error!("unknown BRAND '#{key}' — add it to the Appfile and the Fastfile")
+  end
+)
 
 # Team id is supplied at build time via APPLE_TEAM_ID from Vault.

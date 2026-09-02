@@ -1,5 +1,6 @@
 import { beacon } from "./beacon";
 import { sysops } from "./sysops";
+import { uptimely } from "./uptimely";
 import type { Brand } from "./types";
 
 export type { Brand } from "./types";
@@ -9,6 +10,7 @@ export type { Brand } from "./types";
 const BRANDS: Record<string, Brand> = {
   beacon,
   sysops,
+  uptimely,
 };
 
 // Selected at BUILD time by NEXT_PUBLIC_BRAND. Next inlines NEXT_PUBLIC_* into the

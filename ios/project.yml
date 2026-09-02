@@ -64,6 +64,10 @@ targets:
     templates: [BrandApp]
     templateAttributes:
       brand: Beacon
+  Uptimely:
+    templates: [BrandApp]
+    templateAttributes:
+      brand: Uptimely
 
   BeaconTests:
     type: bundle.unit-test

@@ -1,6 +1,11 @@
 name: iOS Release (TestFlight & App Store)
 
-# Build, sign, and upload the SysOps 24/7 iOS app.
+# Build, sign, and upload the white-label iOS apps (SysOps 24/7, Uptimely).
+#
+# Both brands are targets in ONE XcodeGen project sharing one source set, so a run
+# builds them as a serialised matrix — never in parallel: `prepare_signing` rewrites
+# the shared Beacon.xcodeproj and the shared signing keychain, so two brands building
+# at once would sign each other's target.
 #
 #   PRIMARY   : every push to main — TestFlight internal. Deliberately NOT
 #               filtered on ios/**: the app is a client of this backend, so a
@@ -33,6 +38,15 @@ on:
         options:
           - testflight
           - app_store
+      brand:
+        description: "Which brand to ship"
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - sysops
+          - uptimely
   push:
     branches:
       - main
@@ -44,16 +58,47 @@ concurrency:
 permissions:
   contents: read
 
-defaults:
-  run:
-    working-directory: ios
-
 jobs:
+  # Which brands this run ships. A push builds every brand; a manual run can pick one.
+  # `dir` is the Brands/<dir>/ folder and the scheme name; `key` is what $BRAND uses.
+  prepare:
+    name: Resolve brand matrix
+    runs-on: ubuntu-latest
+    outputs:
+      brands: ${{ steps.matrix.outputs.brands }}
+    steps:
+      - id: matrix
+        env:
+          SELECTED: ${{ github.event_name == 'workflow_dispatch' && inputs.brand || 'all' }}
+        run: |
+          set -euo pipefail
+          ALL='[{"key":"sysops","dir":"SysOps"},{"key":"uptimely","dir":"Uptimely"}]'
+          if [ "$SELECTED" = "all" ]; then
+            BRANDS="$ALL"
+          else
+            BRANDS="$(printf '%s' "$ALL" | python3 -c 'import json,os,sys; print(json.dumps([b for b in json.load(sys.stdin) if b["key"] == os.environ["SELECTED"]]))')"
+          fi
+          [ "$BRANDS" != "[]" ] || { echo "::error::no brand matches '$SELECTED'"; exit 1; }
+          echo "Building: $BRANDS"
+          echo "brands=$BRANDS" >> "$GITHUB_OUTPUT"
+
   release:
-    name: Build & upload (${{ github.event_name == 'workflow_dispatch' && inputs.target || 'testflight' }})
+    name: ${{ matrix.brand.dir }} → ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'testflight' }}
+    needs: [prepare]
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 90
+    strategy:
+      # Serialised on purpose — see the header. One brand failing must not cancel the
+      # other, so the second still reaches TestFlight.
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        brand: ${{ fromJSON(needs.prepare.outputs.brands) }}
+    defaults:
+      run:
+        working-directory: ios
     env:
+      BRAND: ${{ matrix.brand.key }}
       VAULT_TOKEN_FILE: /Users/balinderwalia/.secrets/acc-vault/login-token.json
       LANG: en_US.UTF-8
       LC_ALL: en_US.UTF-8
@@ -95,7 +140,7 @@ jobs:
           # TestFlight and the App Store deliver over the *production* APNs
           # environment; the generated entitlements default to development.
           /usr/libexec/PlistBuddy -c "Set :aps-environment production" \
-            Brands/SysOps/SysOps.entitlements
+            "Brands/${{ matrix.brand.dir }}/${{ matrix.brand.dir }}.entitlements"
 
       - name: Resolve marketing version
         env:
@@ -135,8 +180,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sysops-ios-ipa
-          path: ios/build/SysOps.ipa
+          name: ${{ matrix.brand.key }}-ios-ipa
+          path: ios/build/${{ matrix.brand.dir }}.ipa
           if-no-files-found: warn
           retention-days: 14
 

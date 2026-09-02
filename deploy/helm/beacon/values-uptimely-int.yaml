@@ -1,0 +1,55 @@
+# ── Uptimely — integration environment ──────────────────────────────────────
+# Namespace: uptimely-int   Host: https://int.uptimely.org
+#
+# The THIRD brand, built exactly like SysOps 24/7 (see values-sysops-int.yaml):
+#   • image.frontendTag points at a frontend image built with NEXT_PUBLIC_BRAND=uptimely
+#     (name, mark and the AMBER theme are baked in at build time — src/brand/uptimely.ts).
+#   • The api/worker images are brand-neutral, so they are shared with Beacon unchanged.
+#
+# FULLY AUTOMATED: run the "Beacon … Deploy to K3S" workflow with BRAND=uptimely,
+# TARGET_ENV=int — DNS + wslproxy + build + deploy, no manual step. See DEPLOY-A-BRAND.md.
+env: uptimely-int
+
+# The domain. This one value drives the Ingress host, the TLS SAN, CORS, the dashboard
+# URL, Alertmanager's external URL and the Stripe return URLs.
+host: int.uptimely.org
+
+app:
+  beaconEnv: staging
+  logLevel: debug
+  promRetention: 7d
+  replicas:
+    api: 1
+    frontend: 1
+
+ai:
+  enabled: true
+  baseURL: https://ollama.workstation.co.uk
+  model: qwen3:30b-a3b
+  timeout: 60s
+
+storage:
+  postgres: 5Gi
+  redis: 1Gi
+  prometheus: 5Gi
+  alertmanager: 1Gi
+
+ingress:
+  enabled: true
+  # TLS terminates at the wslproxy edge (pop0), not in-cluster — this cluster has no
+  # cert-manager, so tls:true attaches a Secret that never exists and traefik silently
+  # stops serving the vhost. Same as every other environment here.
+  tls: false
+
+# Reuse the base int environment's secrets with zero manual sealing: the deploy pipeline
+# copies `beacon-secrets` (and the `nebulacr-login` pull secret) from the `int` namespace
+# into `uptimely-int` before helm runs. Fine for a shared INT tier; prod gets its own
+# (see values-uptimely-prod.yaml).
+secretsSource: existing
+
+image:
+  registry: int-spectoncr.diytaxreturn.co.uk
+  # The branded frontend image, built by CI with BRAND=uptimely (tag: uptimely-<sha>).
+  frontendTag: uptimely-latest
+  pullSecret: nebulacr-login
+  pullSecretCreate: false

@@ -1,0 +1,76 @@
+# ── Uptimely — production environment ───────────────────────────────────────
+# Namespace: uptimely-prod   Host: https://uptimely.org   (apex, via CNAME flattening)
+# Deploy: run the workflow with BRAND=uptimely, TARGET_ENV=prod. See DEPLOY-A-BRAND.md.
+env: uptimely-prod
+host: uptimely.org
+# www serves the same app as the apex (no redirect): Ingress host rule + TLS SAN via the
+# chart, CNAME via the dns job, edge vhost via the wslproxy job.
+extraHosts:
+  - www.uptimely.org
+
+# PLACEMENT: deliberately NOT pinned to cloud003, unlike values-sysops-prod.yaml.
+# SysOps pins every pod to that single public edge node for a ~14ms edge->origin hop,
+# but a second full production stack there (postgres + redis + prometheus +
+# alertmanager + 2x api + 2x frontend) risks exhausting it. Uptimely instead takes the
+# same path beaconpulse.net's prod uses: the wslproxy rule backends to the k3s1 traefik
+# ingress, which schedules across the cluster. If Uptimely later needs the low-latency
+# edge placement, copy the nodeSelector + edge toleration out of values-sysops-prod.yaml
+# and repoint uptimely-prod-default at 77.68.126.63:80.
+
+app:
+  beaconEnv: production
+  logLevel: info
+  promRetention: 30d
+  # Platform operator(s): global /platform surface + auto-Pro. Must match the address
+  # you actually sign into uptimely.org with (Google sign-in uses your Google email).
+  platformAdminEmails:
+    - tenthmatrix.mailer@gmail.com
+  replicas:
+    api: 2
+    frontend: 2
+
+ai:
+  enabled: true
+  baseURL: https://ollama.workstation.co.uk
+  model: qwen3:30b-a3b
+  timeout: 60s
+
+storage:
+  postgres: 20Gi
+  redis: 2Gi
+  prometheus: 30Gi
+  alertmanager: 2Gi
+
+resources:
+  api:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "2", memory: 1Gi }
+  prometheus:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "2", memory: 2Gi }
+
+ingress:
+  enabled: true
+  # TLS terminates at the wslproxy edge (pop0); no cert-manager in this cluster.
+  tls: false
+
+# PRODUCTION SECRETS — DEDICATED & ISOLATED.
+# A production brand must NOT reuse int's secrets: a JWT secret shared with a tier
+# anyone can sign up on would make a token minted there valid here, and the encryption
+# key is what protects customers' notification credentials at rest.
+#
+# Secrets come from wslvault via External Secrets Operator. ESO reads
+# kv/beaconpulse/uptimely-prod/config from the wslvault-backend ClusterSecretStore.
+# POPULATE THE VAULT BEFORE THE FIRST PROD DEPLOY, or the pods come up with no
+# POSTGRES_PASSWORD behind a green helm release:
+#   deploy/scripts/vault-load-secrets.sh uptimely-prod
+secretsSource: external
+
+image:
+  # Prod routes through int-spectoncr (stable, LAN-hosted); the prod registry's cloud
+  # nodes drop ~1/3 of connections. The deploy job copies int's pull creds into this
+  # namespace as `beacon-registry-pull`.
+  registry: int-spectoncr.diytaxreturn.co.uk
+  frontendTag: uptimely-latest
+  pullSecret: beacon-registry-pull
+  pullSecretCreate: false
