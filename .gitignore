@@ -43,3 +43,6 @@ deploy/.secrets/
 # sealing is asymmetric, so this lets anyone re-seal without cluster access. The
 # matching PRIVATE key never leaves the in-cluster controller.
 !deploy/sealed/sealing-cert.pem
+
+# Serena MCP local project state (language-server cache, local config).
+.serena/

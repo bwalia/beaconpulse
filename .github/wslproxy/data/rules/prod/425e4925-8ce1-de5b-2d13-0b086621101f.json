@@ -67,12 +67,12 @@
         "mode": "least_conn"
       },
       "is_consul": false,
-      "redirect_uri": "193.237.176.232:8888",
+      "redirect_uri": "vpnhh.workstation.co.uk:8888",
       "backends": [
         {
-          "address": "193.237.176.232:8888",
+          "address": "vpnhh.workstation.co.uk:8888",
           "weight": 100,
-          "label": "193.237.176.232:8888-origin"
+          "label": "vpnhh.workstation.co.uk:8888-origin"
         }
       ]
     },

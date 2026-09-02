@@ -82,9 +82,16 @@ bundle id). The Sign in with Apple capability is enabled on the
 ## Release (TestFlight / App Store)
 
 `.github/workflows/ios-release.yml` builds, signs, and uploads the **SysOps**
-brand on every push to `main` that touches `ios/**` (TestFlight, internal
-testers). `workflow_dispatch` offers a marketing-version override and a
-`target=app_store` option that submits the last build for review.
+brand on every push to `main` (TestFlight, internal testers). There is no
+`ios/**` path filter on purpose — the app is a client of this backend, so a
+backend or config merge can change its behaviour as much as a Swift change, and
+testers should always be running current `main`. `workflow_dispatch` offers a
+marketing-version override and a `target=app_store` option that submits the last
+build for review.
+
+Builds land in the **Internal Testers** beta group, which has "all builds"
+enabled, so each upload distributes to the team automatically — no per-release
+TestFlight admin.
 
 It runs on the self-hosted Mac Studio runner and mirrors the Ring Promoter
 pipeline: signing material (App Store Connect API key, team id) comes from

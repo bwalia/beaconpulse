@@ -55,16 +55,24 @@ Connect app record **SysOps247** (app id `6806569966`) exists; APNs auth key
 Vault as the source of truth); Google iOS OAuth client id set in
 `ios/Brands/SysOps/brand.xcconfig`.
 
-Still manual: TestFlight internal testers, App Store metadata (privacy labels,
-screenshots, review demo account).
+TestFlight internal distribution is live: beta group **Internal Testers**
+(`9b816721-8916-4130-b939-3ca294f35de1`, internal, "all builds" on so every CI
+upload auto-distributes) holds all 7 App Store Connect team accounts, and the
+beta app description + feedback email are set.
+
+Still manual: App Store metadata (privacy labels, screenshots, review demo
+account) and a real privacy-policy page — there is no `/privacy` route on the
+site yet, and App Store review requires one.
 
 ## iOS release pipeline (TestFlight on push to main)
 
-`.github/workflows/ios-release.yml` + `ios/fastlane/` — every push to `main`
-touching `ios/**` builds, signs, and uploads the SysOps brand to TestFlight
-(internal). `workflow_dispatch` adds a version override and `target=app_store`
-to submit for review. Runs on the self-hosted Mac Studio runner
-(`hh193-beacon`); signing uses the App Store Connect API key from Vault
+`.github/workflows/ios-release.yml` + `ios/fastlane/` — **every** push to `main`
+builds, signs, and uploads the SysOps brand to TestFlight (internal). There is
+deliberately no `ios/**` path filter: the app is a client of this backend, so a
+backend or config merge can change its behaviour as much as a Swift change, and
+testers should always be running current `main`. `workflow_dispatch` adds a
+version override and `target=app_store` to submit for review. Runs on the
+self-hosted Mac Studio runner (`hh193-beacon`); signing uses the App Store Connect API key from Vault
 `secret/beaconpulse/ios` and the shared team keychain (mirrors ring-promoter's
 pipeline — see `ios/README.md` → Release).
 

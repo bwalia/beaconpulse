@@ -2,7 +2,10 @@ name: iOS Release (TestFlight & App Store)
 
 # Build, sign, and upload the SysOps 24/7 iOS app.
 #
-#   PRIMARY   : push to main touching ios/** — TestFlight internal
+#   PRIMARY   : every push to main — TestFlight internal. Deliberately NOT
+#               filtered on ios/**: the app is a client of this backend, so a
+#               backend or config merge can change its behaviour just as much as
+#               a Swift change. Testers always run a build of current main.
 #   MANUAL    : workflow_dispatch — TestFlight by default; target = app_store
 #               submits the build for App Store review (after TestFlight QA)
 #
@@ -33,9 +36,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "ios/**"
-      - ".github/workflows/ios-release.yml"
 
 concurrency:
   group: beaconpulse-ios-release
