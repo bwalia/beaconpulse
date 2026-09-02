@@ -1,0 +1,23 @@
+// Red Fox Signals brand configuration. Third brand, same code — see
+// Brands/SysOps/brand.xcconfig for field docs.
+//
+// Every value here is brand-specific and consumed via Info.plist ($(KEY)) or the
+// build. Do NOT hardcode any of these in Swift; read them through AppConfig.
+
+PRODUCT_BUNDLE_IDENTIFIER = com.redfoxsignals.app
+PRODUCT_NAME = RedFox
+BRAND_DISPLAY_NAME = Red Fox Signals
+
+// API base URL. The `/$()/` splits the `//` so xcconfig does not treat it as a
+// comment — the value resolves to a normal https URL.
+API_BASE_URL = https:/$()/redfoxsignals.com
+
+// Google Sign-In: the iOS OAuth client id (NOT the web client id) from Google Cloud
+// Console, and its reversed form for the URL scheme. Red Fox Signals has no Google iOS client
+// yet — email/password and Sign in with Apple work without them, and the Google button
+// stays hidden until these are filled in.
+GOOGLE_CLIENT_ID = REPLACE_WITH_GOOGLE_IOS_CLIENT_ID
+GOOGLE_REVERSED_CLIENT_ID = REPLACE_WITH_REVERSED_GOOGLE_IOS_CLIENT_ID
+
+// Brand accent colour (hex, no #). Fox orange — matches frontend/src/brand/redfox.ts.
+BRAND_ACCENT_HEX = EA580C

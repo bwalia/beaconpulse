@@ -64,6 +64,10 @@ targets:
     templates: [BrandApp]
     templateAttributes:
       brand: Beacon
+  RedFox:
+    templates: [BrandApp]
+    templateAttributes:
+      brand: RedFox
 
   BeaconTests:
     type: bundle.unit-test

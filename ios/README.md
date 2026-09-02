@@ -1,7 +1,7 @@
 # Beacon iOS
 
 A native SwiftUI iPhone/iPad client for the Beacon monitoring platform. One
-codebase ships any brand (SysOps 24/7, Beacon, …) — branding is **pure
+codebase ships any brand (SysOps 24/7, Red Fox Signals, Beacon, …) — branding is **pure
 configuration**, not code.
 
 This is **Phase 1**: app foundation + the alert loop (auth, monitors list/detail,
@@ -23,7 +23,7 @@ open Beacon.xcodeproj
 ```
 
 Then in Xcode:
-1. Pick the **SysOps** (or **Beacon**) scheme.
+1. Pick the **SysOps**, **RedFox** or **Beacon** scheme.
 2. Signing & Capabilities → select your Team. The **Push Notifications** and
    **Sign in with Apple** capabilities come from the generated entitlements.
 3. Run on a device (push does not work in the simulator).
@@ -44,8 +44,12 @@ brand's `brand.xcconfig`, are injected into `Info.plist`, and are read once by
 | `GOOGLE_CLIENT_ID` / `GOOGLE_REVERSED_CLIENT_ID` | `brand.xcconfig` | iOS OAuth client from Google Cloud; leave the `REPLACE_WITH…` placeholder to disable Google |
 | `BRAND_DISPLAY_NAME` / `BRAND_ACCENT_HEX` | `brand.xcconfig` | App name + tint |
 
-**Add a brand:** copy `Brands/SysOps/` to `Brands/<New>/`, edit its values, add a
-target in `project.yml` with `templateAttributes: { brand: <New> }`, re-run
+**Add a brand:** copy `Brands/SysOps/` to `Brands/<New>/`, edit its values, render a
+1024pt icon with `swift Tools/make-brand-icon.swift --hex <RRGGBB> --out
+Brands/<New>/Assets.xcassets/AppIcon.appiconset/icon-1024.png`, add a
+target in `project.yml` with `templateAttributes: { brand: <New> }`, add a row to the
+`BRANDS` tables in `fastlane/Fastfile` **and** `fastlane/Appfile`, add it to the
+`prepare` matrix in `.github/workflows/ios-release.yml`, then re-run
 `xcodegen generate`, drop in an `Assets.xcassets` with the app icon.
 
 ## Architecture
@@ -81,8 +85,12 @@ bundle id). The Sign in with Apple capability is enabled on the
 
 ## Release (TestFlight / App Store)
 
-`.github/workflows/ios-release.yml` builds, signs, and uploads the **SysOps**
-brand on every push to `main` (TestFlight, internal testers). There is no
+`.github/workflows/ios-release.yml` builds, signs, and uploads **every brand**
+(SysOps 24/7 → `com.sysops247.app`, Red Fox Signals → `com.redfoxsignals.app`) on every push to
+`main` (TestFlight, internal testers). Brands build as a **serialised** matrix, never
+in parallel: `prepare_signing` rewrites the shared `Beacon.xcodeproj` and the shared
+signing keychain, so two concurrent brands would sign each other's target. A manual
+run can pick a single brand with the `brand` input. There is no
 `ios/**` path filter on purpose — the app is a client of this backend, so a
 backend or config merge can change its behaviour as much as a Swift change, and
 testers should always be running current `main`. `workflow_dispatch` offers a
