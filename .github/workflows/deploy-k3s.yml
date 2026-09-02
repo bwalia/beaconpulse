@@ -368,6 +368,32 @@ jobs:
             --namespace "$NAMESPACE" --create-namespace \
             --wait --timeout 10m
 
+      # `helm --wait` reports only WHICH resources were not ready, never why, and the
+      # steps after it are skipped once it fails — so a failed deploy left no trace of
+      # pod state at all and could not be diagnosed after the fact. Dump enough to tell
+      # a Pending PVC from an ImagePullBackOff from a scheduling failure.
+      - name: Diagnose failed deploy
+        if: ${{ failure() && (env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy') }}
+        run: |
+          set +e
+          echo "===== pods ====="
+          kubectl -n "$NAMESPACE" get pods -o wide
+          echo "===== persistent volume claims ====="
+          kubectl -n "$NAMESPACE" get pvc
+          echo "===== storage classes (is there a default?) ====="
+          kubectl get storageclass
+          echo "===== not-running pods, described ====="
+          for pod in $(kubectl -n "$NAMESPACE" get pods \
+              --field-selector=status.phase!=Running -o name 2>/dev/null | head -8); do
+            echo "--- $pod ---"
+            kubectl -n "$NAMESPACE" describe "$pod" | sed -n '/^Events:/,$p' | head -25
+          done
+          echo "===== recent namespace events ====="
+          kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -40
+          echo "===== node capacity ====="
+          kubectl top nodes 2>/dev/null || kubectl get nodes -o wide
+          exit 0
+
       - name: Rollout status
         if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         run: |
