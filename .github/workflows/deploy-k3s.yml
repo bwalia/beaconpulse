@@ -40,12 +40,13 @@ on:
         required: false
       BRAND:
         type: choice
-        description: "White-label brand. 'beacon' = default product; 'sysops' = SysOps 24/7 on its own domain + namespace, fully automated (DNS, wslproxy, deploy)."
+        description: "White-label brand. 'beacon' = default product; 'sysops' (sysops247.com) and 'redfox' (redfoxsignals.com) each deploy to their own domain + namespace, fully automated (DNS, wslproxy, deploy)."
         default: "beacon"
         required: true
         options:
           - beacon
           - sysops
+          - redfox
 
 env:
   # SpectonCR (private OCI registry, https via the wslproxy ingress). The host is

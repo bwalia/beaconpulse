@@ -1,7 +1,13 @@
 # Beacon / SysOps 24/7 — repo guide
 
 Multi-tenant infrastructure-monitoring platform. Same backend ships under multiple
-brands (SysOps 24/7, Beacon) — **brand is always configuration, never hardcoded.**
+brands (SysOps 24/7, Red Fox Signals, Beacon) — **brand is always configuration, never
+hardcoded.**
+
+Brands live in three places, all configuration: `frontend/src/brand/<brand>.ts` (web,
+selected at build time by `NEXT_PUBLIC_BRAND`), `deploy/helm/beacon/values-<brand>-<env>.yaml`
++ a wslproxy vhost (domain), and `ios/Brands/<Brand>/` (app). See
+`deploy/helm/beacon/DEPLOY-A-BRAND.md`.
 
 ## Layout
 
@@ -67,7 +73,10 @@ site yet, and App Store review requires one.
 ## iOS release pipeline (TestFlight on push to main)
 
 `.github/workflows/ios-release.yml` + `ios/fastlane/` — **every** push to `main`
-builds, signs, and uploads the SysOps brand to TestFlight (internal). There is
+builds, signs, and uploads **every brand** to TestFlight (internal): SysOps 24/7
+(`com.sysops247.app`) and Red Fox Signals (`com.redfoxsignals.app`). Brands build as a serialised
+matrix — never in parallel, because `prepare_signing` rewrites the shared
+`Beacon.xcodeproj` and signing keychain. There is
 deliberately no `ios/**` path filter: the app is a client of this backend, so a
 backend or config merge can change its behaviour as much as a Swift change, and
 testers should always be running current `main`. `workflow_dispatch` adds a
