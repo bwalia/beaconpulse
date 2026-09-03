@@ -41,6 +41,9 @@ export const beacon: Brand = {
     "Uptime, latency, SSL and DNS monitoring with alerting and public status pages. Self-hosted and multi-tenant.",
   apiHost: "beaconpulse.net",
 
+  // The production apex — the canonical origin for SEO. See url in types.ts.
+  url: "https://beaconpulse.net",
+
   // The original blue ramp, unchanged — this is now the single source every brand-*
   // class reads from.
   primary: {

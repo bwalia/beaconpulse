@@ -49,6 +49,9 @@ export const redfox: Brand = {
   // calls its API same-origin regardless.
   apiHost: "redfoxsignals.com",
 
+  // The production apex — the canonical origin for SEO. See url in types.ts.
+  url: "https://redfoxsignals.com",
+
   // Fox orange: warm and unmistakable against Beacon's blue and SysOps's green, and it
   // carries the name. Swap these ten values to recolour the entire product.
   primary: {

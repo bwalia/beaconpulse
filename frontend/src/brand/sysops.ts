@@ -47,6 +47,10 @@ export const sysops: Brand = {
   // domain; the running app always calls its API same-origin regardless.
   apiHost: "sysops247.io",
 
+  // The production apex — the canonical origin search engines should index. See url in
+  // types.ts; a staging deploy overrides this with NEXT_PUBLIC_SITE_URL.
+  url: "https://sysops247.com",
+
   // A green ramp — visibly not Beacon's blue, so a glance confirms the brand changed.
   // Swap these eleven values for any palette to recolour the whole product.
   primary: {

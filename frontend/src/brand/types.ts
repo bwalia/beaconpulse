@@ -26,6 +26,16 @@ export interface Brand {
   apiHost: string;
 
   /**
+   * The canonical, absolute origin of this brand's public site, e.g.
+   * "https://beaconpulse.net". Used for SEO: metadataBase, canonical links, OG/Twitter
+   * card URLs, the sitemap and robots. This is the brand's PRODUCTION apex; a non-prod
+   * deployment (staging/preview) overrides it with `NEXT_PUBLIC_SITE_URL` and should set
+   * `NEXT_PUBLIC_NOINDEX=true`. See `src/lib/site.ts`. Falls back to `https://<apiHost>`
+   * if omitted.
+   */
+  url?: string;
+
+  /**
    * The accent colour, as a full 50–900 ramp of hex values.
    *
    * A ramp rather than a single hue because good scales are hand-tuned, not linearly

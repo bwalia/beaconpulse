@@ -13,6 +13,7 @@ import {
   BellIcon,
   ChartLineIcon,
   CheckCircleIcon,
+  CheckIcon,
   ClockIcon,
   FolderIcon,
   GaugeIcon,
@@ -21,6 +22,7 @@ import {
 import { IN_VIEW, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { GlowCard } from "./pointer";
 import { brand } from "@/brand";
+import { PLANS } from "@/lib/plans";
 
 /** Section heading with a reveal. Shared so every section has one rhythm. */
 function SectionHead({
@@ -291,6 +293,121 @@ function StatusPreview() {
   );
 }
 
+/** Plan id → the PascalCase fragment its i18n keys use (planFreeName, planPaygFeatures…). */
+const PLAN_KEY: Record<(typeof PLANS)[number]["id"], string> = {
+  free: "Free",
+  starter: "Starter",
+  pro: "Pro",
+  payg: "Payg",
+};
+
+/**
+ * Pricing tiers. The money-shaped facts (price, currency, which is featured) come from
+ * the shared PLANS data — the same source the schema.org Offers read — while every word
+ * comes from the marketing catalog, so the section is localised and the numbers can't
+ * drift between the cards and the structured data.
+ */
+function Pricing() {
+  const t = useTranslations("marketing");
+  const reveal = useRevealVariants();
+  const stagger = useStaggerVariants(0.06);
+
+  return (
+    <section id="pricing" className="scroll-mt-24 border-y border-slate-900/5 bg-slate-50/60 py-28 dark:border-white/5 dark:bg-white/[0.02]">
+      <div className="mx-auto w-full max-w-[1800px] px-6 sm:px-10 lg:px-16">
+        <SectionHead
+          eyebrow={t("pricingEyebrow")}
+          title={t("pricingTitle")}
+          blurb={t("pricingBlurb")}
+        />
+
+        <motion.ul
+          initial="hidden"
+          whileInView="show"
+          viewport={IN_VIEW}
+          variants={stagger}
+          className="mx-auto mt-16 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          {PLANS.map((plan) => {
+            const k = PLAN_KEY[plan.id];
+            const features = t.raw(`plan${k}Features`) as string[];
+            return (
+              <motion.li key={plan.id} variants={reveal} className="h-full">
+                <div
+                  className={`relative flex h-full flex-col rounded-2xl border p-6 backdrop-blur-xl ${
+                    plan.featured
+                      ? "border-brand-500/60 bg-white/80 shadow-xl shadow-brand-600/10 ring-1 ring-brand-500/40 dark:bg-white/[0.06]"
+                      : "border-slate-900/10 bg-white/60 dark:border-white/10 dark:bg-white/[0.04]"
+                  }`}
+                >
+                  {plan.featured && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+                      {t("pricingPopular")}
+                    </span>
+                  )}
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    {t(`plan${k}Name`)}
+                  </h3>
+                  <p className="mt-1 min-h-[2.5rem] text-sm leading-snug text-slate-600 dark:text-slate-400">
+                    {t(`plan${k}Tagline`)}
+                  </p>
+                  <p className="mt-5 flex items-baseline gap-1">
+                    <span className="text-4xl font-semibold tracking-tight text-slate-900 tabular-nums dark:text-white">
+                      {plan.priceLabel}
+                    </span>
+                    {plan.perMonth && (
+                      <span className="text-sm text-slate-500 dark:text-slate-400">
+                        {t("pricingPerMonth")}
+                      </span>
+                    )}
+                  </p>
+                  <ul className="mt-6 space-y-3">
+                    {features.map((f) => (
+                      <li key={f} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200">
+                        <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/register"
+                    className={`mt-8 inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-medium transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:focus-visible:ring-offset-slate-950 ${
+                      plan.featured
+                        ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-900"
+                        : "border border-slate-900/15 text-slate-900 hover:bg-slate-900/5 dark:border-white/15 dark:text-white dark:hover:bg-white/10"
+                    }`}
+                  >
+                    {t("pricingCta")}
+                  </Link>
+                </div>
+              </motion.li>
+            );
+          })}
+        </motion.ul>
+
+        <motion.div
+          initial="hidden"
+          whileInView="show"
+          viewport={IN_VIEW}
+          variants={stagger}
+          className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-2 text-center text-sm text-slate-500 dark:text-slate-400"
+        >
+          <motion.p variants={reveal}>{t("pricingBillingNote")}</motion.p>
+          <motion.p variants={reveal}>
+            <Link
+              href="/docs/plans"
+              className="inline-flex items-center gap-1 rounded font-medium text-brand-700 transition-colors hover:text-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+            >
+              {t("pricingCompare")}
+              <ArrowRightIcon className="h-3.5 w-3.5" />
+            </Link>
+          </motion.p>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 function FinalCTA() {
   const t = useTranslations("marketing");
   const reveal = useRevealVariants();
@@ -360,6 +477,12 @@ function Footer() {
             {t("features")}
           </a>
           <a
+            href="#pricing"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+          >
+            {t("pricing")}
+          </a>
+          <a
             href="#status"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
@@ -383,4 +506,4 @@ function Footer() {
   );
 }
 
-export { Features, HowItWorks, StatusPreview, FinalCTA, Footer };
+export { Features, HowItWorks, Pricing, StatusPreview, FinalCTA, Footer };
