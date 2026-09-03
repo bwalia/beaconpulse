@@ -35,7 +35,7 @@ func TestBrandOr(t *testing.T) {
 	if got := brandOr("  "); got != "Beacon" {
 		t.Errorf("blank brand = %q, want Beacon", got)
 	}
-	if got := brandOr("Red Fox Signals"); got != "Red Fox Signals" {
-		t.Errorf("brand = %q, want Red Fox Signals", got)
+	if got := brandOr("RedFox Signals"); got != "RedFox Signals" {
+		t.Errorf("brand = %q, want RedFox Signals", got)
 	}
 }
