@@ -14,6 +14,20 @@ env: redfox-int
 # URL, Alertmanager's external URL and the Stripe return URLs.
 host: int.redfoxsignals.com
 
+# PLACEMENT. The chart pins every Beacon pod to one node (values.yaml nodeSelector,
+# default debworker00) so the RWO local-path PVCs stay co-located — local-path volumes
+# carry node affinity, so a pod that moves cannot mount its own data.
+#
+# debworker00 already hosts beacon-int AND sysops-int; adding a third full stack put it
+# over the kubelet pod-count limit, and the scheduler rejected it with
+# "0/16 nodes are available: 1 Too many pods, ...". Note it was NOT short of CPU or
+# memory (37% / 16%) — purely pod count. Pin this brand to its own worker instead.
+#
+# Changing this later is not free: the existing PVs stay on the old node, so the
+# namespace has to be deleted and redeployed for the volumes to be recreated here.
+nodeSelector:
+  kubernetes.io/hostname: k3s-worker-08
+
 app:
   beaconEnv: staging
   logLevel: debug

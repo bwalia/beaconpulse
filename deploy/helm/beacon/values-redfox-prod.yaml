@@ -8,7 +8,13 @@ host: redfoxsignals.com
 extraHosts:
   - www.redfoxsignals.com
 
-# PLACEMENT: deliberately NOT pinned to cloud003, unlike values-sysops-prod.yaml.
+# PLACEMENT — READ BEFORE THE FIRST PROD DEPLOY. The chart's default nodeSelector
+# (values.yaml) pins every pod to debworker00, which is already at its pod-count limit
+# from beacon-int + sysops-int + redfox-int. This file does not override it, so the
+# first prod deploy will fail to schedule exactly as redfox-int did. Choose a node with
+# pod headroom and set nodeSelector here first (redfox-int uses k3s-worker-08).
+#
+# Deliberately NOT pinned to cloud003, unlike values-sysops-prod.yaml.
 # SysOps pins every pod to that single public edge node for a ~14ms edge->origin hop,
 # but a second full production stack there (postgres + redis + prometheus +
 # alertmanager + 2x api + 2x frontend) risks exhausting it. Red Fox Signals instead takes the
