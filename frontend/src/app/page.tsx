@@ -9,8 +9,10 @@ import {
   FinalCTA,
   Footer,
   HowItWorks,
+  Pricing,
   StatusPreview,
 } from "@/components/marketing/sections";
+import { StructuredData } from "@/components/marketing/structured-data";
 
 // `/` used to redirect straight to /login, which meant the product had no public
 // surface at all — nothing to point a campaign at, and nothing for a stranger to
@@ -18,15 +20,24 @@ import {
 // the nav swaps its CTA to "Go to dashboard", which is the least surprising
 // behaviour and keeps the page shareable by people who are already customers.
 
+const HERO_DESCRIPTION =
+  "Self-hosted, multi-tenant infrastructure monitoring. Watch endpoints, certificates and DNS every 30 seconds, alert the right person, and publish a status page your customers trust.";
+
 export const metadata: Metadata = {
   title: `${brand.name} — Know it's down before your customers do`,
-  description:
-    "Self-hosted, multi-tenant infrastructure monitoring. Watch endpoints, certificates and DNS every 30 seconds, alert the right person, and publish a status page your customers trust.",
+  description: HERO_DESCRIPTION,
+  alternates: { canonical: "/" },
   openGraph: {
-    title: `${brand.name} — Infrastructure monitoring you own`,
-    description:
-      "Uptime, latency, SSL and DNS monitoring with alerting and public status pages. Self-hosted and multi-tenant.",
     type: "website",
+    siteName: brand.name,
+    url: "/",
+    title: `${brand.name} — Infrastructure monitoring you own`,
+    description: HERO_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${brand.name} — Infrastructure monitoring you own`,
+    description: HERO_DESCRIPTION,
   },
 };
 
@@ -41,11 +52,13 @@ export default async function LandingPage() {
       >
         {t("skipToContent")}
       </a>
+      <StructuredData />
       <MarketingNav />
       <main id="main">
         <Hero />
         <Features />
         <HowItWorks />
+        <Pricing />
         <StatusPreview />
         <FinalCTA />
       </main>

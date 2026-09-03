@@ -22,11 +22,15 @@ import (
 // address by setting a malicious "Slack" URL.
 type SlackNotifier struct {
 	client *safehttp.Client
+	// brand is the product name shown on the "Open in <brand>" button; set per
+	// deployment. Empty falls back to "Beacon".
+	brand string
 }
 
-// NewSlackNotifier builds a SlackNotifier over the SSRF-guarded client.
-func NewSlackNotifier(client *safehttp.Client) *SlackNotifier {
-	return &SlackNotifier{client: client}
+// NewSlackNotifier builds a SlackNotifier over the SSRF-guarded client. brand is
+// the product name for the CTA button; empty falls back to "Beacon".
+func NewSlackNotifier(client *safehttp.Client, brand string) *SlackNotifier {
+	return &SlackNotifier{client: client, brand: brand}
 }
 
 // Type identifies this notifier.
@@ -70,7 +74,7 @@ func (s *SlackNotifier) Send(ctx context.Context, ch notification.Decrypted, msg
 
 	payload := slackPayload{Attachments: []slackAttachment{{
 		Color:  severityHex(msg),
-		Blocks: slackBlocks(msg),
+		Blocks: slackBlocks(s.brand, msg),
 	}}}
 
 	body, err := json.Marshal(payload)
@@ -102,7 +106,7 @@ func (s *SlackNotifier) Send(ctx context.Context, ch notification.Decrypted, msg
 	return nil
 }
 
-func slackBlocks(msg notification.Message) []slackBlock {
+func slackBlocks(brand string, msg notification.Message) []slackBlock {
 	blocks := []slackBlock{{
 		Type: "header",
 		Text: &slackText{Type: "plain_text", Text: statusHeadline(msg)},
@@ -130,7 +134,7 @@ func slackBlocks(msg notification.Message) []slackBlock {
 			Type: "actions",
 			Elements: []slackButton{{
 				Type: "button",
-				Text: &slackText{Type: "plain_text", Text: "Open in Beacon"},
+				Text: &slackText{Type: "plain_text", Text: "Open in " + brandOr(brand)},
 				URL:  msg.DashboardURL,
 			}},
 		})

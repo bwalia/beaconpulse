@@ -147,6 +147,16 @@ STRIPE_PUBLISHABLE_KEY="$(read_env_for STRIPE_PUBLISHABLE_KEY)"
 STRIPE_WEBHOOK_SECRET="$(read_env_for STRIPE_WEBHOOK_SECRET)"
 STRIPE_PRICE_STARTER="$(read_env_for STRIPE_PRICE_STARTER)"
 STRIPE_PRICE_PRO="$(read_env_for STRIPE_PRICE_PRO)"
+# Default email fallback SMTP relay — all optional. Read from deploy/.env; only the
+# ones present get sealed. HOST+FROM together enable it (the API warns + disables it
+# if only one is set); PASSWORD is the SMTP secret, which is why the whole set is
+# sealed rather than living in plaintext values.
+BEACON_DEFAULT_SMTP_HOST="$(read_env_for BEACON_DEFAULT_SMTP_HOST)"
+BEACON_DEFAULT_SMTP_PORT="$(read_env_for BEACON_DEFAULT_SMTP_PORT)"
+BEACON_DEFAULT_SMTP_FROM="$(read_env_for BEACON_DEFAULT_SMTP_FROM)"
+BEACON_DEFAULT_SMTP_USERNAME="$(read_env_for BEACON_DEFAULT_SMTP_USERNAME)"
+BEACON_DEFAULT_SMTP_PASSWORD="$(read_env_for BEACON_DEFAULT_SMTP_PASSWORD)"
+BEACON_DEFAULT_SMTP_SECURITY="$(read_env_for BEACON_DEFAULT_SMTP_SECURITY)"
 REGISTRY_USERNAME="$(read_env_for REGISTRY_USERNAME)"
 REGISTRY_PASSWORD="$(read_env_for REGISTRY_PASSWORD)"
 
@@ -276,6 +286,19 @@ for _sk in STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE
     note "including $_sk"
   fi
 done
+# Default email fallback — include only the keys actually set, so an unset relay
+# never seals empty values (which the backend would treat as "unset" anyway).
+for _sk in BEACON_DEFAULT_SMTP_HOST BEACON_DEFAULT_SMTP_PORT BEACON_DEFAULT_SMTP_FROM \
+  BEACON_DEFAULT_SMTP_USERNAME BEACON_DEFAULT_SMTP_PASSWORD BEACON_DEFAULT_SMTP_SECURITY; do
+  if [[ -n "${!_sk}" ]]; then
+    ARGS+=(--from-literal="$_sk=${!_sk}")
+    note "including $_sk"
+  fi
+done
+if { [[ -n "$BEACON_DEFAULT_SMTP_HOST" ]] && [[ -z "$BEACON_DEFAULT_SMTP_FROM" ]]; } ||
+  { [[ -z "$BEACON_DEFAULT_SMTP_HOST" ]] && [[ -n "$BEACON_DEFAULT_SMTP_FROM" ]]; }; then
+  note "WARNING: default email needs BOTH BEACON_DEFAULT_SMTP_HOST and BEACON_DEFAULT_SMTP_FROM — the fallback will stay disabled until both are set"
+fi
 if [[ -n "$BEACON_AI_API_KEY" ]]; then
   ARGS+=(--from-literal=BEACON_AI_API_KEY="$BEACON_AI_API_KEY")
   note "including BEACON_AI_API_KEY"

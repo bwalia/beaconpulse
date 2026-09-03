@@ -16,6 +16,7 @@ import { brand } from "@/brand";
 const LINKS = [
   { href: "#features", key: "features" },
   { href: "#how", key: "howItWorks" },
+  { href: "#pricing", key: "pricing" },
   { href: "#status", key: "statusPages" },
   // Absolute, not an anchor: this one leaves the page.
   { href: "/docs", key: "docs" },

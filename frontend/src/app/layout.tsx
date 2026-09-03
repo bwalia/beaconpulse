@@ -6,6 +6,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { localeDir, resolveLocale } from "@/i18n/config";
 import { brand, brandCSSVariables } from "@/brand";
+import { noindex, siteUrl } from "@/lib/site";
 
 // next/font downloads and self-hosts these at BUILD time, so the running app never
 // calls fonts.googleapis.com — important for a self-hosted product — and the font
@@ -30,6 +31,9 @@ const firaCode = Fira_Code({
 });
 
 export const metadata: Metadata = {
+  // Absolute-URL base for canonical links and OG/Twitter images. Every relative URL in
+  // page metadata resolves against this, so the site's own origin is set in one place.
+  metadataBase: new URL(siteUrl),
   // The title carries into every page via the template; a page sets its own name and
   // the brand supplies the suffix. One brand change renames every tab.
   title: {
@@ -37,6 +41,26 @@ export const metadata: Metadata = {
     template: `%s — ${brand.name}`,
   },
   description: brand.description,
+  applicationName: brand.name,
+  // Defaults every page inherits; the marketing page overrides title/description/canonical.
+  // The social image comes from app/opengraph-image.tsx, which Next attaches automatically.
+  openGraph: {
+    type: "website",
+    siteName: brand.name,
+    title: `${brand.name} — Infrastructure Monitoring`,
+    description: brand.description,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${brand.name} — Infrastructure Monitoring`,
+    description: brand.description,
+  },
+  // Non-prod deployments set NEXT_PUBLIC_NOINDEX=true to stay out of search entirely.
+  robots: noindex
+    ? { index: false, follow: false }
+    : { index: true, follow: true, googleBot: { index: true, follow: true } },
+  icons: { icon: "/icon.svg" },
 };
 
 // Runs before first paint, so the page never flashes light before hydration swaps

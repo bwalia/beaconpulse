@@ -27,6 +27,7 @@ tolerations:
     effect: NoSchedule
 
 app:
+  brandName: "SysOps 24/7"
   beaconEnv: production
   logLevel: info
   promRetention: 30d

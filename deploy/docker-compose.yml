@@ -49,6 +49,8 @@ x-backend-env: &backend-env
   BEACON_WEBHOOK_TOKEN: beacon-dev-webhook-token
   # Base URL used for "open dashboard" links in notification messages.
   BEACON_DASHBOARD_URL: http://localhost:${BEACON_GATEWAY_PORT:-8090}
+  # Product name shown in alert notifications (email subject, "Open in <brand>").
+  BEACON_BRAND_NAME: ${BEACON_BRAND_NAME:-Beacon}
   # AI alert enrichment (optional). Turn on by setting these in deploy/.env:
   #   BEACON_AI_ENABLED=true
   #   BEACON_AI_BASE_URL=https://ollama.diytaxreturn.co.uk
@@ -66,6 +68,16 @@ x-backend-env: &backend-env
   STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
   STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
   STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+  # Default email fallback — values come from deploy/.env (gitignored). Empty host
+  # leaves it OFF; when an org has no notification channel, an alert is emailed to
+  # its owners/admins over this relay instead of being dropped. Host + From are
+  # required together.
+  BEACON_DEFAULT_SMTP_HOST: ${BEACON_DEFAULT_SMTP_HOST:-}
+  BEACON_DEFAULT_SMTP_PORT: ${BEACON_DEFAULT_SMTP_PORT:-587}
+  BEACON_DEFAULT_SMTP_FROM: ${BEACON_DEFAULT_SMTP_FROM:-}
+  BEACON_DEFAULT_SMTP_USERNAME: ${BEACON_DEFAULT_SMTP_USERNAME:-}
+  BEACON_DEFAULT_SMTP_PASSWORD: ${BEACON_DEFAULT_SMTP_PASSWORD:-}
+  BEACON_DEFAULT_SMTP_SECURITY: ${BEACON_DEFAULT_SMTP_SECURITY:-starttls}
   # Only the SEED value: once the Platform screen has been saved once, the database
   # value wins and this is ignored.
   BEACON_BILLING_MONITOR_HOURS_PER_DOLLAR: ${BEACON_BILLING_MONITOR_HOURS_PER_DOLLAR:-5}

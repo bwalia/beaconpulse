@@ -11,6 +11,16 @@ import (
 // HTML formatter; Slack/Email/Webhook share these so their wording stays
 // consistent and there is one place to change the copy.
 
+// brandOr returns the configured product name, or "Beacon" when unset — so a
+// deployment that never sets BEACON_BRAND_NAME still renders sensible copy rather
+// than an empty "[] ..." subject or "Open in " button.
+func brandOr(brand string) string {
+	if b := strings.TrimSpace(brand); b != "" {
+		return b
+	}
+	return "Beacon"
+}
+
 // statusHeadline is the one-line summary, e.g. "DOWN — api.example.com".
 func statusHeadline(msg notification.Message) string {
 	verb := "DOWN"
