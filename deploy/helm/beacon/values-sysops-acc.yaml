@@ -6,6 +6,7 @@ env: sysops-acc
 host: acc.sysops247.com
 
 app:
+  brandName: "SysOps 24/7"
   beaconEnv: staging
   logLevel: info
   promRetention: 15d

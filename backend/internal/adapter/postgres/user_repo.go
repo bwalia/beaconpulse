@@ -114,6 +114,33 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*auth.U
 	return u, nil
 }
 
+// AlertRecipients returns the addresses to fall back to when an org has no
+// notification channel configured: its active owners and admins, owners first.
+// Members and viewers are deliberately excluded — the fallback pages the people
+// accountable for the account, not every reader. Emails are stored normalised
+// (lowercased), so no extra dedup is needed beyond the query.
+func (r *UserRepository) AlertRecipients(ctx context.Context, orgID uuid.UUID) ([]string, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT email FROM users
+		   WHERE org_id = $1 AND deleted_at IS NULL AND is_active
+		     AND role IN ('owner', 'admin')
+		   ORDER BY CASE role WHEN 'owner' THEN 0 ELSE 1 END, email`, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var emails []string
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, err
+		}
+		emails = append(emails, email)
+	}
+	return emails, rows.Err()
+}
+
 // GetUserByEmail fetches a non-deleted user by lowercased email.
 func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*auth.User, error) {
 	row := r.pool.QueryRow(ctx,

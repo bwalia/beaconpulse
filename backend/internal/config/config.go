@@ -146,6 +146,11 @@ type Notify struct {
 	// DashboardURL is the base URL used to build "open dashboard" links in
 	// notification messages.
 	DashboardURL string
+	// BrandName is the product name shown in alert notifications (email subject
+	// prefix, the "Open in <brand>" button). The backend is deployed per brand, so
+	// this is set once per deployment (BEACON_BRAND_NAME, from the brand's helm
+	// values) — never hardcoded. Empty falls back to "Beacon" at render time.
+	BrandName string
 	// WebhookAllowPrivate lets tenant webhook/Slack channels reach private,
 	// loopback and link-local addresses. This RE-OPENS the SSRF hole and exists
 	// only for single-tenant on-prem operators who deliberately want an internal
@@ -154,7 +159,33 @@ type Notify struct {
 	// WebhookAllowHTTP permits plain-http webhook targets (default false: https
 	// only). For local development against an http test receiver.
 	WebhookAllowHTTP bool
+	// DefaultEmail is the platform SMTP relay used as a last-resort alert channel.
+	DefaultEmail DefaultEmail
 }
+
+// DefaultEmail is a platform-provided SMTP relay used as a LAST-RESORT alert
+// channel: when an org has configured no notification channel of its own, a
+// firing/resolved alert is emailed to that org's owners and admins instead of
+// being silently dropped. An empty Host disables it entirely — the same
+// graceful-degradation pattern as Push/AI, so an org with no channels simply
+// gets no alert (the previous behaviour) until an operator sets a relay.
+//
+// This relay belongs to the OPERATOR: one relay for the whole deployment,
+// distinct from the per-org "email" channels tenants configure themselves
+// (those carry their own SMTP settings). Both are delivered by the same
+// EmailNotifier.
+type DefaultEmail struct {
+	Host     string
+	Port     string
+	From     string
+	Username string // optional; empty means an unauthenticated relay
+	Password string // optional; the SMTP password (secret)
+	Security string // starttls | tls | none
+}
+
+// Enabled reports whether a default SMTP relay is configured. Host and From are
+// the minimum needed to send; without both the fallback stays off.
+func (d DefaultEmail) Enabled() bool { return d.Host != "" && d.From != "" }
 
 // HTTP holds the API server configuration.
 type HTTP struct {
@@ -382,8 +413,17 @@ func Load() (Config, error) {
 		Notify: Notify{
 			WebhookToken:        getStr("BEACON_WEBHOOK_TOKEN", ""),
 			DashboardURL:        getStr("BEACON_DASHBOARD_URL", "http://localhost:3000"),
+			BrandName:           getStr("BEACON_BRAND_NAME", "Beacon"),
 			WebhookAllowPrivate: getBool("BEACON_WEBHOOK_ALLOW_PRIVATE", false, add),
 			WebhookAllowHTTP:    getBool("BEACON_WEBHOOK_ALLOW_HTTP", false, add),
+			DefaultEmail: DefaultEmail{
+				Host:     getStr("BEACON_DEFAULT_SMTP_HOST", ""),
+				Port:     getStr("BEACON_DEFAULT_SMTP_PORT", "587"),
+				From:     getStr("BEACON_DEFAULT_SMTP_FROM", ""),
+				Username: getStr("BEACON_DEFAULT_SMTP_USERNAME", ""),
+				Password: getStr("BEACON_DEFAULT_SMTP_PASSWORD", ""),
+				Security: strings.ToLower(getStr("BEACON_DEFAULT_SMTP_SECURITY", "starttls")),
+			},
 		},
 		Billing: Billing{
 			StripeSecretKey:       getStr("STRIPE_SECRET_KEY", ""),
@@ -483,6 +523,12 @@ func Load() (Config, error) {
 	if apnsSet > 0 && apnsSet < 4 {
 		add("APNs push is partially configured: set all of BEACON_APNS_KEY_P8, BEACON_APNS_KEY_ID, BEACON_APNS_TEAM_ID and BEACON_APNS_TOPIC, or none")
 	}
+	// The default email fallback is deliberately NOT validated as a hard error: it
+	// is a nice-to-have safety net, so a partial or bad SMTP config must never crash
+	// the API (which would take monitoring itself down). main.go warns and disables
+	// the fallback when it is only partially configured, and a bad security mode /
+	// unreachable relay surfaces as a per-alert delivery error that is logged and
+	// audited — never fatal.
 
 	if len(errs) > 0 {
 		return Config{}, fmt.Errorf("invalid configuration:\n  - %s", strings.Join(errs, "\n  - "))

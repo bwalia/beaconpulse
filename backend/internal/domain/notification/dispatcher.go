@@ -21,6 +21,16 @@ type MaintenanceChecker interface {
 	IsSuppressed(ctx context.Context, orgID, monitorID uuid.UUID, at time.Time) (bool, error)
 }
 
+// FallbackNotifier delivers an alert to an org's default recipients when the org
+// has configured no notification channel of its own — the safety net so a real
+// outage is never silently swallowed just because nobody has set up Telegram or
+// email yet. Optional: a nil fallback restores the previous behaviour, where an
+// org with no channels simply gets no alert. Implemented in the adapter layer as
+// email over the platform SMTP relay (see notifier.DefaultEmailNotifier).
+type FallbackNotifier interface {
+	Fallback(ctx context.Context, orgID uuid.UUID, msg Message) error
+}
+
 // Dispatcher fans an Alertmanager webhook's alerts out to the notification
 // channels of the owning organization. It is best-effort: a failed delivery to
 // one channel is logged and audited but never blocks the others.
@@ -31,16 +41,17 @@ type Dispatcher struct {
 	projects   ProjectLookup
 	auditlog   audit.Recorder
 	suppressor MaintenanceChecker // optional maintenance-window suppression; nil disables it
+	fallback   FallbackNotifier   // optional default-recipient fallback for orgs with no channels; nil disables it
 	dashURL    string
 	analyzer   Analyzer      // optional AI enrichment; nil disables it
 	aiTimeout  time.Duration // per-alert budget for the analyzer
 	now        func() time.Time
 }
 
-// NewDispatcher wires the dispatcher. analyzer and suppressor may each be nil, in
-// which case alerts are delivered without AI enrichment / without maintenance
-// suppression respectively.
-func NewDispatcher(repo Repository, cipher *crypto.Cipher, registry map[ChannelType]Notifier, projects ProjectLookup, auditlog audit.Recorder, suppressor MaintenanceChecker, dashboardURL string, analyzer Analyzer, aiTimeout time.Duration) *Dispatcher {
+// NewDispatcher wires the dispatcher. analyzer, suppressor and fallback may each
+// be nil, in which case alerts are delivered without AI enrichment / without
+// maintenance suppression / with no default-recipient fallback respectively.
+func NewDispatcher(repo Repository, cipher *crypto.Cipher, registry map[ChannelType]Notifier, projects ProjectLookup, auditlog audit.Recorder, suppressor MaintenanceChecker, dashboardURL string, analyzer Analyzer, aiTimeout time.Duration, fallback FallbackNotifier) *Dispatcher {
 	if aiTimeout <= 0 {
 		aiTimeout = 20 * time.Second
 	}
@@ -51,6 +62,7 @@ func NewDispatcher(repo Repository, cipher *crypto.Cipher, registry map[ChannelT
 		projects:   projects,
 		auditlog:   auditlog,
 		suppressor: suppressor,
+		fallback:   fallback,
 		dashURL:    strings.TrimRight(dashboardURL, "/"),
 		analyzer:   analyzer,
 		aiTimeout:  aiTimeout,
@@ -103,6 +115,10 @@ func (d *Dispatcher) DispatchAlerts(ctx context.Context, events []AlertEvent) {
 			channelsByOrg[ev.OrgID] = channels
 		}
 		if len(channels) == 0 {
+			// No channel configured for this org. Rather than silently drop a real
+			// outage, fall back to emailing the org's default recipients (owners /
+			// admins) over the platform relay — when one is wired.
+			d.dispatchFallback(ctx, ev)
 			continue
 		}
 
@@ -137,6 +153,48 @@ func (d *Dispatcher) enrich(ctx context.Context, ev AlertEvent) *AlertAnalysis {
 		return nil
 	}
 	return analysis
+}
+
+// dispatchFallback emails an alert to the org's default recipients when the org
+// has no notification channel configured. A no-op when no fallback is wired. It
+// mirrors the normal path (firing alerts are AI-enriched, delivery is
+// best-effort and audited) so the safety net behaves like a real channel.
+func (d *Dispatcher) dispatchFallback(ctx context.Context, ev AlertEvent) {
+	if d.fallback == nil {
+		return
+	}
+	log := logger.FromContext(ctx)
+	msg := d.render(ctx, ev)
+	if ev.Status == StatusFiring {
+		msg.Analysis = d.enrich(ctx, ev)
+	}
+	if err := d.fallback.Fallback(ctx, ev.OrgID, msg); err != nil {
+		log.Warn("dispatch: default email fallback failed",
+			slog.String("org_id", ev.OrgID.String()),
+			slog.String("monitor", ev.MonitorName),
+			slog.String("error", err.Error()))
+		d.recordFallback(ctx, ev, err)
+		return
+	}
+	d.recordFallback(ctx, ev, nil)
+}
+
+// recordFallback audits a default-email delivery (or its failure), keyed on the
+// org rather than a channel — there is no channel record for the fallback. The
+// "via":"default_email" tag distinguishes it in the audit trail. Best-effort,
+// like every other audit call here.
+func (d *Dispatcher) recordFallback(ctx context.Context, ev AlertEvent, sendErr error) {
+	org := ev.OrgID
+	action := audit.Action("notification.sent")
+	md := map[string]any{"via": "default_email", "monitor": ev.MonitorName, "status": string(ev.Status)}
+	if sendErr != nil {
+		action = audit.Action("notification.failed")
+		md["error"] = sendErr.Error()
+	}
+	_ = d.auditlog.Record(ctx, audit.Entry{
+		OrgID: &org, Action: action,
+		ResourceType: "notification_channel", ResourceID: "default-email", Metadata: md,
+	})
 }
 
 func (d *Dispatcher) deliver(ctx context.Context, ch *Channel, msg Message) {

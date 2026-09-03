@@ -39,8 +39,24 @@ func newDispatcherWith(t *testing.T, orgID uuid.UUID, analyzer Analyzer) (*Dispa
 	}
 	notif := &fakeNotifier{}
 	registry := map[ChannelType]Notifier{TypeTelegram: notif}
-	d := NewDispatcher(repo, cipher, registry, nil, noopRecorder{}, nil, "http://dash", analyzer, time.Second)
+	d := NewDispatcher(repo, cipher, registry, nil, noopRecorder{}, nil, "http://dash", analyzer, time.Second, nil)
 	return d, notif
+}
+
+// fakeFallback records the last fallback delivery so tests can assert the safety
+// net fired (or did not).
+type fakeFallback struct {
+	called bool
+	orgID  uuid.UUID
+	msg    Message
+	err    error
+}
+
+func (f *fakeFallback) Fallback(_ context.Context, orgID uuid.UUID, msg Message) error {
+	f.called = true
+	f.orgID = orgID
+	f.msg = msg
+	return f.err
 }
 
 func firingEvent(orgID uuid.UUID) AlertEvent {
@@ -110,4 +126,57 @@ func TestDispatchNilAnalyzerDelivers(t *testing.T) {
 	if notif.msg.Analysis != nil {
 		t.Error("no analyzer means no analysis")
 	}
+}
+
+func TestDispatchFallbackWhenNoChannels(t *testing.T) {
+	cipher, err := crypto.NewCipher(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	org := uuid.New()
+	repo := newFakeChannelRepo() // org has no channels
+	fb := &fakeFallback{}
+	d := NewDispatcher(repo, cipher, map[ChannelType]Notifier{}, nil, noopRecorder{}, nil, "http://dash", nil, time.Second, fb)
+
+	d.DispatchAlerts(context.Background(), []AlertEvent{firingEvent(org)})
+
+	if !fb.called {
+		t.Fatal("fallback must fire when the org has no channels")
+	}
+	if fb.orgID != org {
+		t.Errorf("fallback org = %v, want %v", fb.orgID, org)
+	}
+	if fb.msg.MonitorName != "API" {
+		t.Errorf("fallback message not rendered: %+v", fb.msg)
+	}
+}
+
+func TestDispatchNoFallbackWhenChannelExists(t *testing.T) {
+	org := uuid.New()
+	d, notif := newDispatcherWith(t, org, nil) // one enabled telegram channel
+	fb := &fakeFallback{}
+	d.fallback = fb
+
+	d.DispatchAlerts(context.Background(), []AlertEvent{firingEvent(org)})
+
+	if !notif.called {
+		t.Fatal("configured channel should have received the alert")
+	}
+	if fb.called {
+		t.Error("fallback must NOT fire when a channel is configured")
+	}
+}
+
+func TestDispatchNoFallbackWhenUnconfigured(t *testing.T) {
+	cipher, err := crypto.NewCipher(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	org := uuid.New()
+	repo := newFakeChannelRepo() // no channels, and no fallback wired
+	d := NewDispatcher(repo, cipher, map[ChannelType]Notifier{}, nil, noopRecorder{}, nil, "http://dash", nil, time.Second, nil)
+
+	// Must not panic on a nil fallback — this is the previous behaviour: an org
+	// with no channels simply gets no alert.
+	d.DispatchAlerts(context.Background(), []AlertEvent{firingEvent(org)})
 }

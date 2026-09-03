@@ -65,6 +65,10 @@ app:
   beaconEnv: staging
   logLevel: info
   logFormat: json
+  # BEACON_BRAND_NAME — product name shown in alert notifications (email subject
+  # prefix, the "Open in <brand>" button). Per-brand: a white-label overrides this
+  # in its values-<brand>-<env>.yaml so its alerts read as its own product.
+  brandName: Beacon Pulse
   # DNS resolver used by DNS monitors.
   dnsResolver: 8.8.8.8:53
   # NOTE: "Sign in with Google" — BEACON_GOOGLE_CLIENT_ID is NOT a raw chart value.

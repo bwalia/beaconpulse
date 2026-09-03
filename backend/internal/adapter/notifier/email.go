@@ -25,15 +25,20 @@ import (
 // whole exchange with a timeout.
 type EmailNotifier struct {
 	timeout time.Duration
+	// brand is the product name shown in the subject prefix and CTA button; set per
+	// deployment so a white-label sends "[SysOps 24/7] …" rather than "[Beacon] …".
+	brand string
 	// dial is injectable so tests can run against an in-memory SMTP server.
 	dial func(ctx context.Context, addr string) (net.Conn, error)
 }
 
-// NewEmailNotifier builds an EmailNotifier.
-func NewEmailNotifier() *EmailNotifier {
+// NewEmailNotifier builds an EmailNotifier. brand is the product name for the
+// message copy; empty falls back to "Beacon".
+func NewEmailNotifier(brand string) *EmailNotifier {
 	d := &net.Dialer{Timeout: 10 * time.Second}
 	return &EmailNotifier{
 		timeout: 15 * time.Second,
+		brand:   brand,
 		dial:    func(ctx context.Context, addr string) (net.Conn, error) { return d.DialContext(ctx, "tcp", addr) },
 	}
 }
@@ -97,7 +102,7 @@ func (e *EmailNotifier) Send(ctx context.Context, ch notification.Decrypted, msg
 	if err != nil {
 		return fmt.Errorf("email: DATA: %w", err)
 	}
-	if _, err := w.Write([]byte(buildMIME(cfg, msg))); err != nil {
+	if _, err := w.Write([]byte(buildMIME(e.brand, cfg, msg))); err != nil {
 		return fmt.Errorf("email: write body: %w", err)
 	}
 	if err := w.Close(); err != nil {
@@ -150,8 +155,8 @@ func parseEmailConfig(ch notification.Decrypted) (emailConfig, error) {
 
 // buildMIME renders a multipart/alternative message: a plaintext part (always
 // readable) and a minimal HTML part. CRLF line endings per RFC 5322.
-func buildMIME(cfg emailConfig, msg notification.Message) string {
-	subject := "[BEACON] " + statusHeadline(msg)
+func buildMIME(brand string, cfg emailConfig, msg notification.Message) string {
+	subject := "[" + brandOr(brand) + "] " + statusHeadline(msg)
 	boundary := "beacon-boundary-9d7f2a"
 
 	var b strings.Builder
@@ -176,14 +181,14 @@ func buildMIME(cfg emailConfig, msg notification.Message) string {
 	crlf("--" + boundary)
 	crlf("Content-Type: text/html; charset=UTF-8")
 	crlf("")
-	b.WriteString(htmlBody(msg))
+	b.WriteString(htmlBody(brand, msg))
 	crlf("")
 
 	crlf("--" + boundary + "--")
 	return b.String()
 }
 
-func htmlBody(msg notification.Message) string {
+func htmlBody(brand string, msg notification.Message) string {
 	var rows strings.Builder
 	for _, l := range detailLines(msg) {
 		k, v, ok := strings.Cut(l, ": ")
@@ -197,8 +202,8 @@ func htmlBody(msg notification.Message) string {
 	button := ""
 	if msg.DashboardURL != "" {
 		button = fmt.Sprintf(
-			`<p style="margin-top:16px"><a href="%s" style="background:#0f172a;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Open in Beacon</a></p>`,
-			html.EscapeString(msg.DashboardURL))
+			`<p style="margin-top:16px"><a href="%s" style="background:#0f172a;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Open in %s</a></p>`,
+			html.EscapeString(msg.DashboardURL), html.EscapeString(brandOr(brand)))
 	}
 	return fmt.Sprintf(`<!doctype html><html><body style="font-family:system-ui,-apple-system,sans-serif;color:#0f172a;max-width:560px;margin:0 auto;padding:16px">
 <div style="border-left:4px solid %s;padding-left:12px;margin-bottom:16px"><h2 style="margin:0;font-size:18px">%s</h2></div>

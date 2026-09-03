@@ -181,8 +181,8 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	})
 	notifierRegistry := map[notification.ChannelType]notification.Notifier{
 		notification.TypeTelegram: notifier.NewTelegramNotifier(),
-		notification.TypeSlack:    notifier.NewSlackNotifier(tenantHTTP),
-		notification.TypeEmail:    notifier.NewEmailNotifier(),
+		notification.TypeSlack:    notifier.NewSlackNotifier(tenantHTTP, cfg.Notify.BrandName),
+		notification.TypeEmail:    notifier.NewEmailNotifier(cfg.Notify.BrandName),
 		notification.TypeWebhook:  notifier.NewWebhookNotifier(tenantHTTP),
 	}
 	// Apple Push (APNs): registered only when the platform signing key is set, so
@@ -224,7 +224,30 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		log.Info("AI alert enrichment enabled",
 			slog.String("endpoint", cfg.AI.BaseURL), slog.String("model", cfg.AI.Model))
 	}
-	dispatcher := notification.NewDispatcher(notificationRepo, cipher, notifierRegistry, projectLookup, auditRec, maintenanceSvc, cfg.Notify.DashboardURL, analyzer, cfg.AI.Timeout)
+	// Default email fallback: when an org has configured no notification channel,
+	// a firing/resolved alert is emailed to its owners and admins over the platform
+	// SMTP relay instead of being silently dropped. Off unless a relay is set
+	// (BEACON_DEFAULT_SMTP_*), the same graceful-degradation pattern as APNs/AI. A
+	// partial config (host or from, not both) is a likely mistake: warn loudly and
+	// leave it off rather than half-enable it.
+	var fallbackNotifier notification.FallbackNotifier
+	switch de := cfg.Notify.DefaultEmail; {
+	case de.Enabled():
+		fallbackNotifier = notifier.NewDefaultEmailNotifier(notifier.DefaultEmailConfig{
+			Host:     de.Host,
+			Port:     de.Port,
+			From:     de.From,
+			Username: de.Username,
+			Password: de.Password,
+			Security: de.Security,
+		}, userRepo, cfg.Notify.BrandName)
+		log.Info("default email fallback enabled",
+			slog.String("smtp_host", de.Host), slog.String("from", de.From))
+	case de.Host != "" || de.From != "":
+		log.Warn("default email fallback partially configured — set BOTH BEACON_DEFAULT_SMTP_HOST and BEACON_DEFAULT_SMTP_FROM; fallback disabled",
+			slog.Bool("host_set", de.Host != ""), slog.Bool("from_set", de.From != ""))
+	}
+	dispatcher := notification.NewDispatcher(notificationRepo, cipher, notifierRegistry, projectLookup, auditRec, maintenanceSvc, cfg.Notify.DashboardURL, analyzer, cfg.AI.Timeout, fallbackNotifier)
 
 	// Tenant-scoped insight reads over Prometheus.
 	insightQuerier := promapi.NewInsightQuerier(promapi.New(cfg.CtrlPlane.PromQueryURL))

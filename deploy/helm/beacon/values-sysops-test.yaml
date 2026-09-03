@@ -12,6 +12,7 @@ nodeSelector:
   kubernetes.io/hostname: debian001
 
 app:
+  brandName: "SysOps 24/7"
   beaconEnv: staging
   logLevel: info
   promRetention: 7d

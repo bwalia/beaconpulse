@@ -100,6 +100,10 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
   value: {{ include "beacon.baseURL" . | quote }}
 - name: BEACON_DASHBOARD_URL
   value: {{ include "beacon.baseURL" . | quote }}
+# Product name shown in alert notifications (email subject, "Open in <brand>"
+# button). Per-brand deployment value; defaults to "Beacon" if unset.
+- name: BEACON_BRAND_NAME
+  value: {{ .Values.app.brandName | default "Beacon" | quote }}
 - name: BEACON_PROM_SCRAPE_FILE
   value: "/etc/prometheus/generated/scrape_monitors.yml"
 - name: BEACON_PROM_RULES_FILE
@@ -216,6 +220,48 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
   value: "{{ include "beacon.baseURL" . }}/billing?checkout=success"
 - name: BEACON_BILLING_CANCEL_URL
   value: "{{ include "beacon.baseURL" . }}/billing?checkout=cancel"
+# Default email fallback. When an org has configured NO notification channel, an
+# alert is emailed to its owners/admins over this operator SMTP relay instead of
+# being dropped. All sealed into beacon-secrets (seal-secrets.sh reads them from
+# deploy/.env) and all optional: absent host/from leaves the fallback OFF, so the
+# chart ships fine before a relay is wired. HOST and FROM must be set together —
+# the API warns and disables the fallback if only one is present.
+- name: BEACON_DEFAULT_SMTP_HOST
+  valueFrom:
+    secretKeyRef:
+      name: beacon-secrets
+      key: BEACON_DEFAULT_SMTP_HOST
+      optional: true
+- name: BEACON_DEFAULT_SMTP_PORT
+  valueFrom:
+    secretKeyRef:
+      name: beacon-secrets
+      key: BEACON_DEFAULT_SMTP_PORT
+      optional: true
+- name: BEACON_DEFAULT_SMTP_FROM
+  valueFrom:
+    secretKeyRef:
+      name: beacon-secrets
+      key: BEACON_DEFAULT_SMTP_FROM
+      optional: true
+- name: BEACON_DEFAULT_SMTP_USERNAME
+  valueFrom:
+    secretKeyRef:
+      name: beacon-secrets
+      key: BEACON_DEFAULT_SMTP_USERNAME
+      optional: true
+- name: BEACON_DEFAULT_SMTP_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: beacon-secrets
+      key: BEACON_DEFAULT_SMTP_PASSWORD
+      optional: true
+- name: BEACON_DEFAULT_SMTP_SECURITY
+  valueFrom:
+    secretKeyRef:
+      name: beacon-secrets
+      key: BEACON_DEFAULT_SMTP_SECURITY
+      optional: true
 {{- end -}}
 
 {{/*
