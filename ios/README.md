@@ -1,7 +1,7 @@
 # Beacon iOS
 
 A native SwiftUI iPhone/iPad client for the Beacon monitoring platform. One
-codebase ships any brand (SysOps 24/7, Red Fox Signals, Beacon, …) — branding is **pure
+codebase ships any brand (SysOps 24/7, RedFox Signals, Beacon, …) — branding is **pure
 configuration**, not code.
 
 This is **Phase 1**: app foundation + the alert loop (auth, monitors list/detail,
@@ -86,7 +86,7 @@ bundle id). The Sign in with Apple capability is enabled on the
 ## Release (TestFlight / App Store)
 
 `.github/workflows/ios-release.yml` builds, signs, and uploads **every brand**
-(SysOps 24/7 → `com.sysops247.app`, Red Fox Signals → `com.redfoxsignals.app`) on every push to
+(SysOps 24/7 → `com.sysops247.app`, RedFox Signals → `com.redfoxsignals.app`) on every push to
 `main` (TestFlight, internal testers). Brands build as a **serialised** matrix, never
 in parallel: `prepare_signing` rewrites the shared `Beacon.xcodeproj` and the shared
 signing keychain, so two concurrent brands would sign each other's target. A manual

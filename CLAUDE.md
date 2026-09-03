@@ -1,7 +1,7 @@
 # Beacon / SysOps 24/7 — repo guide
 
 Multi-tenant infrastructure-monitoring platform. Same backend ships under multiple
-brands (SysOps 24/7, Red Fox Signals, Beacon) — **brand is always configuration, never
+brands (SysOps 24/7, RedFox Signals, Beacon) — **brand is always configuration, never
 hardcoded.**
 
 Brands live in three places, all configuration: `frontend/src/brand/<brand>.ts` (web,
@@ -74,7 +74,7 @@ site yet, and App Store review requires one.
 
 `.github/workflows/ios-release.yml` + `ios/fastlane/` — **every** push to `main`
 builds, signs, and uploads **every brand** to TestFlight (internal): SysOps 24/7
-(`com.sysops247.app`) and Red Fox Signals (`com.redfoxsignals.app`). Brands build as a serialised
+(`com.sysops247.app`) and RedFox Signals (`com.redfoxsignals.app`). Brands build as a serialised
 matrix — never in parallel, because `prepare_signing` rewrites the shared
 `Beacon.xcodeproj` and signing keychain. There is
 deliberately no `ios/**` path filter: the app is a client of this backend, so a

@@ -1,4 +1,4 @@
-# ── Red Fox Signals — production environment ───────────────────────────────────────
+# ── RedFox Signals — production environment ───────────────────────────────────────
 # Namespace: redfox-prod   Host: https://redfoxsignals.com   (apex, via CNAME flattening)
 # Deploy: run the workflow with BRAND=redfox, TARGET_ENV=prod. See DEPLOY-A-BRAND.md.
 env: redfox-prod
@@ -25,9 +25,9 @@ nodeSelector:
 # Deliberately NOT pinned to cloud003, unlike values-sysops-prod.yaml.
 # SysOps pins every pod to that single public edge node for a ~14ms edge->origin hop,
 # but a second full production stack there (postgres + redis + prometheus +
-# alertmanager + 2x api + 2x frontend) risks exhausting it. Red Fox Signals instead takes the
+# alertmanager + 2x api + 2x frontend) risks exhausting it. RedFox Signals instead takes the
 # same path beaconpulse.net's prod uses: the wslproxy rule backends to the k3s1 traefik
-# ingress, which schedules across the cluster. If Red Fox Signals later needs the low-latency
+# ingress, which schedules across the cluster. If RedFox Signals later needs the low-latency
 # edge placement, copy the nodeSelector + edge toleration out of values-sysops-prod.yaml
 # and repoint redfox-prod-default at 77.68.126.63:80.
 

@@ -1,6 +1,6 @@
 # Fastfile — white-label native iOS release (GitHub Actions + Vault + fastlane).
 #
-# Ships any brand in the BRANDS table below (SysOps 24/7, Red Fox Signals) from one shared
+# Ships any brand in the BRANDS table below (SysOps 24/7, RedFox Signals) from one shared
 # source set; $BRAND selects which. See ios/README.md and ios/project.yml.
 #
 # CI signs with an App Store Connect API key pulled from Vault by
