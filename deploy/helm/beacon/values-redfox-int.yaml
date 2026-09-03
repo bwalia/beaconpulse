@@ -29,7 +29,7 @@ nodeSelector:
   kubernetes.io/hostname: debian006
 
 app:
-  brandName: "Red Fox Signals"
+  brandName: "RedFox Signals"
   beaconEnv: staging
   logLevel: debug
   promRetention: 7d
