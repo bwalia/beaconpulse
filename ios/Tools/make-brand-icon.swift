@@ -10,7 +10,7 @@
 // at all, even one that is fully opaque, and most SVG rasterisers emit RGBA
 // unconditionally. `.noneSkipLast` here guarantees 3 samples per pixel.
 //
-// The mark drawn is Red Fox Signals' — signal arcs broadcasting from a node, matching
+// The mark drawn is RedFox Signals' — signal arcs broadcasting from a node, matching
 // frontend/src/brand/redfox.ts so the phone icon and the web logo are the same drawing.
 // A new brand adds its own draw function beside `drawRedFoxMark`.
 

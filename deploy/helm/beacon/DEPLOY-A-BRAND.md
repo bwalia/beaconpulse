@@ -61,7 +61,7 @@ Result: `https://int.sysops247.com` serving the green SysOps 24/7 dashboard.
 3. Run the workflow with `BRAND=sysops`. The chart never hardcodes a domain — `host` is
    the only knob.
 
-## Red Fox Signals (orange) — the third brand, on redfoxsignals.com
+## RedFox Signals (orange) — the third brand, on redfoxsignals.com
 
 Built exactly by the recipe below. Environments:
 
@@ -79,7 +79,7 @@ Deploy with **BRAND** = `redfox`, **TARGET_ENV** = `int` or `prod`.
     deploy/scripts/vault-load-secrets.sh redfox-prod
 
 Unlike SysOps, redfox-prod is **not** pinned to cloud003 — a second full production
-stack on that single edge node risks exhausting it, so Red Fox Signals takes beaconpulse.net's
+stack on that single edge node risks exhausting it, so RedFox Signals takes beaconpulse.net's
 path through the k3s1 traefik ingress instead. See values-redfox-prod.yaml.
 
 ## Add a FOURTH brand
@@ -87,7 +87,7 @@ path through the k3s1 traefik ingress instead. See values-redfox-prod.yaml.
 1. `frontend/src/brand/<brand>.ts` (copy `redfox.ts`; change name, ramp, mark) and
    register it in `src/brand/index.ts`.
 2. Add `BRAND: <brand>` to the workflow's choice list.
-3. Add `values-<brand>-int.yaml` (copy the Red Fox overlay; change `host`) and the
+3. Add `values-<brand>-int.yaml` (copy the RedFox overlay; change `host`) and the
    wslproxy vhost JSON — a server file per host, plus a `<brand>-prod-default` rule for
    the apex; for `int`, add the host to the shared `aws-k3s1-ingress-klipper-80` rule's
    `servers` list instead.

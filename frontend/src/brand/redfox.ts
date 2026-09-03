@@ -3,11 +3,11 @@ import { createElement } from "react";
 import type { Brand } from "./types";
 
 /**
- * Red Fox Signals — the third brand, on redfoxsignals.com.
+ * RedFox Signals — the third brand, on redfoxsignals.com.
  *
  * Same product as Beacon and SysOps 24/7, shipped under its own name, mark and orange
  * ramp. Build with NEXT_PUBLIC_BRAND=redfox and the entire product — landing page,
- * dashboard, docs, page titles, focus rings, the logo — comes out as Red Fox Signals
+ * dashboard, docs, page titles, focus rings, the logo — comes out as RedFox Signals
  * with no other file touched. See ./README.md and
  * deploy/helm/beacon/DEPLOY-A-BRAND.md.
  */
@@ -40,8 +40,8 @@ function RedFoxMark({ className }: { className?: string }) {
 }
 
 export const redfox: Brand = {
-  name: "Red Fox Signals",
-  shortName: "Red Fox",
+  name: "RedFox Signals",
+  shortName: "RedFox",
   tagline: "Know before your users do.",
   description:
     "Uptime, performance and certificate monitoring with instant alerting and public status pages. Multi-tenant and self-hostable.",

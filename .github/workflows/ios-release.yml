@@ -1,6 +1,6 @@
 name: iOS Release (TestFlight & App Store)
 
-# Build, sign, and upload the white-label iOS apps (SysOps 24/7, Red Fox Signals).
+# Build, sign, and upload the white-label iOS apps (SysOps 24/7, RedFox Signals).
 #
 # Both brands are targets in ONE XcodeGen project sharing one source set, so a run
 # builds them as a serialised matrix — never in parallel: `prepare_signing` rewrites
