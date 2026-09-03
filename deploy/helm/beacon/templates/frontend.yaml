@@ -7,6 +7,17 @@ metadata:
     {{- include "beacon.selector" "frontend" | nindent 4 }}
 spec:
   replicas: {{ .Values.app.replicas.frontend }}
+  # In-place rollout: every Beacon pod is pinned to a single node (values.yaml
+  # nodeSelector), and a busy node can sit at its max-pods limit — so the default
+  # surge (add a new pod before removing an old one) can never schedule and the
+  # rollout deadlocks. maxSurge:0 + maxUnavailable:1 replaces a replica in its own
+  # freed slot instead, which always fits. Brief dip to N-1 replicas is fine for a
+  # stateless frontend behind a Service.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       {{- include "beacon.selector" "frontend" | nindent 6 }}
