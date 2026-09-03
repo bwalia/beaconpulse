@@ -26,7 +26,7 @@ host: int.redfoxsignals.com
 # Changing this later is not free: the existing PVs stay on the old node, so the
 # namespace has to be deleted and redeployed for the volumes to be recreated here.
 nodeSelector:
-  kubernetes.io/hostname: k3s-worker-08
+  kubernetes.io/hostname: debian006
 
 app:
   beaconEnv: staging

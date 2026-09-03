@@ -8,12 +8,20 @@ host: redfoxsignals.com
 extraHosts:
   - www.redfoxsignals.com
 
-# PLACEMENT — READ BEFORE THE FIRST PROD DEPLOY. The chart's default nodeSelector
-# (values.yaml) pins every pod to debworker00, which is already at its pod-count limit
-# from beacon-int + sysops-int + redfox-int. This file does not override it, so the
-# first prod deploy will fail to schedule exactly as redfox-int did. Choose a node with
-# pod headroom and set nodeSelector here first (redfox-int uses k3s-worker-08).
+# PLACEMENT. The chart's default nodeSelector (values.yaml) pins every pod to
+# debworker00, which is already at its pod-count limit from beacon-int + sysops-int +
+# redfox-int — so this MUST override it or the deploy fails to schedule, exactly as
+# redfox-int did. Pinned rather than left free because the RWO local-path PVCs carry
+# node affinity: a pod that moves cannot mount its own data.
 #
+# vps002 was the lightest-loaded node in the cluster (1% CPU, 3% memory). Note that is
+# current *usage*, not capacity — this file requests materially more than int does
+# (54Gi of volumes vs 12Gi, and 2 replicas each of api and frontend), so confirm vps002
+# has the disk and headroom before the first prod deploy. Changing it later is not
+# free: the PVs stay on the old node, so the namespace must be deleted and redeployed.
+nodeSelector:
+  kubernetes.io/hostname: vps002
+
 # Deliberately NOT pinned to cloud003, unlike values-sysops-prod.yaml.
 # SysOps pins every pod to that single public edge node for a ~14ms edge->origin hop,
 # but a second full production stack there (postgres + redis + prometheus +
