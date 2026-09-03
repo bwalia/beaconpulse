@@ -38,6 +38,11 @@ on:
         description: "Image tag to DEPLOY (deploy-only). Leave blank to use this commit's short SHA."
         default: ""
         required: false
+      RECREATE_NAMESPACE:
+        type: boolean
+        description: "DESTRUCTIVE: delete the brand's namespace before deploying, losing everything in it. Needed after changing nodeSelector — local-path PVs are node-local, so old volumes strand on the old node. Ignored for BRAND=beacon."
+        default: false
+        required: false
       BRAND:
         type: choice
         description: "White-label brand. 'beacon' = default product; 'sysops' (sysops247.com) and 'redfox' (redfoxsignals.com) each deploy to their own domain + namespace, fully automated (DNS, wslproxy, deploy)."
@@ -76,6 +81,8 @@ env:
   # every push to main building Beacon exactly as before; only a manual dispatch with a
   # different BRAND produces a branded image (tagged <brand>-<sha>).
   BRAND: ${{ github.event.inputs.BRAND || 'beacon' }}
+  # Never true for a push: github.event.inputs is empty outside workflow_dispatch.
+  RECREATE_NAMESPACE: ${{ github.event.inputs.RECREATE_NAMESPACE || 'false' }}
   # DNS: every environment host is a CNAME to the wslproxy edge, same as the rest
   # of the platform. The hostname itself is read from the env's Helm values file so
   # DNS can never drift from what the Ingress actually serves.
@@ -322,6 +329,17 @@ jobs:
             # The brand ships a branded frontend image ($BRAND-$TAG); api/worker are
             # brand-neutral and stay on the shared backend tag ($TAG).
             EXTRA="--set image.frontendTag=${BRAND}-${TAG}"
+            # DESTRUCTIVE and opt-in. Required when a brand's nodeSelector changes:
+            # local-path PVs carry node affinity, so volumes provisioned on the old node
+            # can never be mounted by pods on the new one, and the deploy hangs forever
+            # on unschedulable pods. Deliberately reachable only for a BRAND namespace —
+            # for beacon, NAMESPACE is the shared base env (int/test/acc/prod) that every
+            # brand copies its secrets FROM, and deleting it would take out every brand.
+            if [ "${RECREATE_NAMESPACE:-false}" = "true" ]; then
+              echo "::warning::RECREATE_NAMESPACE=true — deleting namespace '${NAMESPACE}' and everything in it"
+              kubectl delete namespace "$NAMESPACE" --ignore-not-found --wait --timeout=5m
+              echo "Namespace '${NAMESPACE}' removed; it will be recreated below."
+            fi
             kubectl get namespace "$NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$NAMESPACE"
             # The image PULL secret is always copied from the base env (the brand values
             # reference nebulacr-login with pullSecretCreate=false).
