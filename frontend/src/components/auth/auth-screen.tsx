@@ -256,10 +256,15 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
   }, [loading, user, router]);
 
   // Keep the URL honest as the user switches, without a navigation (which would
-  // re-mount the form and lose anything they had typed).
+  // re-mount the form and lose anything they had typed). Skipped while auth is
+  // unresolved or the user is signed in: otherwise this fires right after the
+  // redirect effect above and rewrites the URL back to /register, fighting
+  // router.replace("/dashboard") — the component has already returned null, so the
+  // visitor is left staring at a blank /register instead of landing on the app.
   useEffect(() => {
+    if (loading || user) return;
     window.history.replaceState(null, "", mode === "register" ? "/register" : "/login");
-  }, [mode]);
+  }, [mode, loading, user]);
 
   // Don't flash the form to a signed-in user while the redirect above fires.
   if (!loading && user) return null;

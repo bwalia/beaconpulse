@@ -47,8 +47,14 @@ export default function PlatformPage() {
     );
   }
 
-  const setField = (i: number, field: keyof PlanSetting, value: string) =>
+  type NumericPlanField = "price_monthly" | "max_monitors" | "min_interval_seconds" | "monthly_diagnoses";
+  const setField = (i: number, field: NumericPlanField, value: string) =>
     setPlans((prev) => prev.map((p, idx) => (idx === i ? { ...p, [field]: Number(value) } : p)));
+  const setTagline = (i: number, value: string) =>
+    setPlans((prev) => prev.map((p, idx) => (idx === i ? { ...p, tagline: value } : p)));
+  // Textarea holds one bullet per line; kept verbatim while typing (blanks trimmed on save).
+  const setFeatures = (i: number, value: string) =>
+    setPlans((prev) => prev.map((p, idx) => (idx === i ? { ...p, features: value.split("\n") } : p)));
 
   const onSave = async () => {
     setErr(null);
@@ -67,6 +73,8 @@ export default function PlatformPage() {
           max_monitors: Number(p.max_monitors),
           min_interval_seconds: Number(p.min_interval_seconds),
           monthly_diagnoses: Number(p.monthly_diagnoses),
+          tagline: p.tagline.trim(),
+          features: (p.features ?? []).map((f) => f.trim()).filter(Boolean),
         })),
         premium_grants,
       });
@@ -175,6 +183,32 @@ export default function PlatformPage() {
                       min={0}
                       onChange={(v) => setField(i, "monthly_diagnoses", v)}
                     />
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Tagline</span>
+                      <input
+                        type="text"
+                        value={p.tagline}
+                        onChange={(e) => setTagline(i, e.target.value)}
+                        placeholder="For a small team running real services."
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                        Feature bullets
+                      </span>
+                      <Textarea
+                        rows={3}
+                        value={(p.features ?? []).join("\n")}
+                        onChange={(e) => setFeatures(i, e.target.value)}
+                        placeholder={"All alert channels\nEmail support"}
+                        className="text-sm"
+                      />
+                      <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                        One per line. The monitors, interval and AI-summary bullets are added automatically
+                        from the numbers above — leave blank to use the defaults.
+                      </span>
+                    </label>
                   </div>
                 </Card>
               ))}

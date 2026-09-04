@@ -148,6 +148,11 @@ export interface PlanSetting {
   max_monitors: number;
   min_interval_seconds: number;
   monthly_diagnoses: number;
+  /** Operator-editable one-line pitch. Empty = use the built-in default. */
+  tagline: string;
+  /** Operator-editable marketing bullets. Empty = use the built-in defaults. The
+   *  monitor/interval/AI bullets are generated from the numbers, not stored here. */
+  features: string[];
 }
 
 export interface PlatformSettings {

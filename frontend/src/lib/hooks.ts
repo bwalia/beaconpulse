@@ -351,6 +351,8 @@ export interface UpdatePlatformSettingsInput {
     max_monitors: number;
     min_interval_seconds: number;
     monthly_diagnoses: number;
+    tagline: string;
+    features: string[];
   }>;
   premium_grants: string[];
 }

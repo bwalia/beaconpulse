@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -50,13 +51,29 @@ func (h *SettingsHandler) Routes() chi.Router {
 
 var planDisplayName = map[string]string{"free": "Free", "starter": "Starter", "pro": "Pro"}
 
+// cleanFeatures trims each bullet and drops blank ones, so a stray empty line in the
+// admin textarea never becomes an empty bullet on the card.
+func cleanFeatures(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, f := range in {
+		if f = strings.TrimSpace(f); f != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 type planSettingResponse struct {
-	Plan               string `json:"plan"`
-	Name               string `json:"name"`
-	PriceMonthly       int    `json:"price_monthly"`
-	MaxMonitors        int    `json:"max_monitors"`
-	MinIntervalSeconds int    `json:"min_interval_seconds"`
-	MonthlyDiagnoses   int    `json:"monthly_diagnoses"`
+	Plan               string   `json:"plan"`
+	Name               string   `json:"name"`
+	PriceMonthly       int      `json:"price_monthly"`
+	MaxMonitors        int      `json:"max_monitors"`
+	MinIntervalSeconds int      `json:"min_interval_seconds"`
+	MonthlyDiagnoses   int      `json:"monthly_diagnoses"`
+	// Tagline/Features are the raw stored copy (empty = using the built-in default),
+	// so the admin form shows blanks with the default as placeholder.
+	Tagline  string   `json:"tagline"`
+	Features []string `json:"features"`
 }
 
 type settingsResponse struct {
@@ -75,6 +92,10 @@ func presentSettings(s settings.Settings) settingsResponse {
 		resp.PremiumGrants = []string{}
 	}
 	for _, p := range s.Plans {
+		feats := p.Features
+		if feats == nil {
+			feats = []string{}
+		}
 		resp.Plans = append(resp.Plans, planSettingResponse{
 			Plan:               string(p.Plan),
 			Name:               planDisplayName[string(p.Plan)],
@@ -82,6 +103,8 @@ func presentSettings(s settings.Settings) settingsResponse {
 			MaxMonitors:        p.MaxMonitors,
 			MinIntervalSeconds: p.MinIntervalSeconds,
 			MonthlyDiagnoses:   p.MonthlyDiagnoses,
+			Tagline:            p.Tagline,
+			Features:           feats,
 		})
 	}
 	if !s.UpdatedAt.IsZero() {
@@ -115,11 +138,13 @@ func (h *SettingsHandler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 type planSettingRequest struct {
-	Plan               string `json:"plan" validate:"required,oneof=free starter pro"`
-	PriceMonthly       int    `json:"price_monthly" validate:"gte=0,lte=1000000"`
-	MaxMonitors        int    `json:"max_monitors" validate:"gte=1,lte=1000000"`
-	MinIntervalSeconds int    `json:"min_interval_seconds" validate:"gte=5,lte=86400"`
-	MonthlyDiagnoses   int    `json:"monthly_diagnoses" validate:"gte=0,lte=1000000"`
+	Plan               string   `json:"plan" validate:"required,oneof=free starter pro"`
+	PriceMonthly       int      `json:"price_monthly" validate:"gte=0,lte=1000000"`
+	MaxMonitors        int      `json:"max_monitors" validate:"gte=1,lte=1000000"`
+	MinIntervalSeconds int      `json:"min_interval_seconds" validate:"gte=5,lte=86400"`
+	MonthlyDiagnoses   int      `json:"monthly_diagnoses" validate:"gte=0,lte=1000000"`
+	Tagline            string   `json:"tagline" validate:"max=160"`
+	Features           []string `json:"features" validate:"omitempty,max=8,dive,max=80"`
 }
 
 type updateSettingsRequest struct {
@@ -154,6 +179,8 @@ func (h *SettingsHandler) update(w http.ResponseWriter, r *http.Request) {
 			MaxMonitors:        p.MaxMonitors,
 			MinIntervalSeconds: p.MinIntervalSeconds,
 			MonthlyDiagnoses:   p.MonthlyDiagnoses,
+			Tagline:            strings.TrimSpace(p.Tagline),
+			Features:           cleanFeatures(p.Features),
 		})
 	}
 	out, err := h.svc.Update(r.Context(), mustPrincipal(r).UserID, email, in)

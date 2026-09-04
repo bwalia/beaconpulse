@@ -13,6 +13,34 @@ import {
   StatusPreview,
 } from "@/components/marketing/sections";
 import { StructuredData } from "@/components/marketing/structured-data";
+import type { LivePlans } from "@/lib/plans";
+
+// Server-side, requests go to the API service inside the cluster (the browser base URL
+// is deliberately empty for same-origin). `||`, not `??`: NEXT_PUBLIC_API_BASE_URL is
+// the empty string in every deployment, which must fall through to the internal host.
+const API_INTERNAL =
+  process.env.BEACON_INTERNAL_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "http://api:8080";
+
+// Live, operator-tuned pricing for the cards and the schema.org Offers. Never throws:
+// at build time (API unreachable) or on any error it returns null and the page renders
+// the static PLANS fallback, correcting itself on the next revalidation once live.
+async function fetchLivePlans(): Promise<LivePlans | null> {
+  try {
+    const res = await fetch(`${API_INTERNAL.replace(/\/$/, "")}/api/v1/public/plans`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as LivePlans;
+  } catch {
+    return null;
+  }
+}
+
+// Re-render at most once a minute so an operator's price change at /platform reaches
+// the (statically served, SEO-friendly) landing page without a redeploy.
+export const revalidate = 60;
 
 // `/` used to redirect straight to /login, which meant the product had no public
 // surface at all — nothing to point a campaign at, and nothing for a stranger to
@@ -43,6 +71,7 @@ export const metadata: Metadata = {
 
 export default async function LandingPage() {
   const t = await getTranslations("marketing");
+  const live = await fetchLivePlans();
   return (
     <div className="min-h-dvh bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {/* Skip link: the nav is fixed, so keyboard users need a way past it. */}
@@ -52,13 +81,13 @@ export default async function LandingPage() {
       >
         {t("skipToContent")}
       </a>
-      <StructuredData />
+      <StructuredData live={live} />
       <MarketingNav />
       <main id="main">
         <Hero />
         <Features />
         <HowItWorks />
-        <Pricing />
+        <Pricing live={live} />
         <StatusPreview />
         <FinalCTA />
       </main>

@@ -20,13 +20,18 @@ import (
 	"beacon/internal/platform/emailmatch"
 )
 
-// PlanConfig is one tier's editable pricing and limits.
+// PlanConfig is one tier's editable pricing, limits and marketing copy.
 type PlanConfig struct {
 	Plan               plan.Plan
 	PriceMonthly       int
 	MaxMonitors        int
 	MinIntervalSeconds int
 	MonthlyDiagnoses   int
+	// Tagline and Features are the pricing-card copy. Empty means "use the built-in
+	// default" — the numeric bullets (monitors/interval/AI) are always generated, so
+	// only the one-line pitch and the marketing highlight bullets are stored here.
+	Tagline  string
+	Features []string
 }
 
 // Settings is the full editable platform configuration.
@@ -142,6 +147,10 @@ func fromLive() Settings {
 			MaxMonitors:        l.MaxMonitors,
 			MinIntervalSeconds: l.MinIntervalSeconds,
 			MonthlyDiagnoses:   l.MonthlyDiagnoses,
+			// Raw stored copy (empty when not customised) so the admin form shows blanks
+			// with the default as a placeholder, rather than the resolved default.
+			Tagline:  c.Taglines[p],
+			Features: c.Features[p],
 		})
 	}
 	return out
@@ -159,6 +168,10 @@ func toPlanConfig(s Settings) plan.Config {
 			MaxMonitors:        p.MaxMonitors,
 			MinIntervalSeconds: p.MinIntervalSeconds,
 			MonthlyDiagnoses:   p.MonthlyDiagnoses,
+		}
+		c.Taglines[p.Plan] = p.Tagline
+		if len(p.Features) > 0 {
+			c.Features[p.Plan] = p.Features
 		}
 	}
 	return c
@@ -197,6 +210,20 @@ func validate(s Settings) error {
 		if p.PriceMonthly < 0 || p.PriceMonthly > 1_000_000 {
 			return apperror.Validation("price out of range",
 				apperror.FieldError{Field: "price_monthly", Message: "must be between 0 and 1,000,000"})
+		}
+		if len(p.Tagline) > 160 {
+			return apperror.Validation("tagline too long",
+				apperror.FieldError{Field: "tagline", Message: "must be 160 characters or fewer"})
+		}
+		if len(p.Features) > 8 {
+			return apperror.Validation("too many feature bullets",
+				apperror.FieldError{Field: "features", Message: "at most 8 bullets per plan"})
+		}
+		for _, f := range p.Features {
+			if len(f) > 80 {
+				return apperror.Validation("feature bullet too long",
+					apperror.FieldError{Field: "features", Message: "each bullet must be 80 characters or fewer"})
+			}
 		}
 	}
 	return nil

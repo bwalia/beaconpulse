@@ -27,13 +27,18 @@ func NewSettingsRepository(pool *pgxpool.Pool) *SettingsRepository {
 
 var _ settings.Repository = (*SettingsRepository)(nil)
 
-// planJSON is the on-disk shape of one tier inside the `plans` JSONB column.
+// planJSON is the on-disk shape of one tier inside the `plans` JSONB column. New fields
+// append cleanly — JSONB is schemaless, so no migration is needed when a tier grows a
+// field; older rows simply read the zero value (empty tagline/features → built-in
+// default applies).
 type planJSON struct {
-	Plan               string `json:"plan"`
-	PriceMonthly       int    `json:"price_monthly"`
-	MaxMonitors        int    `json:"max_monitors"`
-	MinIntervalSeconds int    `json:"min_interval_seconds"`
-	MonthlyDiagnoses   int    `json:"monthly_diagnoses"`
+	Plan               string   `json:"plan"`
+	PriceMonthly       int      `json:"price_monthly"`
+	MaxMonitors        int      `json:"max_monitors"`
+	MinIntervalSeconds int      `json:"min_interval_seconds"`
+	MonthlyDiagnoses   int      `json:"monthly_diagnoses"`
+	Tagline            string   `json:"tagline,omitempty"`
+	Features           []string `json:"features,omitempty"`
 }
 
 // Load reads the settings row. ok=false when no row exists yet (fresh install).
@@ -65,6 +70,8 @@ func (r *SettingsRepository) Load(ctx context.Context) (settings.Settings, bool,
 			MaxMonitors:        p.MaxMonitors,
 			MinIntervalSeconds: p.MinIntervalSeconds,
 			MonthlyDiagnoses:   p.MonthlyDiagnoses,
+			Tagline:            p.Tagline,
+			Features:           p.Features,
 		})
 	}
 	return s, true, nil
@@ -81,6 +88,8 @@ func (r *SettingsRepository) Save(ctx context.Context, s settings.Settings, upda
 			MaxMonitors:        p.MaxMonitors,
 			MinIntervalSeconds: p.MinIntervalSeconds,
 			MonthlyDiagnoses:   p.MonthlyDiagnoses,
+			Tagline:            p.Tagline,
+			Features:           p.Features,
 		})
 	}
 	plansRaw, err := json.Marshal(rows)
