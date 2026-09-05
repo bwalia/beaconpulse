@@ -28,3 +28,25 @@ export const PLANS: Plan[] = [
   { id: "pro", name: "Pro", price: 79, currency: "USD", priceLabel: "$79", perMonth: true },
   { id: "payg", name: "Pay-as-you-go", price: 1, currency: "USD", priceLabel: "from $1" },
 ];
+
+// The live pricing served by GET /api/v1/public/plans — the operator-tuned figures the
+// landing page fetches server-side so admin price changes show without a redeploy. Only
+// the subscribable tiers (free/starter/pro) appear; PAYG is described from the rate.
+// Fetched in app/page.tsx; the static PLANS above are the build-time / fetch-failure
+// fallback and the schema.org base. Type only — the fetch lives server-side.
+export interface LivePlan {
+  id: string;
+  /** Operator-editable one-line pitch; defaults applied server-side. */
+  tagline: string;
+  price_monthly: number;
+  max_monitors: number;
+  min_interval_seconds: number;
+  monthly_diagnoses: number;
+  /** Operator-editable marketing bullets; defaults applied server-side. The numeric
+   *  bullets (monitors/interval/AI) are derived on the card from the numbers above. */
+  highlights: string[];
+}
+export interface LivePlans {
+  monitor_hours_per_dollar: number;
+  plans: LivePlan[];
+}

@@ -727,10 +727,7 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
 
   // Interval options honoring the plan floor, always including the current value.
   const minInterval = usage?.min_interval_seconds ?? 10;
-  const opts = INTERVAL_OPTIONS.filter((o) => o.v >= minInterval);
-  if (!opts.some((o) => o.v === monitor.interval_seconds)) {
-    opts.unshift({ v: monitor.interval_seconds, label: `Every ${monitor.interval_seconds}s (current)` });
-  }
+  const opts = intervalOptions(minInterval, monitor.interval_seconds);
 
   const onSubmit = async (values: EditValues) => {
     setServerError(null);
@@ -855,12 +852,33 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
   );
 }
 
-const INTERVAL_OPTIONS = [
-  { v: 30, label: "Every 30 seconds" },
-  { v: 60, label: "Every minute" },
-  { v: 300, label: "Every 5 minutes" },
-  { v: 900, label: "Every 15 minutes" },
-];
+// Human label for a check interval: 30→"Every 30 seconds", 1800→"Every 30 minutes".
+function intervalLabel(s: number): string {
+  if (s % 86400 === 0) return s / 86400 === 1 ? "Every day" : `Every ${s / 86400} days`;
+  if (s % 3600 === 0) return s / 3600 === 1 ? "Every hour" : `Every ${s / 3600} hours`;
+  if (s % 60 === 0) return s / 60 === 1 ? "Every minute" : `Every ${s / 60} minutes`;
+  return `Every ${s} seconds`;
+}
+
+// Selectable intervals for a plan whose fastest allowed is `min`: the plan minimum as
+// the fastest choice, plus the standard steps above it. GENERATED, not a fixed list, so
+// ANY operator-set minimum — including one larger than every preset (e.g. 1800s for a
+// re-tuned Free tier) — always yields valid options; filtering a fixed list would come
+// back empty and leave nothing to pick. `current` keeps an existing monitor's own value
+// selectable even if a later plan change raised the floor above it.
+const INTERVAL_STEPS = [30, 60, 300, 900, 1800, 3600, 21600, 86400];
+function intervalOptions(min: number, current?: number): { v: number; label: string }[] {
+  const vals = new Set(INTERVAL_STEPS.filter((v) => v >= min));
+  vals.add(min);
+  const grandfathered = current != null && !vals.has(current);
+  if (current != null) vals.add(current);
+  return [...vals]
+    .sort((a, b) => a - b)
+    .map((v) => ({
+      v,
+      label: grandfathered && v === current ? `${intervalLabel(v)} (current)` : intervalLabel(v),
+    }));
+}
 
 function CreateMonitorForm({ onDone }: { onDone: () => void }) {
   const { data: projects } = useProjects();
@@ -872,11 +890,24 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
     register,
     handleSubmit,
     control,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { type: "https", interval_seconds: 60, alert_sensitivity: "balanced" },
   });
+
+  const intervals = intervalOptions(minInterval);
+  // Keep the chosen interval valid as the plan floor loads/changes: the default is 60,
+  // which an operator-set floor above 60 would make unsubmittable (and absent from the
+  // dropdown). Snap to the fastest allowed option in that case.
+  useEffect(() => {
+    if (!intervals.some((o) => o.v === getValues("interval_seconds"))) {
+      setValue("interval_seconds", intervals[0].v);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minInterval]);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [created, setCreated] = useState<Monitor | null>(null);
@@ -955,7 +986,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
         </Field>
         <Field label="Check interval" error={errors.interval_seconds?.message}>
           <Select {...register("interval_seconds")}>
-            {INTERVAL_OPTIONS.filter((o) => o.v >= minInterval).map((o) => (
+            {intervals.map((o) => (
               <option key={o.v} value={o.v}>
                 {o.label}
               </option>

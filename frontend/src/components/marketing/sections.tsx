@@ -22,7 +22,8 @@ import {
 import { IN_VIEW, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { GlowCard } from "./pointer";
 import { brand } from "@/brand";
-import { PLANS } from "@/lib/plans";
+import { PLANS, type LivePlans } from "@/lib/plans";
+import { useStartHref } from "@/lib/auth";
 
 /** Section heading with a reveal. Shared so every section has one rhythm. */
 function SectionHead({
@@ -307,10 +308,25 @@ const PLAN_KEY: Record<(typeof PLANS)[number]["id"], string> = {
  * comes from the marketing catalog, so the section is localised and the numbers can't
  * drift between the cards and the structured data.
  */
-function Pricing() {
+function Pricing({ live }: { live: LivePlans | null }) {
   const t = useTranslations("marketing");
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.06);
+  const startHref = useStartHref();
+
+  // Live money/limit facts by id, when the public endpoint answered. Words stay in i18n;
+  // only the numbers come from the backend, so a /platform price or limit change shows
+  // here without a redeploy.
+  const liveById = new Map((live?.plans ?? []).map((p) => [p.id, p]));
+
+  // A pricing-card interval bullet from a second count: 60→"60-second checks",
+  // 1800→"30-minute checks", 3600→"1-hour checks". Localised via the marketing catalog.
+  const intervalBullet = (s: number) =>
+    s % 3600 === 0
+      ? t("planCheckHours", { n: s / 3600 })
+      : s % 60 === 0
+        ? t("planCheckMinutes", { n: s / 60 })
+        : t("planCheckSeconds", { n: s });
 
   return (
     <section id="pricing" className="scroll-mt-24 border-y border-slate-900/5 bg-slate-50/60 py-28 dark:border-white/5 dark:bg-white/[0.02]">
@@ -331,6 +347,27 @@ function Pricing() {
           {PLANS.map((plan) => {
             const k = PLAN_KEY[plan.id];
             const features = t.raw(`plan${k}Features`) as string[];
+            // Subscribable tiers take their price from the live config; PAYG isn't in
+            // the catalog, so it keeps its "from $1" label and gets a rate line instead.
+            const lp = liveById.get(plan.id);
+            const priceLabel = lp ? `$${lp.price_monthly}` : plan.priceLabel;
+            // Tagline: operator's text, falling back to the localised default.
+            const tagline = lp?.tagline || t(`plan${k}Tagline`);
+            // Card bullets: numeric facts derived live from the limits (localised, always
+            // in sync with the enforced caps) + the operator-editable marketing highlights.
+            // PAYG isn't operator-editable, so it keeps its static bullets + the rate line.
+            // If the endpoint is unreachable (no live), fall back to the full i18n list.
+            let shownFeatures = features;
+            if (lp) {
+              const numeric = [
+                t("planMonitors", { count: lp.max_monitors }),
+                intervalBullet(lp.min_interval_seconds),
+              ];
+              if (lp.monthly_diagnoses > 0) numeric.push(t("planDiagnoses", { n: lp.monthly_diagnoses }));
+              shownFeatures = [...numeric, ...lp.highlights];
+            } else if (plan.id === "payg" && live) {
+              shownFeatures = [t("planPaygRate", { hours: live.monitor_hours_per_dollar }), ...features];
+            }
             return (
               <motion.li key={plan.id} variants={reveal} className="h-full">
                 <div
@@ -349,11 +386,11 @@ function Pricing() {
                     {t(`plan${k}Name`)}
                   </h3>
                   <p className="mt-1 min-h-[2.5rem] text-sm leading-snug text-slate-600 dark:text-slate-400">
-                    {t(`plan${k}Tagline`)}
+                    {tagline}
                   </p>
                   <p className="mt-5 flex items-baseline gap-1">
                     <span className="text-4xl font-semibold tracking-tight text-slate-900 tabular-nums dark:text-white">
-                      {plan.priceLabel}
+                      {priceLabel}
                     </span>
                     {plan.perMonth && (
                       <span className="text-sm text-slate-500 dark:text-slate-400">
@@ -362,7 +399,7 @@ function Pricing() {
                     )}
                   </p>
                   <ul className="mt-6 space-y-3">
-                    {features.map((f) => (
+                    {shownFeatures.map((f) => (
                       <li key={f} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200">
                         <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
                         <span>{f}</span>
@@ -370,7 +407,7 @@ function Pricing() {
                     ))}
                   </ul>
                   <Link
-                    href="/register"
+                    href={startHref}
                     className={`mt-8 inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-base font-medium transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:focus-visible:ring-offset-slate-950 ${
                       plan.featured
                         ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-900"
@@ -412,6 +449,7 @@ function FinalCTA() {
   const t = useTranslations("marketing");
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants();
+  const startHref = useStartHref();
 
   return (
     <section className="relative overflow-hidden py-28">
@@ -437,7 +475,7 @@ function FinalCTA() {
         </motion.p>
         <motion.div variants={reveal} className="mt-9 flex flex-wrap justify-center gap-3">
           <Link
-            href="/register"
+            href={startHref}
             className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-8 py-4 text-lg font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
           >
             {t("ctaButton")}

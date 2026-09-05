@@ -108,3 +108,12 @@ export function useAuth(): AuthState {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
+
+// Where a "Start free" / "Get started" CTA should point. A signed-in visitor has no use
+// for /register (it only bounces them back to the app, and until auth resolves that
+// bounce flashes a blank screen) — send them straight to the dashboard, matching the
+// nav's own CTA. One place so every marketing CTA agrees.
+export function useStartHref(): string {
+  const { user } = useAuth();
+  return user ? "/dashboard" : "/register";
+}

@@ -9,6 +9,7 @@ import { ArrowRightIcon, CheckCircleIcon } from "@/components/icons";
 import { DUR, EASE_OUT, IN_VIEW, useRevealVariants, useStaggerVariants } from "@/lib/motion";
 import { Spotlight, TiltCard } from "./pointer";
 import { brand } from "@/brand";
+import { useStartHref } from "@/lib/auth";
 
 /**
  * Counts up to `to` when scrolled into view.
@@ -119,6 +120,7 @@ export function Hero() {
   const t = useTranslations("marketing");
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.07);
+  const startHref = useStartHref();
 
   return (
     <section className="relative overflow-hidden pb-24 pt-36 sm:pt-44">
@@ -163,7 +165,7 @@ export function Hero() {
 
           <motion.div variants={reveal} className="mt-9 flex flex-wrap items-center gap-3">
             <Link
-              href="/register"
+              href={startHref}
               className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-7 py-4 text-lg font-medium text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:bg-white dark:text-slate-900 dark:focus-visible:ring-offset-slate-950"
             >
               {t("ctaStartFree")}

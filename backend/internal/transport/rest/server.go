@@ -121,6 +121,11 @@ func NewRouter(d RouterDeps) http.Handler {
 		// legitimate traffic.
 		api.With(middleware.RateLimit(publicLimiter, middleware.ByIP, 5*time.Second)).
 			Mount("/public/status", d.StatusPage.Routes())
+		// PUBLIC, unauthenticated: live pricing for the marketing site. Reads the
+		// operator-tuned plan config, so a price/limit change at /platform reaches the
+		// landing page without a redeploy. Same public rate limit as the status page.
+		api.With(middleware.RateLimit(publicLimiter, middleware.ByIP, 5*time.Second)).
+			Get("/public/plans", publicPlans)
 		// PUBLIC, unauthenticated: heartbeat ping ingest. The URL token is the
 		// credential; rate-limited per token inside the handler.
 		// Same payload as /healthz, mounted where a BROWSER can reach it: the gateway

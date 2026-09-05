@@ -32,3 +32,75 @@ func TestResolve(t *testing.T) {
 		}
 	}
 }
+
+// TestCatalogCopy checks the operator-editable card copy: numeric bullets are always
+// generated from the live limits (never drift), and tagline/highlights fall back to the
+// built-in defaults when not customised but honour an operator override.
+func TestCatalogCopy(t *testing.T) {
+	t.Cleanup(func() { Apply(DefaultConfig()) })
+
+	// Defaults: no stored tagline/features → built-in defaults, numeric bullets derived.
+	Apply(DefaultConfig())
+	free := catalogFor(t, Free)
+	if free.Tagline != defaultTaglines[Free] {
+		t.Errorf("default tagline = %q, want %q", free.Tagline, defaultTaglines[Free])
+	}
+	if got := free.Features[0]; got != "10 monitors" {
+		t.Errorf("free first bullet = %q, want %q", got, "10 monitors")
+	}
+	// Free has 0 monthly diagnoses → no AI bullet; Pro has 1000 → one.
+	pro := catalogFor(t, Pro)
+	if !hasBullet(pro.Features, "1000 AI summaries / month") {
+		t.Errorf("pro features missing AI bullet: %v", pro.Features)
+	}
+	if hasBullet(free.Features, "AI summaries / month") {
+		t.Errorf("free should have no AI bullet: %v", free.Features)
+	}
+
+	// Operator override: custom tagline + highlights win; a re-tuned interval shows in
+	// the generated bullet as readable text (1800s → "30m minimum interval").
+	c := DefaultConfig()
+	c.Limits[Free] = Limits{MaxMonitors: 5, MinIntervalSeconds: 1800, MonthlyDiagnoses: 0}
+	c.Taglines[Free] = "Kick the tyres."
+	c.Features[Free] = []string{"Custom bullet"}
+	Apply(c)
+	free = catalogFor(t, Free)
+	if free.Tagline != "Kick the tyres." {
+		t.Errorf("custom tagline = %q", free.Tagline)
+	}
+	if free.Features[0] != "5 monitors" || free.Features[1] != "30m minimum interval" {
+		t.Errorf("generated bullets not updated: %v", free.Features)
+	}
+	if free.Highlights[0] != "Custom bullet" {
+		t.Errorf("custom highlight lost: %v", free.Highlights)
+	}
+}
+
+func catalogFor(t *testing.T, p Plan) Info {
+	t.Helper()
+	for _, info := range Catalog() {
+		if info.Plan == p {
+			return info
+		}
+	}
+	t.Fatalf("plan %q not in catalog", p)
+	return Info{}
+}
+
+func hasBullet(bullets []string, sub string) bool {
+	for _, b := range bullets {
+		if b == sub || (len(sub) < len(b) && contains(b, sub)) {
+			return true
+		}
+	}
+	return false
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}

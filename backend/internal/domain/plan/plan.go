@@ -77,10 +77,19 @@ var defaultLimits = map[Plan]Limits{
 // defaultPrices is the built-in monthly USD price of each subscribable tier.
 var defaultPrices = map[Plan]int{Free: 0, Starter: 19, Pro: 79}
 
-// featureTail is the non-numeric marketing copy for each tier. The monitor-count and
-// interval bullets are generated from the live limits (so they never disagree with the
-// caps actually applied); these are appended after them.
-var featureTail = map[Plan][]string{
+// defaultTaglines is the built-in one-line pitch for each tier — the seed and the
+// fallback when an operator has not set their own.
+var defaultTaglines = map[Plan]string{
+	Free:    "For a side project or kicking the tyres.",
+	Starter: "For a small team running real services.",
+	Pro:     "For scale and priority response.",
+}
+
+// defaultFeatures is the built-in marketing HIGHLIGHTS for each tier: the non-numeric
+// bullets. The monitor-count, interval and AI-quota bullets are GENERATED from the live
+// limits (so they can never disagree with the caps actually applied); these highlights
+// are appended after them and are operator-editable (empty = these defaults).
+var defaultFeatures = map[Plan][]string{
 	Free:    {"Telegram alerts", "Community support"},
 	Starter: {"All alert channels", "Email support"},
 	Pro:     {"Priority alerting", "Priority support"},
@@ -94,6 +103,12 @@ type Config struct {
 	Prices         map[Plan]int
 	HoursPerDollar int
 	Grants         []string
+	// Taglines and Features are the operator-editable pricing-card copy: the tier's
+	// one-line pitch and its marketing highlight bullets. Stored RAW — an empty value
+	// means "not customised", and the reader (Catalog) falls back to the built-in
+	// default. Kept separate from the generated numeric bullets, which are never stored.
+	Taglines map[Plan]string
+	Features map[Plan][]string
 }
 
 // live holds the active configuration. Read lock-free via atomic.Load on every
@@ -123,7 +138,13 @@ func DefaultConfig() Config {
 	for k, v := range defaultPrices {
 		prices[k] = v
 	}
-	return Config{Limits: lim, Prices: prices, HoursPerDollar: 5}
+	return Config{
+		Limits:         lim,
+		Prices:         prices,
+		HoursPerDollar: 5,
+		Taglines:       map[Plan]string{},
+		Features:       map[Plan][]string{},
+	}
 }
 
 // Apply installs c as the live configuration, filling any missing tier/price from the
@@ -150,6 +171,15 @@ func Apply(c Config) {
 	if c.HoursPerDollar <= 0 {
 		c.HoursPerDollar = d.HoursPerDollar
 	}
+	// Keep the copy maps non-nil so reads never panic, but do NOT fill defaults here:
+	// an empty tagline/feature list means "not customised", and Catalog applies the
+	// built-in default at read time. Filling here would hide that from the admin form.
+	if c.Taglines == nil {
+		c.Taglines = map[Plan]string{}
+	}
+	if c.Features == nil {
+		c.Features = map[Plan][]string{}
+	}
 	c.Grants = emailmatch.Normalize(c.Grants)
 	live.Store(&c)
 }
@@ -166,11 +196,21 @@ func Snapshot() Config {
 	for k, v := range c.Prices {
 		prices[k] = v
 	}
+	taglines := make(map[Plan]string, len(c.Taglines))
+	for k, v := range c.Taglines {
+		taglines[k] = v
+	}
+	feats := make(map[Plan][]string, len(c.Features))
+	for k, v := range c.Features {
+		feats[k] = append([]string(nil), v...)
+	}
 	return Config{
 		Limits:         lim,
 		Prices:         prices,
 		HoursPerDollar: c.HoursPerDollar,
 		Grants:         append([]string(nil), c.Grants...),
+		Taglines:       taglines,
+		Features:       feats,
 	}
 }
 
@@ -254,9 +294,16 @@ func LimitsFor(p Plan) Limits {
 type Info struct {
 	Plan         Plan
 	Name         string
+	Tagline      string
 	PriceMonthly int
 	Limits       Limits
-	Features     []string
+	// Highlights are the operator-editable marketing bullets (falling back to the
+	// built-in defaults). Features is the FULL rendered list — the generated numeric
+	// bullets (monitors/interval/AI) followed by Highlights — for surfaces that want a
+	// ready-made list (the billing page); the landing page reads Highlights + the raw
+	// numbers so it can localise the numeric bullets itself.
+	Highlights []string
+	Features   []string
 }
 
 // Catalog returns the ordered list of purchasable plans for the pricing page, built
@@ -267,21 +314,59 @@ func Catalog() []Info {
 	out := make([]Info, 0, 3)
 	for _, p := range []Plan{Free, Starter, Pro} {
 		l := c.Limits[p]
+		hl := highlightsOf(c, p)
 		out = append(out, Info{
 			Plan:         p,
 			Name:         names[p],
+			Tagline:      taglineOf(c, p),
 			PriceMonthly: c.Prices[p],
 			Limits:       l,
-			Features:     features(p, l),
+			Highlights:   hl,
+			Features:     append(numericBullets(l), hl...),
 		})
 	}
 	return out
 }
 
-func features(p Plan, l Limits) []string {
+// taglineOf / highlightsOf apply the built-in default when the operator has not set a
+// value — so an empty stored field means "use the default", never "blank".
+func taglineOf(c *Config, p Plan) string {
+	if t := c.Taglines[p]; t != "" {
+		return t
+	}
+	return defaultTaglines[p]
+}
+
+func highlightsOf(c *Config, p Plan) []string {
+	if h := c.Features[p]; len(h) > 0 {
+		return h
+	}
+	return defaultFeatures[p]
+}
+
+// numericBullets are the generated, always-in-sync facts for a tier — never stored, so
+// they can't drift from the caps actually enforced.
+func numericBullets(l Limits) []string {
 	out := []string{
 		fmt.Sprintf("%d monitors", l.MaxMonitors),
-		fmt.Sprintf("%ds minimum interval", l.MinIntervalSeconds),
+		fmt.Sprintf("%s minimum interval", intervalPhrase(l.MinIntervalSeconds)),
 	}
-	return append(out, featureTail[p]...)
+	if l.MonthlyDiagnoses > 0 {
+		out = append(out, fmt.Sprintf("%d AI summaries / month", l.MonthlyDiagnoses))
+	}
+	return out
+}
+
+// intervalPhrase renders a second count as readable text: 30→"30s", 1800→"30m", 3600→"1h".
+func intervalPhrase(s int) string {
+	switch {
+	case s%86400 == 0:
+		return fmt.Sprintf("%dd", s/86400)
+	case s%3600 == 0:
+		return fmt.Sprintf("%dh", s/3600)
+	case s%60 == 0:
+		return fmt.Sprintf("%dm", s/60)
+	default:
+		return fmt.Sprintf("%ds", s)
+	}
 }
