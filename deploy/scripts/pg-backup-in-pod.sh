@@ -34,8 +34,11 @@ SIZE="$(du -h "$OUT" | cut -f1)"
 echo "==> dumped ${OUT} (${SIZE})"
 
 # `mc` is a single static binary (Go); fetch it fresh so the image stays vanilla.
-echo "==> fetching mc"
-wget -q https://dl.min.io/client/mc/release/linux-amd64/mc -O /tmp/mc
+# dl.min.io was retired (HTTP 410 Gone) in 2025, so pull the pinned release from
+# GitHub. ponytail: pinned version for reproducible backups — bump when needed.
+MC_RELEASE="RELEASE.2025-08-13T08-35-41Z"
+echo "==> fetching mc ${MC_RELEASE}"
+wget -q "https://github.com/minio/mc/releases/download/${MC_RELEASE}/mc.linux-amd64.${MC_RELEASE}" -O /tmp/mc
 chmod +x /tmp/mc
 
 # STORAGE_ENDPOINT is a full URL (http://minio.svc:9000 or https://s3.<region>.amazonaws.com).
