@@ -6,12 +6,14 @@
 # it launches an in-cluster Job (which can reach the ClusterIP MinIO and the DB) and
 # waits for it. The Job's logic lives in pg-backup-in-pod.sh.
 #
-# Storage routing (as requested): MinIO for int/acc/test, S3 for prod.
-#   • MinIO envs reuse the in-cluster `workstation-minio` + `workstation-minio-creds`
-#     that already exist in those namespaces — no new secrets.
-#   • prod uploads to S3 using credentials passed in via the environment (the
-#     workflow supplies them from GitHub secrets); we materialise a short-lived
-#     Secret for the Job and delete it afterwards.
+# Storage routing: an env backs up to its in-cluster `workstation-minio` when that
+# namespace has `workstation-minio-creds` (int/acc/test do); every other env
+# (prod, sysops-int, sysops-prod, …) has no in-cluster MinIO and uploads to the
+# external S3 given by BEACON_BACKUP_S3_* (offsite, survives cluster loss).
+#   • MinIO envs reuse the existing `workstation-minio-creds` — no new secrets.
+#   • S3 envs get the creds from the environment (the workflow supplies them from
+#     GitHub secrets); we materialise a short-lived Secret for the Job and delete
+#     it afterwards.
 #
 # Usage:
 #   deploy/scripts/backup-postgres.sh <env>            # int|acc|test|prod (+ brand envs)
@@ -58,35 +60,13 @@ trap cleanup EXIT
 kubectl -n "$NS" create configmap "$CM" --from-file=backup.sh="$IN_POD" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
-# ---- storage env sources: MinIO for lower tiers, S3 for prod ----------------
-# A prod env is any whose tier is 'prod' (prod, sysops-prod, …).
-case "$NS" in
-  *prod)
-    for v in BEACON_BACKUP_S3_ENDPOINT BEACON_BACKUP_S3_BUCKET BEACON_BACKUP_S3_ACCESS_KEY BEACON_BACKUP_S3_SECRET_KEY; do
-      eval "val=\${$v:-}"; [ -n "$val" ] || { echo "::error::$v is required for the prod (S3) backup"; exit 1; }
-    done
-    # Short-lived Secret so the S3 creds never sit in the Job manifest / logs.
-    kubectl -n "$NS" create secret generic "$S3_SECRET" \
-      --from-literal=STORAGE_ENDPOINT="$BEACON_BACKUP_S3_ENDPOINT" \
-      --from-literal=STORAGE_BUCKET="$BEACON_BACKUP_S3_BUCKET" \
-      --from-literal=STORAGE_ACCESS_KEY="$BEACON_BACKUP_S3_ACCESS_KEY" \
-      --from-literal=STORAGE_SECRET_KEY="$BEACON_BACKUP_S3_SECRET_KEY" \
-      --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-    # env: entries (12-space indent) — must align with the PG* vars above.
-    STORAGE_ENVFROM="            - name: STORAGE_ENDPOINT
-              valueFrom: { secretKeyRef: { name: ${S3_SECRET}, key: STORAGE_ENDPOINT } }
-            - name: STORAGE_BUCKET
-              valueFrom: { secretKeyRef: { name: ${S3_SECRET}, key: STORAGE_BUCKET } }
-            - name: STORAGE_ACCESS_KEY
-              valueFrom: { secretKeyRef: { name: ${S3_SECRET}, key: STORAGE_ACCESS_KEY } }
-            - name: STORAGE_SECRET_KEY
-              valueFrom: { secretKeyRef: { name: ${S3_SECRET}, key: STORAGE_SECRET_KEY } }"
-    echo "env '$NS' -> S3 bucket '$BEACON_BACKUP_S3_BUCKET'"
-    ;;
-  *)
-    kubectl -n "$NS" get secret workstation-minio-creds >/dev/null 2>&1 \
-      || { echo "::error::no workstation-minio-creds in '$NS' — cannot back up to MinIO. Provide S3 creds or create the MinIO secret."; exit 1; }
-    STORAGE_ENVFROM="            - name: STORAGE_ENDPOINT
+# ---- storage env sources: in-cluster MinIO where it exists, else external S3 --
+# Route by what the namespace actually has, not by tier name: int/acc/test ship a
+# `workstation-minio` + `workstation-minio-creds`, so they back up in-cluster;
+# every other env (prod, sysops-int, sysops-prod, …) has no MinIO and goes to the
+# external S3 configured via BEACON_BACKUP_S3_* (offsite, survives cluster loss).
+if kubectl -n "$NS" get secret workstation-minio-creds >/dev/null 2>&1; then
+  STORAGE_ENVFROM="            - name: STORAGE_ENDPOINT
               value: http://workstation-minio.${NS}.svc.cluster.local:9000
             - name: STORAGE_BUCKET
               value: ${MINIO_BUCKET}
@@ -94,9 +74,29 @@ case "$NS" in
               valueFrom: { secretKeyRef: { name: workstation-minio-creds, key: MINIO_ROOT_USER } }
             - name: STORAGE_SECRET_KEY
               valueFrom: { secretKeyRef: { name: workstation-minio-creds, key: MINIO_ROOT_PASSWORD } }"
-    echo "env '$NS' -> MinIO bucket '$MINIO_BUCKET' (workstation-minio)"
-    ;;
-esac
+  echo "env '$NS' -> MinIO bucket '$MINIO_BUCKET' (workstation-minio)"
+else
+  for v in BEACON_BACKUP_S3_ENDPOINT BEACON_BACKUP_S3_BUCKET BEACON_BACKUP_S3_ACCESS_KEY BEACON_BACKUP_S3_SECRET_KEY; do
+    eval "val=\${$v:-}"; [ -n "$val" ] || { echo "::error::no in-cluster MinIO in '$NS' and \$$v is unset — set the BEACON_BACKUP_S3_* GitHub secrets to back this env up to S3"; exit 1; }
+  done
+  # Short-lived Secret so the S3 creds never sit in the Job manifest / logs.
+  kubectl -n "$NS" create secret generic "$S3_SECRET" \
+    --from-literal=STORAGE_ENDPOINT="$BEACON_BACKUP_S3_ENDPOINT" \
+    --from-literal=STORAGE_BUCKET="$BEACON_BACKUP_S3_BUCKET" \
+    --from-literal=STORAGE_ACCESS_KEY="$BEACON_BACKUP_S3_ACCESS_KEY" \
+    --from-literal=STORAGE_SECRET_KEY="$BEACON_BACKUP_S3_SECRET_KEY" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  # env: entries (12-space indent) — must align with the PG* vars above.
+  STORAGE_ENVFROM="            - name: STORAGE_ENDPOINT
+              valueFrom: { secretKeyRef: { name: ${S3_SECRET}, key: STORAGE_ENDPOINT } }
+            - name: STORAGE_BUCKET
+              valueFrom: { secretKeyRef: { name: ${S3_SECRET}, key: STORAGE_BUCKET } }
+            - name: STORAGE_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: ${S3_SECRET}, key: STORAGE_ACCESS_KEY } }
+            - name: STORAGE_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: ${S3_SECRET}, key: STORAGE_SECRET_KEY } }"
+  echo "env '$NS' -> S3 bucket '$BEACON_BACKUP_S3_BUCKET'"
+fi
 
 # ---- render + apply the Job -------------------------------------------------
 kubectl apply -f - >/dev/null <<YAML
