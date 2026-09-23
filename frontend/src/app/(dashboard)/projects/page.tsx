@@ -6,12 +6,14 @@ import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateProject, useProjectsPage } from "@/lib/hooks";
+import { useCreateProject, useDeleteProject, useProjectsPage, useUpdateProject } from "@/lib/hooks";
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, EmptyState, Field, Input, PageHeader, Select, Skeleton } from "@/components/ui";
 import { FolderIcon, PlusIcon, SearchIcon, XIcon } from "@/components/icons";
 import { Pagination, SearchInput } from "@/components/table-controls";
+import { useConfirm } from "@/components/confirm";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
+import type { Project } from "@/lib/types";
 
 const PROJECTS_PAGE_SIZE = 12;
 
@@ -44,6 +46,9 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState("");
   const [environment, setEnvironment] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Project | null>(null);
+  const deleteProject = useDeleteProject();
+  const confirm = useConfirm();
   const reveal = useRevealVariants();
   const stagger = useStaggerVariants(0.04);
 
@@ -80,14 +85,27 @@ export default function ProjectsPage() {
         title={t("title")}
         subtitle={t("subtitle")}
         actions={
-          <Button onClick={() => setShowForm((v) => !v)}>
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setShowForm((v) => !v);
+            }}
+          >
             {showForm ? <XIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
             {showForm ? "Close" : "New project"}
           </Button>
         }
       />
 
-      {showForm && <CreateProjectForm onDone={() => setShowForm(false)} />}
+      {(showForm || editing) && (
+        <ProjectForm
+          project={editing ?? undefined}
+          onDone={() => {
+            setShowForm(false);
+            setEditing(null);
+          }}
+        />
+      )}
 
       {(total > 0 || filtering) && !isLoading && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -177,6 +195,37 @@ export default function ProjectsPage() {
                       </p>
                       <p className="truncate font-mono text-xs text-slate-500 dark:text-slate-400">{p.slug}</p>
                     </div>
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setShowForm(false);
+                          setEditing(p);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={deleteProject.isPending}
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: `Delete “${p.name}”?`,
+                            body: "This also deletes every monitor in this project and stops probing them. This can’t be undone.",
+                            confirmLabel: "Delete project",
+                            danger: true,
+                          });
+                          if (ok) {
+                            if (editing?.id === p.id) setEditing(null);
+                            deleteProject.mutate(p.id);
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               </motion.li>
@@ -196,28 +245,50 @@ export default function ProjectsPage() {
   );
 }
 
-function CreateProjectForm({ onDone }: { onDone: () => void }) {
+// One form for both create and edit: pass `project` to edit it, omit to create.
+// The slug is set once at creation and never changes on rename (it backs status-page
+// URLs), so it's shown read-only here rather than offered as a field.
+function ProjectForm({ project, onDone }: { project?: Project; onDone: () => void }) {
   const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
+  const isEdit = !!project;
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { environment: "production" } });
+  } = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: project
+      ? { name: project.name, description: project.description, environment: project.environment }
+      : { environment: "production" },
+  });
 
   const onSubmit = async (values: Values) => {
     setServerError(null);
     try {
-      await createProject.mutateAsync(values);
+      if (project) {
+        await updateProject.mutateAsync({ id: project.id, input: values });
+      } else {
+        await createProject.mutateAsync(values);
+      }
       onDone();
     } catch (err) {
-      setServerError(err instanceof ApiRequestError ? err.message : "Failed to create project");
+      setServerError(
+        err instanceof ApiRequestError ? err.message : `Failed to ${isEdit ? "update" : "create"} project`,
+      );
     }
   };
 
   return (
     <Card>
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+        {isEdit && (
+          <div className="sm:col-span-2">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Edit project</h2>
+            <p className="mt-0.5 font-mono text-xs text-slate-500 dark:text-slate-400">{project?.slug}</p>
+          </div>
+        )}
         <Field label="Name" error={errors.name?.message}>
           <Input placeholder="Production Website" {...register("name")} />
         </Field>
@@ -240,7 +311,7 @@ function CreateProjectForm({ onDone }: { onDone: () => void }) {
         )}
         <div className="flex gap-2 sm:col-span-2">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating…" : "Create project"}
+            {isSubmitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save changes" : "Create project"}
           </Button>
           <Button type="button" variant="secondary" onClick={onDone}>
             Cancel
