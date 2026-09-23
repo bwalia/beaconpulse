@@ -83,6 +83,36 @@ export function useCreateProject() {
   });
 }
 
+export interface UpdateProjectInput {
+  name?: string;
+  description?: string;
+  environment?: string;
+  is_active?: boolean;
+}
+
+export function useUpdateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateProjectInput }) =>
+      api.patch<Project>(`/api/v1/projects/${id}`, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/api/v1/projects/${id}`),
+    // Deleting a project soft-deletes its monitors too (backend cascade), so
+    // refresh both lists and the usage counter.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["monitors"] });
+      qc.invalidateQueries({ queryKey: ["usage"] });
+    },
+  });
+}
+
 // ---- Monitors ----
 
 // useMonitors fetches up to 200 monitors in one shot. It backs the consumers that
