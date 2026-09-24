@@ -1,0 +1,35 @@
+# Self-test for the Beacon Notify action. Runs in the STANDALONE action repo once
+# these files are published there (in the monorepo it does nothing — workflows only
+# run from the repository root's .github/workflows).
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: bash -n notify.sh
+      - name: Reports without failing the build on an unreachable endpoint
+        env:
+          BEACON_URL: http://127.0.0.1:1/nope
+          BEACON_STATUS: failure
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash notify.sh
+
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Exercise the composite action end to end. A bad URL must NOT fail the job —
+      # that is the whole contract of a notifier.
+      - name: Use the action
+        uses: ./
+        with:
+          url: http://127.0.0.1:1/nope
+          status: success

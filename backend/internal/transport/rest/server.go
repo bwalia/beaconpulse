@@ -28,16 +28,18 @@ type RouterDeps struct {
 	Auth   *AuthHandler
 	// SSO may be nil when OIDC single sign-on is not configured; the routes are
 	// then not mounted and the frontend hides the button.
-	SSO                *SSOHandler
-	Project            *ProjectHandler
-	Monitor            *MonitorHandler
-	Notification       *NotificationHandler
-	Maintenance        *MaintenanceHandler
-	Alert              *AlertHandler
-	Insight            *InsightHandler
-	Billing            *BillingHandler
-	StatusPage         *StatusPageHandler
-	Heartbeat          *HeartbeatHandler
+	SSO          *SSOHandler
+	Project      *ProjectHandler
+	Monitor      *MonitorHandler
+	Notification *NotificationHandler
+	Maintenance  *MaintenanceHandler
+	Alert        *AlertHandler
+	Insight      *InsightHandler
+	Billing      *BillingHandler
+	StatusPage   *StatusPageHandler
+	Heartbeat    *HeartbeatHandler
+	// GitHubActions serves the public "Beacon Notify" ingest endpoint.
+	GitHubActions      *GitHubActionsHandler
 	StatusPageSettings *StatusPageSettingsHandler
 	// Settings is the platform-global admin surface (pricing, limits, premium access).
 	Settings *SettingsHandler
@@ -134,6 +136,10 @@ func NewRouter(d RouterDeps) http.Handler {
 		// the environment is legible from the hostname.
 		api.Get("/system/info", d.Health.Health)
 		api.Mount("/ping", d.Heartbeat.Routes())
+		// PUBLIC, unauthenticated: GitHub Actions ingest. The URL token is the
+		// credential (same capability-URL model as /ping); rate-limited per token
+		// inside the handler. This is where the "Beacon Notify" Action POSTs.
+		api.Mount("/github", d.GitHubActions.Routes())
 
 		api.Mount("/auth", d.Auth.Routes())
 		// "Sign in with <provider>" (OIDC). Mounted as a sibling of /auth only

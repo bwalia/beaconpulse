@@ -46,6 +46,7 @@ func (h *MonitorHandler) Routes() chi.Router {
 	r.With(h.auth.RequireWriter).Delete("/{id}", h.delete)
 	r.With(h.auth.RequireWriter).Post("/{id}/pause", h.pause)
 	r.With(h.auth.RequireWriter).Post("/{id}/resume", h.resume)
+	r.With(h.auth.RequireWriter).Post("/{id}/github-token", h.rotateGitHubToken)
 	return r
 }
 
@@ -65,6 +66,7 @@ type monitorSettingsDTO struct {
 	DNSQueryName          string            `json:"dns_query_name,omitempty" validate:"omitempty,max=253"`
 	DNSQueryType          string            `json:"dns_query_type,omitempty" validate:"omitempty,oneof=A AAAA CNAME MX TXT NS SOA CAA"`
 	DNSExpectedIPs        []string          `json:"dns_expected_ips,omitempty"`
+	GitHubWorkflow        string            `json:"github_workflow,omitempty" validate:"omitempty,max=200"`
 }
 
 func (d monitorSettingsDTO) toDomain() monitor.Settings {
@@ -82,13 +84,14 @@ func (d monitorSettingsDTO) toDomain() monitor.Settings {
 		DNSQueryName:          d.DNSQueryName,
 		DNSQueryType:          d.DNSQueryType,
 		DNSExpectedIPs:        d.DNSExpectedIPs,
+		GitHubWorkflow:        d.GitHubWorkflow,
 	}
 }
 
 type createMonitorRequest struct {
 	ProjectID string `json:"project_id" validate:"required,uuid"`
 	Name      string `json:"name" validate:"required,min=1,max=200"`
-	Type      string `json:"type" validate:"required,oneof=http https ssl tcp icmp dns heartbeat"`
+	Type      string `json:"type" validate:"required,oneof=http https ssl tcp icmp dns heartbeat github_actions"`
 	// Optional: a heartbeat has no probe target (the domain enforces
 	// required-for-probed-types). max only.
 	Target          string             `json:"target" validate:"omitempty,max=2048"`
@@ -133,8 +136,14 @@ type monitorResponse struct {
 	PingURL      string     `json:"ping_url,omitempty"`
 	GraceSeconds int        `json:"grace_seconds,omitempty"`
 	LastPingAt   *time.Time `json:"last_ping_at,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	// GitHub Actions only. IngestURL/IngestToken carry the freshly-minted token and
+	// are returned ONCE — on create and on token rotation. Afterwards only
+	// GitHubTokenPrefix identifies the token (the usable value is unrecoverable).
+	GitHubIngestURL   string    `json:"github_ingest_url,omitempty"`
+	GitHubIngestToken string    `json:"github_ingest_token,omitempty"`
+	GitHubTokenPrefix string    `json:"github_token_prefix,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 func presentMonitor(m *monitor.Monitor) monitorResponse {
@@ -161,6 +170,16 @@ func presentMonitor(m *monitor.Monitor) monitorResponse {
 		// Relative on purpose: the frontend prepends its own origin, so this never
 		// hard-codes a gateway host that could drift per environment.
 		r.PingURL = "/api/v1/ping/" + *m.PingToken
+	}
+	// GitHub token prefix identifies the token in the UI after the one-time reveal.
+	if m.GitHubTokenPrefix != "" {
+		r.GitHubTokenPrefix = m.GitHubTokenPrefix
+	}
+	// The usable token exists only on the create/rotate response. Relative like
+	// ping_url so the frontend prepends its own origin for the copy-paste snippet.
+	if m.GitHubTokenPlain != "" {
+		r.GitHubIngestToken = m.GitHubTokenPlain
+		r.GitHubIngestURL = "/api/v1/github/ingest/" + m.GitHubTokenPlain
 	}
 	return r
 }
@@ -389,6 +408,23 @@ func toMetricPoints(pts []insight.Point) []metricPoint {
 		out = append(out, metricPoint{T: p.T, V: p.V})
 	}
 	return out
+}
+
+// rotateGitHubToken mints a new ingest token for a github_actions monitor and
+// returns it once (the old token stops working). The response carries the new
+// github_ingest_url/token for the UI to reveal exactly once.
+func (h *MonitorHandler) rotateGitHubToken(w http.ResponseWriter, r *http.Request) {
+	id, err := parseIDParam(r, "id")
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	m, err := h.svc.RotateGitHubToken(r.Context(), monitorActor(r), id)
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	httpx.OK(w, presentMonitor(m))
 }
 
 func (h *MonitorHandler) pause(w http.ResponseWriter, r *http.Request)  { h.setEnabled(w, r, false) }

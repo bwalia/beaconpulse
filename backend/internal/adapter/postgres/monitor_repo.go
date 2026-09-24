@@ -30,7 +30,8 @@ var _ monitor.Repository = (*MonitorRepository)(nil)
 const monitorColumns = `id, org_id, project_id, name, type, target, enabled, public,
 	interval_seconds, timeout_seconds, config, last_status, last_checked_at,
 	created_by, updated_by, created_at, updated_at,
-	ping_token, last_ping_at, grace_seconds`
+	ping_token, last_ping_at, grace_seconds,
+	COALESCE(github_token_hash, ''), COALESCE(github_token_prefix, '')`
 
 func scanMonitor(row pgx.Row) (*monitor.Monitor, error) {
 	var (
@@ -44,7 +45,8 @@ func scanMonitor(row pgx.Row) (*monitor.Monitor, error) {
 	if err := row.Scan(&m.ID, &m.OrgID, &m.ProjectID, &m.Name, &typ, &m.Target, &m.Enabled, &m.Public,
 		&m.IntervalSeconds, &m.TimeoutSeconds, &configRaw, &status, &m.LastCheckedAt,
 		&m.CreatedBy, &m.UpdatedBy, &m.CreatedAt, &m.UpdatedAt,
-		&m.PingToken, &m.LastPingAt, &m.GraceSeconds); err != nil {
+		&m.PingToken, &m.LastPingAt, &m.GraceSeconds,
+		&m.GitHubTokenHash, &m.GitHubTokenPrefix); err != nil {
 		return nil, err
 	}
 	m.Type = monitor.Type(typ)
@@ -65,12 +67,13 @@ func (r *MonitorRepository) Create(ctx context.Context, m *monitor.Monitor) erro
 	}
 	_, err = r.pool.Exec(ctx,
 		`INSERT INTO monitors
-		 (id, org_id, project_id, name, type, target, enabled, public, interval_seconds, timeout_seconds, config, last_status, created_by, updated_by, created_at, updated_at, ping_token, last_ping_at, grace_seconds)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+		 (id, org_id, project_id, name, type, target, enabled, public, interval_seconds, timeout_seconds, config, last_status, created_by, updated_by, created_at, updated_at, ping_token, last_ping_at, grace_seconds, github_token_hash, github_token_prefix)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
 		m.ID, m.OrgID, m.ProjectID, m.Name, string(m.Type), m.Target, m.Enabled, m.Public,
 		m.IntervalSeconds, m.TimeoutSeconds, cfg, string(m.LastStatus),
 		m.CreatedBy, m.UpdatedBy, m.CreatedAt, m.UpdatedAt,
-		m.PingToken, m.LastPingAt, m.GraceSeconds)
+		m.PingToken, m.LastPingAt, m.GraceSeconds,
+		nullIfEmpty(m.GitHubTokenHash), nullIfEmpty(m.GitHubTokenPrefix))
 	if err != nil {
 		if isForeignKeyViolation(err) {
 			return apperror.Validation("project not found",
@@ -181,9 +184,10 @@ func (r *MonitorRepository) Update(ctx context.Context, m *monitor.Monitor) erro
 		return apperror.Internal(fmt.Errorf("marshal settings: %w", err))
 	}
 	tag, err := r.pool.Exec(ctx,
-		`UPDATE monitors SET name=$3, target=$4, enabled=$5, interval_seconds=$6, timeout_seconds=$7, config=$8, updated_by=$9, public=$10, grace_seconds=$11
+		`UPDATE monitors SET name=$3, target=$4, enabled=$5, interval_seconds=$6, timeout_seconds=$7, config=$8, updated_by=$9, public=$10, grace_seconds=$11, github_token_hash=$12, github_token_prefix=$13
 		 WHERE id=$1 AND org_id=$2 AND deleted_at IS NULL`,
-		m.ID, m.OrgID, m.Name, m.Target, m.Enabled, m.IntervalSeconds, m.TimeoutSeconds, cfg, m.UpdatedBy, m.Public, m.GraceSeconds)
+		m.ID, m.OrgID, m.Name, m.Target, m.Enabled, m.IntervalSeconds, m.TimeoutSeconds, cfg, m.UpdatedBy, m.Public, m.GraceSeconds,
+		nullIfEmpty(m.GitHubTokenHash), nullIfEmpty(m.GitHubTokenPrefix))
 	if err != nil {
 		return apperror.Internal(fmt.Errorf("update monitor: %w", err))
 	}
@@ -335,4 +339,31 @@ func (r *MonitorRepository) ApplyStatusUpdates(ctx context.Context, updates []mo
 		return 0, apperror.Internal(fmt.Errorf("commit status updates: %w", err))
 	}
 	return affected, nil
+}
+
+// GitHubByTokenHash resolves the non-deleted github_actions monitor whose ingest
+// token hashes to hash, in one indexed lookup on the unique hash. It returns
+// (nil, nil) when no monitor matches, so the domain reports one opaque NotFound
+// rather than letting the endpoint become an oracle for which tokens exist.
+func (r *MonitorRepository) GitHubByTokenHash(ctx context.Context, hash string) (*monitor.Monitor, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT `+monitorColumns+` FROM monitors WHERE github_token_hash=$1 AND deleted_at IS NULL`, hash)
+	m, err := scanMonitor(row)
+	if err != nil {
+		if isNoRows(err) {
+			return nil, nil
+		}
+		return nil, apperror.Internal(fmt.Errorf("lookup github monitor: %w", err))
+	}
+	return m, nil
+}
+
+// nullIfEmpty maps an empty string to a SQL NULL. github_token_hash carries a
+// partial UNIQUE index, so the many monitors without a token must store NULL (many
+// allowed) rather than a shared empty string (which would collide on the second row).
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }

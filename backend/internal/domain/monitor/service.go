@@ -17,6 +17,7 @@ import (
 	"beacon/internal/domain/audit"
 	"beacon/internal/domain/plan"
 	"beacon/internal/platform/apperror"
+	"beacon/internal/platform/crypto"
 	"beacon/internal/platform/logger"
 	"beacon/internal/platform/safehttp"
 )
@@ -144,8 +145,10 @@ func (s *Service) WithTargetGuard(g TargetGuard) *Service {
 // also carry an egress NetworkPolicy. This layer stops the accident and the casual
 // abuse; the network layer stops the determined attacker.
 func (s *Service) vetTarget(ctx context.Context, t Type, target string) error {
-	if s.guard == nil || target == "" || t == TypeHeartbeat {
-		return nil // a heartbeat has no target: it waits to be pinged
+	if s.guard == nil || target == "" || t == TypeHeartbeat || t == TypeGitHubActions {
+		// A heartbeat has no target, and a github_actions target is an "owner/repo"
+		// slug, not a network host — neither points our probes anywhere to vet.
+		return nil
 	}
 	host := hostOf(target)
 	if host == "" {
@@ -264,6 +267,18 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Mon
 		m.PingToken = &token
 		m.LastPingAt = &now
 		m.GraceSeconds = graceOrDefault(in.GraceSeconds, interval)
+	}
+
+	// GitHub Actions: mint the ingest token the customer's Action authenticates with.
+	// Only its hash is stored; the plaintext is returned on this call alone.
+	if in.Type == TypeGitHubActions {
+		plain, hash, prefix, err := newGitHubIngestToken()
+		if err != nil {
+			return nil, apperror.Internal(err)
+		}
+		m.GitHubTokenHash = hash
+		m.GitHubTokenPrefix = prefix
+		m.GitHubTokenPlain = plain
 	}
 
 	if err := s.repo.Create(ctx, m); err != nil {
@@ -396,6 +411,37 @@ func (s *Service) SetEnabled(ctx context.Context, actor Actor, id uuid.UUID, ena
 	return s.repo.GetByID(ctx, actor.OrgID, id)
 }
 
+// RotateGitHubToken mints a fresh ingest token for a github_actions monitor and
+// returns it (in GitHubTokenPlain) exactly once. The previous token stops working
+// the instant this commits, so a lost or possibly-leaked token can be replaced
+// without recreating the monitor. Not synced: a push monitor produces no control-
+// plane config, so nothing downstream depends on the token.
+func (s *Service) RotateGitHubToken(ctx context.Context, actor Actor, id uuid.UUID) (*Monitor, error) {
+	if !actor.Role.CanWrite() {
+		return nil, apperror.Forbidden("your role does not permit changing monitors")
+	}
+	m, err := s.repo.GetByID(ctx, actor.OrgID, id)
+	if err != nil {
+		return nil, err
+	}
+	if m.Type != TypeGitHubActions {
+		return nil, apperror.Validation("this monitor has no GitHub ingest token")
+	}
+	plain, hash, prefix, err := newGitHubIngestToken()
+	if err != nil {
+		return nil, apperror.Internal(err)
+	}
+	m.GitHubTokenHash = hash
+	m.GitHubTokenPrefix = prefix
+	m.UpdatedBy = &actor.UserID
+	if err := s.repo.Update(ctx, m); err != nil {
+		return nil, err
+	}
+	m.GitHubTokenPlain = plain
+	s.record(ctx, actor, audit.ActionMonitorUpdated, id, map[string]any{"github_token": "rotated"})
+	return m, nil
+}
+
 // Delete soft-deletes a monitor and re-syncs so probing stops.
 func (s *Service) Delete(ctx context.Context, actor Actor, id uuid.UUID) error {
 	if !actor.Role.CanWrite() {
@@ -486,6 +532,28 @@ func newPingToken() (string, error) {
 		return "", fmt.Errorf("generate ping token: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// gitHubTokenPrefix marks a Beacon GitHub Actions ingest token. Distinctive on
+// purpose: it lets secret scanners spot one committed by mistake and lets a user
+// recognise a stray string as ours.
+const gitHubTokenPrefix = "bpgh_"
+
+// gitHubTokenDisplayLen is how much of the token is kept in clear for the UI — the
+// prefix plus a few characters, enough to tell tokens apart, useless to a reader.
+const gitHubTokenDisplayLen = 13
+
+// newGitHubIngestToken returns a fresh ingest token, the hash to store, and the
+// display prefix. The plaintext is the only copy that will ever exist; only its
+// hash is persisted, so a database read cannot recover a working token.
+func newGitHubIngestToken() (plain, hash, prefix string, err error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", "", "", fmt.Errorf("generate github ingest token: %w", err)
+	}
+	// URL-safe and unpadded so the token is one word in a URL, a shell, or a CI secret.
+	plain = gitHubTokenPrefix + base64.RawURLEncoding.EncodeToString(b)
+	return plain, crypto.SHA256Hex(plain), plain[:gitHubTokenDisplayLen], nil
 }
 
 // enforceIntervalFloor rejects intervals faster than the plan allows.

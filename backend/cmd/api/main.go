@@ -36,6 +36,7 @@ import (
 	"beacon/internal/domain/configsync"
 	"beacon/internal/domain/device"
 	"beacon/internal/domain/diagnose"
+	"beacon/internal/domain/githubactions"
 	"beacon/internal/domain/heartbeat"
 	"beacon/internal/domain/insight"
 	"beacon/internal/domain/maintenance"
@@ -335,6 +336,9 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	// enqueuer — it is read-only and cannot mutate anything by construction.
 	statusPageSvc := statuspage.NewService(statusPageRepo)
 	heartbeatSvc := heartbeat.NewService(heartbeatRepo)
+	// GitHub Actions ingest: resolves a monitor by its capability token and dispatches
+	// failed runs through the same dispatcher every other alert uses.
+	githubActionsSvc := githubactions.NewService(monitorRepo)
 	statusPageSettingsSvc := statuspage.NewSettingsService(statusPageSettingsRepo, auditRec)
 
 	// Transport.
@@ -375,6 +379,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Billing:            rest.NewBillingHandler(billingSvc, stripeWebhook, validator, authn, cfg.AI.DiagnoseCostSeconds),
 		StatusPage:         rest.NewStatusPageHandler(statusPageSvc),
 		Heartbeat:          rest.NewHeartbeatHandler(heartbeatSvc),
+		GitHubActions:      rest.NewGitHubActionsHandler(githubActionsSvc, dispatcher),
 		StatusPageSettings: rest.NewStatusPageSettingsHandler(statusPageSettingsSvc, validator, authn),
 		Settings:           rest.NewSettingsHandler(settingsSvc, userRepo, validator, authn),
 		Diagnose:           diagnoseHandler,

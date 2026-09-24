@@ -30,6 +30,11 @@ const (
 	// job pings a capability URL, and silence past interval+grace alerts. It has
 	// no probe target and generates no Blackbox/scrape config.
 	TypeHeartbeat Type = "heartbeat"
+	// TypeGitHubActions is a PUSH monitor for CI: Beacon does not probe or poll it.
+	// The customer adds the "Beacon Notify" Action to a workflow, which POSTs each
+	// run's result to a capability URL; a failed run alerts. Its target is the
+	// "owner/repo" it watches. Generates no Blackbox/scrape config.
+	TypeGitHubActions Type = "github_actions"
 )
 
 // HeartbeatTarget is the placeholder stored in a heartbeat's target column. The
@@ -48,11 +53,14 @@ const (
 	StatusPaused   Status = "paused"
 )
 
-// SupportedTypes are the monitor types the control plane can currently probe.
+// SupportedTypes are the monitor types Beacon can create. Most are probed by the
+// control plane; heartbeat and github_actions are PUSH types Beacon never probes
+// (they are handled specially in the control-plane generator and by their own
+// ingest endpoints).
 var SupportedTypes = map[Type]bool{
 	TypeHTTP: true, TypeHTTPS: true, TypeSSL: true,
 	TypeTCP: true, TypeICMP: true, TypeDNS: true,
-	TypeHeartbeat: true,
+	TypeHeartbeat: true, TypeGitHubActions: true,
 }
 
 // Sensitivity controls how long a monitor must stay down before its MonitorDown
@@ -100,6 +108,12 @@ type Settings struct {
 	DNSQueryName   string   `json:"dns_query_name,omitempty"`
 	DNSQueryType   string   `json:"dns_query_type,omitempty"`
 	DNSExpectedIPs []string `json:"dns_expected_ips,omitempty"`
+
+	// ---- GitHub Actions ----
+	// GitHubWorkflow, when set, restricts alerting to runs of the named workflow
+	// (matched against the value the Action reports). Empty means every workflow in
+	// the repo that reports a failure alerts on this monitor.
+	GitHubWorkflow string `json:"github_workflow,omitempty"`
 }
 
 // Monitor is a single monitored resource.
@@ -127,12 +141,22 @@ type Monitor struct {
 	IntervalSeconds int
 	TimeoutSeconds  int
 	Settings        Settings
-	LastStatus      Status
-	LastCheckedAt   *time.Time
-	CreatedBy       *uuid.UUID
-	UpdatedBy       *uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	// GitHubTokenHash is the SHA-256 (hex) of a github_actions monitor's ingest
+	// token; empty for every other type. The usable token is never stored.
+	GitHubTokenHash string
+	// GitHubTokenPrefix is the first characters of that token, kept for display so a
+	// user can recognise it after the one-time reveal.
+	GitHubTokenPrefix string
+	// GitHubTokenPlain is the freshly-minted ingest token. It is set ONLY in the
+	// return value of Create/RotateGitHubToken — never persisted, never scanned —
+	// so the transport can surface it exactly once.
+	GitHubTokenPlain string
+	LastStatus       Status
+	LastCheckedAt    *time.Time
+	CreatedBy        *uuid.UUID
+	UpdatedBy        *uuid.UUID
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // Actor is the authenticated caller performing a monitor operation.

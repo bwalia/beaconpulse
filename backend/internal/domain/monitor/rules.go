@@ -61,9 +61,36 @@ func normalizeAndValidate(t Type, target string, s Settings) (string, Settings, 
 		return validateICMP(target, s)
 	case TypeDNS:
 		return validateDNS(target, s)
+	case TypeGitHubActions:
+		return validateGitHubActions(target, s)
 	default:
 		return "", s, apperror.Validation("unsupported monitor type")
 	}
+}
+
+// validateGitHubActions normalizes the target to "owner/repo". It is lenient about
+// input: a full GitHub URL (https://github.com/owner/repo[/...]) is accepted and
+// reduced to owner/repo, since that is what a user is most likely to paste.
+func validateGitHubActions(target string, s Settings) (string, Settings, error) {
+	repo := strings.TrimSpace(target)
+	// Strip a pasted GitHub URL down to its owner/repo path.
+	for _, p := range []string{"https://github.com/", "http://github.com/", "github.com/", "git@github.com:"} {
+		if strings.HasPrefix(strings.ToLower(repo), p) {
+			repo = repo[len(p):]
+			break
+		}
+	}
+	repo = strings.TrimSuffix(strings.Trim(repo, "/"), ".git")
+	parts := strings.Split(repo, "/")
+	badRepo := apperror.Validation("target must be a repository in owner/repo form",
+		apperror.FieldError{Field: "target", Message: "use the owner/repo form, e.g. bwalia/beaconpulse"})
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", s, badRepo
+	}
+	// Keep only owner/repo, discarding any trailing path a pasted URL carried.
+	repo = parts[0] + "/" + parts[1]
+	s.GitHubWorkflow = strings.TrimSpace(s.GitHubWorkflow)
+	return repo, s, nil
 }
 
 func validateHTTP(t Type, target string, s Settings) (string, Settings, error) {
