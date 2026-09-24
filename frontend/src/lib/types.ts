@@ -35,7 +35,7 @@ export interface Project {
   updated_at: string;
 }
 
-export type MonitorType = "http" | "https" | "ssl" | "tcp" | "icmp" | "dns" | "heartbeat";
+export type MonitorType = "http" | "https" | "ssl" | "tcp" | "icmp" | "dns" | "heartbeat" | "github_actions";
 export type MonitorStatus = "up" | "down" | "degraded" | "unknown" | "paused";
 
 export interface MonitorSettings {
@@ -51,6 +51,8 @@ export interface MonitorSettings {
   alert_sensitivity?: string;
   dns_query_name?: string;
   dns_query_type?: string;
+  /** GitHub Actions: optional workflow-name filter. Empty = alert on any workflow. */
+  github_workflow?: string;
 }
 
 export interface Monitor {
@@ -74,6 +76,12 @@ export interface Monitor {
   ping_url?: string;
   grace_seconds?: number;
   last_ping_at?: string;
+  /** GitHub Actions: the ingest URL, returned ONCE on create/rotate (owner-only). */
+  github_ingest_url?: string;
+  /** GitHub Actions: the raw ingest token, returned ONCE on create/rotate. */
+  github_ingest_token?: string;
+  /** GitHub Actions: token prefix, shown to identify the token after the reveal. */
+  github_token_prefix?: string;
   created_at: string;
   updated_at: string;
 }

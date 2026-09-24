@@ -15,6 +15,7 @@ import {
   useMonitorsPage,
   useOverview,
   useProjects,
+  useRotateGitHubToken,
   useSetMonitorEnabled,
   useUpdateMonitor,
   useUsage,
@@ -56,7 +57,7 @@ function countByStatus(monitors: Monitor[]): StatusCounts {
 const schema = z.object({
   project_id: z.string().uuid("Select a project"),
   name: z.string().min(1, "Name is required"),
-  type: z.enum(["http", "https", "ssl", "tcp", "icmp", "dns", "heartbeat"]),
+  type: z.enum(["http", "https", "ssl", "tcp", "icmp", "dns", "heartbeat", "github_actions"]),
   // Optional at the schema level; required-unless-heartbeat is enforced by the
   // refine() at the bottom of the object, because a heartbeat has no target.
   target: z.string().optional(),
@@ -72,6 +73,8 @@ const schema = z.object({
   headers: z.string().optional(),
   dns_query_type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA"]).optional(),
   alert_sensitivity: z.enum(["immediate", "balanced", "relaxed"]).optional(),
+  // GitHub Actions: optional workflow-name filter.
+  github_workflow: z.string().optional(),
 }).refine((v) => v.type === "heartbeat" || (v.target ?? "").trim().length > 0, {
   message: "Target is required",
   path: ["target"],
@@ -90,6 +93,7 @@ type AdvancedFields = {
   headers?: string;
   dns_query_type?: string;
   alert_sensitivity?: string;
+  github_workflow?: string;
 };
 
 // SENSITIVITY_OPTIONS controls how long a monitor must be down before it alerts.
@@ -110,6 +114,7 @@ function buildSettings(v: AdvancedFields): Record<string, unknown> {
   if (v.ssl_expiry_warning_days) s.ssl_expiry_warning_days = v.ssl_expiry_warning_days;
   if (v.dns_query_type) s.dns_query_type = v.dns_query_type;
   if (v.alert_sensitivity) s.alert_sensitivity = v.alert_sensitivity;
+  if (v.github_workflow?.trim()) s.github_workflow = v.github_workflow.trim();
   if (v.valid_status_codes) {
     const codes = v.valid_status_codes
       .split(",")
@@ -193,6 +198,89 @@ function HeartbeatCreated({ monitor, onDone }: { monitor: Monitor; onDone: () =>
             {`0 2 * * *  /path/to/backup.sh && curl -fsS ${url}`}
           </pre>
 
+          <div className="mt-4">
+            <Button onClick={onDone}>Done</Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// absoluteURL turns a server-returned relative capability path into an absolute
+// URL against the current origin, so nothing hard-codes a gateway host.
+function absoluteURL(path?: string): string {
+  if (!path) return "";
+  return typeof window !== "undefined" ? new URL(path, window.location.origin).toString() : path;
+}
+
+// GitHubIngestReveal shows a github_actions monitor's ingest URL and the ready-to-
+// paste workflow step. The URL is a capability credential returned only once, so it
+// is surfaced prominently here and never again.
+function GitHubIngestReveal({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — the URL is selectable in the field regardless */
+    }
+  }
+  const step = `- name: Notify ${brand.name}
+  if: \${{ always() }}
+  uses: bwalia/beacon-notify@v1
+  with:
+    url: \${{ secrets.BEACON_NOTIFY_URL }}
+    status: \${{ job.status }}`;
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        1. Add a repository secret named <span className="font-mono">BEACON_NOTIFY_URL</span> with this value
+        (GitHub → Settings → Secrets and variables → Actions):
+      </p>
+      <div className="mt-1.5 flex items-center gap-2">
+        <input
+          readOnly
+          value={url}
+          onFocus={(e) => e.currentTarget.select()}
+          className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        />
+        <Button variant="secondary" onClick={copy}>
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+        2. Add this step to the end of the job you want watched:
+      </p>
+      <pre className="mt-1 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{step}</pre>
+      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        Prefer no dependencies? Post the same result with a plain <span className="font-mono">curl</span> step —
+        see the action&apos;s README. Any run that reports a failure alerts your configured channels.
+      </p>
+    </div>
+  );
+}
+
+// GitHubActionsCreated is the one-time panel shown right after a github_actions
+// monitor is created — the ingest URL cannot be shown again (only its hash is kept).
+function GitHubActionsCreated({ monitor, onDone }: { monitor: Monitor; onDone: () => void }) {
+  const url = absoluteURL(monitor.github_ingest_url);
+  return (
+    <Card>
+      <div className="flex items-start gap-3">
+        <CheckCircleIcon className="mt-0.5 h-7 w-7 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold text-slate-900 dark:text-white">“{monitor.name}” is ready</h3>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            Copy this now — for security it&apos;s shown only once. If you lose it, regenerate the token from
+            the monitor&apos;s Edit dialog.
+          </p>
+          <div className="mt-3">
+            <GitHubIngestReveal url={url} />
+          </div>
           <div className="mt-4">
             <Button onClick={onDone}>Done</Button>
           </div>
@@ -541,10 +629,11 @@ function MonitorCard({
         <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
           <ClockIcon className="h-3.5 w-3.5" />
           {monitor.last_checked_at ? `Checked ${timeAgo(monitor.last_checked_at)}` : "Awaiting first check"}
-          {` · every ${monitor.interval_seconds}s`}
+          {monitor.type !== "github_actions" && ` · every ${monitor.interval_seconds}s`}
         </span>
         <div className="flex items-center gap-1">
-          {isFailing(monitor) && (
+          {/* Diagnosis probes a network target; push-based monitors have none. */}
+          {isFailing(monitor) && monitor.type !== "heartbeat" && monitor.type !== "github_actions" && (
             <Button
               size="sm"
               variant="ghost"
@@ -691,14 +780,19 @@ const editSchema = z.object({
   headers: z.string().optional(),
   dns_query_type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA"]).optional(),
   alert_sensitivity: z.enum(["immediate", "balanced", "relaxed"]).optional(),
+  github_workflow: z.string().optional(),
 });
 type EditValues = z.infer<typeof editSchema>;
 
 function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () => void }) {
   const updateMonitor = useUpdateMonitor();
+  const rotateToken = useRotateGitHubToken();
   const { data: usage } = useUsage();
   const [serverError, setServerError] = useState<string | null>(null);
+  // The freshly-rotated ingest URL, revealed once after a successful regenerate.
+  const [rotatedURL, setRotatedURL] = useState<string | null>(null);
   const isHTTP = monitor.type === "http" || monitor.type === "https" || monitor.type === "ssl";
+  const isGitHub = monitor.type === "github_actions";
   const s = monitor.settings ?? {};
 
   const {
@@ -722,6 +816,7 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
         .join("\n"),
       dns_query_type: (s.dns_query_type as EditValues["dns_query_type"]) ?? "A",
       alert_sensitivity: (s.alert_sensitivity as EditValues["alert_sensitivity"]) ?? "balanced",
+      github_workflow: s.github_workflow ?? "",
     },
   });
 
@@ -771,31 +866,35 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
           <Field label="Name" error={errors.name?.message}>
             <Input {...register("name")} />
           </Field>
-          <Field label="Check interval" error={errors.interval_seconds?.message}>
-            <Select {...register("interval_seconds")}>
-              {opts.map((o) => (
-                <option key={o.v} value={o.v}>
-                  {o.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="Target" error={errors.target?.message}>
-              <Input {...register("target")} />
-            </Field>
-          </div>
-          <div className="sm:col-span-2">
-            <Field label="Alert sensitivity" error={errors.alert_sensitivity?.message}>
-              <Select {...register("alert_sensitivity")}>
-                {SENSITIVITY_OPTIONS.map((o) => (
+          {!isGitHub && (
+            <Field label="Check interval" error={errors.interval_seconds?.message}>
+              <Select {...register("interval_seconds")}>
+                {opts.map((o) => (
                   <option key={o.v} value={o.v}>
                     {o.label}
                   </option>
                 ))}
               </Select>
             </Field>
+          )}
+          <div className="sm:col-span-2">
+            <Field label={isGitHub ? "Repository" : "Target"} error={errors.target?.message}>
+              <Input placeholder={isGitHub ? "owner/repo" : undefined} {...register("target")} />
+            </Field>
           </div>
+          {!isGitHub && (
+            <div className="sm:col-span-2">
+              <Field label="Alert sensitivity" error={errors.alert_sensitivity?.message}>
+                <Select {...register("alert_sensitivity")}>
+                  {SENSITIVITY_OPTIONS.map((o) => (
+                    <option key={o.v} value={o.v}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          )}
 
           {isHTTP && (
             <>
@@ -835,6 +934,56 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
                 ))}
               </Select>
             </Field>
+          )}
+
+          {isGitHub && (
+            <>
+              <div className="sm:col-span-2">
+                <Field label="Workflow filter (optional)" error={errors.github_workflow?.message}>
+                  <Input placeholder="Leave blank to alert on any workflow" {...register("github_workflow")} />
+                </Field>
+              </div>
+              <div className="sm:col-span-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Ingest token</p>
+                {rotatedURL ? (
+                  <div className="mt-2">
+                    <GitHubIngestReveal url={rotatedURL} />
+                  </div>
+                ) : (
+                  <>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      {monitor.github_token_prefix ? (
+                        <>
+                          Current token starts with{" "}
+                          <span className="font-mono">{monitor.github_token_prefix}…</span> — the full token is
+                          shown only once.
+                        </>
+                      ) : (
+                        "No token set."
+                      )}{" "}
+                      Regenerating invalidates the previous token immediately.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="mt-2"
+                      disabled={rotateToken.isPending}
+                      onClick={async () => {
+                        setServerError(null);
+                        try {
+                          const m = await rotateToken.mutateAsync(monitor.id);
+                          if (m.github_ingest_url) setRotatedURL(absoluteURL(m.github_ingest_url));
+                        } catch (err) {
+                          setServerError(err instanceof ApiRequestError ? err.message : "Failed to regenerate token");
+                        }
+                      }}
+                    >
+                      {rotateToken.isPending ? "Regenerating…" : "Regenerate token"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </>
           )}
 
           {serverError && <p className="text-sm text-red-600 sm:col-span-2">{serverError}</p>}
@@ -917,6 +1066,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
   const type = useWatch({ control, name: "type" });
   const isHTTP = type === "http" || type === "https" || type === "ssl";
   const isHeartbeat = type === "heartbeat";
+  const isGitHub = type === "github_actions";
 
   const onSubmit = async (values: Values) => {
     setServerError(null);
@@ -931,9 +1081,13 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
         grace_seconds: isHeartbeat ? values.grace_seconds : undefined,
         settings: buildSettings(values),
       });
-      // A heartbeat's ping URL is only shown once, right after creation — so we
-      // pause on a success panel instead of closing the form immediately.
-      if (monitor.type === "heartbeat" && monitor.ping_url) {
+      // A heartbeat's ping URL and a github_actions ingest URL are each shown only
+      // once, right after creation — so we pause on a success panel instead of
+      // closing the form immediately.
+      if (
+        (monitor.type === "heartbeat" && monitor.ping_url) ||
+        (monitor.type === "github_actions" && monitor.github_ingest_url)
+      ) {
         setCreated(monitor);
       } else {
         onDone();
@@ -944,7 +1098,11 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
   };
 
   if (created) {
-    return <HeartbeatCreated monitor={created} onDone={onDone} />;
+    return created.type === "github_actions" ? (
+      <GitHubActionsCreated monitor={created} onDone={onDone} />
+    ) : (
+      <HeartbeatCreated monitor={created} onDone={onDone} />
+    );
   }
 
   if (!projects?.data.length) {
@@ -982,22 +1140,27 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
             <option value="icmp">Ping (ICMP)</option>
             <option value="dns">DNS</option>
             <option value="heartbeat">Heartbeat (cron / job)</option>
+            <option value="github_actions">GitHub Actions workflow</option>
           </Select>
         </Field>
-        <Field label="Check interval" error={errors.interval_seconds?.message}>
-          <Select {...register("interval_seconds")}>
-            {intervals.map((o) => (
-              <option key={o.v} value={o.v}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-          {usage && minInterval > 30 && (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Your {usage.plan} plan&apos;s fastest interval is {minInterval}s.
-            </p>
-          )}
-        </Field>
+        {/* A github_actions monitor is push-based: it reports per run, so there is no
+            probe interval to choose. */}
+        {!isGitHub && (
+          <Field label="Check interval" error={errors.interval_seconds?.message}>
+            <Select {...register("interval_seconds")}>
+              {intervals.map((o) => (
+                <option key={o.v} value={o.v}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+            {usage && minInterval > 30 && (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Your {usage.plan} plan&apos;s fastest interval is {minInterval}s.
+              </p>
+            )}
+          </Field>
+        )}
         {isHeartbeat ? (
           <>
             <Field label="Grace period" error={errors.grace_seconds?.message}>
@@ -1015,6 +1178,27 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
               plus grace period, you&apos;re alerted. You&apos;ll get the URL after saving.
             </div>
           </>
+        ) : isGitHub ? (
+          <>
+            <div className="sm:col-span-2">
+              <Field label="Repository" error={errors.target?.message}>
+                <Input placeholder="owner/repo" {...register("target")} />
+              </Field>
+            </div>
+            <div className="sm:col-span-2">
+              <Field
+                label="Workflow filter (optional)"
+                error={errors.github_workflow?.message}
+              >
+                <Input placeholder="Leave blank to alert on any workflow" {...register("github_workflow")} />
+              </Field>
+            </div>
+            <div className="sm:col-span-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
+              {brand.name} doesn&apos;t poll GitHub. You add the <span className="font-mono">beacon-notify</span>{" "}
+              action to your workflow; when a run fails it posts here and you&apos;re alerted through your
+              normal channels. You&apos;ll get a one-time token to add as a repo secret after saving.
+            </div>
+          </>
         ) : (
           <div className="sm:col-span-2">
             <Field label="Target" error={errors.target?.message}>
@@ -1024,8 +1208,8 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
         )}
 
         {/* Sensitivity is a probe concept (how many failed checks before alerting);
-            a heartbeat uses its grace period instead, so it is hidden here. */}
-        {!isHeartbeat && (
+            heartbeat and github_actions are push-based, so it is hidden for them. */}
+        {!isHeartbeat && !isGitHub && (
           <div className="sm:col-span-2">
             <Field label="Alert sensitivity" error={errors.alert_sensitivity?.message}>
               <Select {...register("alert_sensitivity")}>
@@ -1043,7 +1227,7 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
           </div>
         )}
 
-        {!isHeartbeat && (
+        {!isHeartbeat && !isGitHub && (
           <div className="sm:col-span-2 border-t border-slate-200 pt-3 dark:border-slate-800">
             <button
               type="button"
@@ -1100,9 +1284,11 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Creating…" : "Create monitor"}
           </Button>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            Prometheus & Blackbox are configured automatically.
-          </span>
+          {!isGitHub && !isHeartbeat && (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Prometheus & Blackbox are configured automatically.
+            </span>
+          )}
         </div>
       </form>
     </Card>

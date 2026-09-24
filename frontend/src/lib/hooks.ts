@@ -229,6 +229,17 @@ export function useDeleteMonitor() {
   });
 }
 
+// useRotateGitHubToken mints a fresh ingest token for a github_actions monitor. The
+// response carries the new token exactly once (github_ingest_url/token), so the
+// caller must reveal it immediately — it can never be shown again.
+export function useRotateGitHubToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<Monitor>(`/api/v1/monitors/${id}/github-token`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["monitors"] }),
+  });
+}
+
 // ---- Notification channels ----
 
 export interface ChannelPageParams {

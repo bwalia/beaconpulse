@@ -1,0 +1,30 @@
+name: 'Beacon Notify'
+description: 'Report a GitHub Actions workflow result to Beacon / SysOps 24/7 and alert your team on failure.'
+author: 'Beacon'
+branding:
+  icon: 'bell'
+  color: 'blue'
+
+inputs:
+  url:
+    description: >-
+      Your Beacon ingest URL, taken from the GitHub Actions monitor you created in
+      Beacon. Store it as a repository secret (it is a capability credential) and
+      pass it here, e.g. url: ${{ secrets.BEACON_NOTIFY_URL }}.
+    required: true
+  status:
+    description: >-
+      The run result to report. Defaults to the current job's status. Pass
+      ${{ job.status }} explicitly when using `if: always()` so recoveries are
+      reported as well as failures.
+    required: false
+    default: ${{ job.status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      env:
+        BEACON_URL: ${{ inputs.url }}
+        BEACON_STATUS: ${{ inputs.status }}
+      run: bash "${{ github.action_path }}/notify.sh"

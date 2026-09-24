@@ -49,6 +49,15 @@ func Generate(cfg GeneratorConfig, monitors []monitor.Monitor) (Artifacts, error
 			continue
 		}
 
+		// A github_actions monitor is also push-based, but its alerting does not go
+		// through Prometheus at all: the "Beacon Notify" Action POSTs each failed run
+		// straight to the ingest endpoint, which dispatches. So it produces no
+		// Blackbox module, no scrape job, and no rule — skip it entirely. (Without
+		// this it would fall through to buildModule's default and fail the whole sync.)
+		if m.Type == monitor.TypeGitHubActions {
+			continue
+		}
+
 		id := sanitizeID(m.ID.String())
 		module := "beacon_" + id
 		job := "mon_" + id

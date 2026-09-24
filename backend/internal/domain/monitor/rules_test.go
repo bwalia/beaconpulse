@@ -65,3 +65,30 @@ func TestNormalizeICMPRejectsURL(t *testing.T) {
 		t.Fatal("expected ICMP to reject a URL target")
 	}
 }
+
+func TestNormalizeGitHubActions(t *testing.T) {
+	cases := map[string]string{
+		"bwalia/beaconpulse":                              "bwalia/beaconpulse",
+		"https://github.com/bwalia/beaconpulse":           "bwalia/beaconpulse",
+		"https://github.com/bwalia/beaconpulse/":          "bwalia/beaconpulse",
+		"github.com/bwalia/beaconpulse.git":               "bwalia/beaconpulse",
+		"https://github.com/bwalia/beaconpulse/tree/main": "bwalia/beaconpulse",
+	}
+	for in, want := range cases {
+		got, _, err := normalizeAndValidate(TypeGitHubActions, in, Settings{})
+		if err != nil {
+			t.Fatalf("%q: unexpected error: %v", in, err)
+		}
+		if got != want {
+			t.Errorf("%q normalized to %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestNormalizeGitHubActionsRejectsBadRepo(t *testing.T) {
+	for _, in := range []string{"", "just-owner", "/", "owner/"} {
+		if _, _, err := normalizeAndValidate(TypeGitHubActions, in, Settings{}); !apperror.IsCode(err, apperror.CodeValidation) {
+			t.Errorf("%q: expected validation error, got %v", in, err)
+		}
+	}
+}
