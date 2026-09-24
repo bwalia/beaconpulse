@@ -114,19 +114,29 @@ func (h *GitHubActionsHandler) ingest(w http.ResponseWriter, r *http.Request) {
 // notification send never holds the Action's HTTP request open.
 func (h *GitHubActionsHandler) dispatch(r *http.Request, res *githubactions.Result, ev githubactions.Event) {
 	m := res.Monitor
-	status := notification.StatusFiring
-	if res.Alert == githubactions.AlertResolved {
-		status = notification.StatusResolved
-	}
 	now := time.Now().UTC()
 
 	workflow := ev.Workflow
 	if workflow == "" {
 		workflow = "GitHub Actions workflow"
 	}
-	summary := fmt.Sprintf("%s failed on %s", workflow, m.Target)
-	if status == notification.StatusResolved {
+
+	// Both a recovery and a success-confirmation deliver as a green (resolved)
+	// notification; only the wording differs.
+	var status notification.AlertStatus
+	var summary string
+	switch res.Alert {
+	case githubactions.AlertFiring:
+		status = notification.StatusFiring
+		summary = fmt.Sprintf("%s failed on %s", workflow, m.Target)
+	case githubactions.AlertResolved:
+		status = notification.StatusResolved
 		summary = fmt.Sprintf("%s recovered on %s", workflow, m.Target)
+	case githubactions.AlertSucceeded:
+		status = notification.StatusResolved
+		summary = fmt.Sprintf("%s succeeded on %s", workflow, m.Target)
+	default:
+		return
 	}
 
 	event := notification.AlertEvent{

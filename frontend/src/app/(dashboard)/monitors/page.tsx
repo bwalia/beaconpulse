@@ -73,8 +73,9 @@ const schema = z.object({
   headers: z.string().optional(),
   dns_query_type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA"]).optional(),
   alert_sensitivity: z.enum(["immediate", "balanced", "relaxed"]).optional(),
-  // GitHub Actions: optional workflow-name filter.
+  // GitHub Actions: optional workflow-name filter + success-confirmation toggle.
   github_workflow: z.string().optional(),
+  github_notify_on_success: z.boolean().optional(),
 }).refine((v) => v.type === "heartbeat" || (v.target ?? "").trim().length > 0, {
   message: "Target is required",
   path: ["target"],
@@ -94,6 +95,7 @@ type AdvancedFields = {
   dns_query_type?: string;
   alert_sensitivity?: string;
   github_workflow?: string;
+  github_notify_on_success?: boolean;
 };
 
 // SENSITIVITY_OPTIONS controls how long a monitor must be down before it alerts.
@@ -115,6 +117,7 @@ function buildSettings(v: AdvancedFields): Record<string, unknown> {
   if (v.dns_query_type) s.dns_query_type = v.dns_query_type;
   if (v.alert_sensitivity) s.alert_sensitivity = v.alert_sensitivity;
   if (v.github_workflow?.trim()) s.github_workflow = v.github_workflow.trim();
+  if (v.github_notify_on_success) s.github_notify_on_success = true;
   if (v.valid_status_codes) {
     const codes = v.valid_status_codes
       .split(",")
@@ -781,6 +784,7 @@ const editSchema = z.object({
   dns_query_type: z.enum(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "CAA"]).optional(),
   alert_sensitivity: z.enum(["immediate", "balanced", "relaxed"]).optional(),
   github_workflow: z.string().optional(),
+  github_notify_on_success: z.boolean().optional(),
 });
 type EditValues = z.infer<typeof editSchema>;
 
@@ -817,6 +821,7 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
       dns_query_type: (s.dns_query_type as EditValues["dns_query_type"]) ?? "A",
       alert_sensitivity: (s.alert_sensitivity as EditValues["alert_sensitivity"]) ?? "balanced",
       github_workflow: s.github_workflow ?? "",
+      github_notify_on_success: s.github_notify_on_success ?? false,
     },
   });
 
@@ -943,6 +948,10 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
                   <Input placeholder="Leave blank to alert on any workflow" {...register("github_workflow")} />
                 </Field>
               </div>
+              <label className="sm:col-span-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input type="checkbox" className="h-4 w-4" {...register("github_notify_on_success")} />
+                Also notify on every successful run (a green ✓ confirmation — good for backups)
+              </label>
               <div className="sm:col-span-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Ingest token</p>
                 {rotatedURL ? (
@@ -1193,6 +1202,10 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
                 <Input placeholder="Leave blank to alert on any workflow" {...register("github_workflow")} />
               </Field>
             </div>
+            <label className="sm:col-span-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <input type="checkbox" className="h-4 w-4" {...register("github_notify_on_success")} />
+              Also notify on every successful run (a green ✓ confirmation — good for backups)
+            </label>
             <div className="sm:col-span-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
               {brand.name} doesn&apos;t poll GitHub. You add the <span className="font-mono">beacon-notify</span>{" "}
               action to your workflow; when a run fails it posts here and you&apos;re alerted through your

@@ -42,13 +42,17 @@ type Event struct {
 type AlertKind int
 
 const (
-	// AlertNone: the run needs no notification (a success with no prior failure, or
-	// an outcome we neither alert nor recover on, like cancelled).
+	// AlertNone: the run needs no notification (a routine success on a monitor that
+	// does not confirm successes, or an outcome we neither alert nor recover on,
+	// like cancelled).
 	AlertNone AlertKind = iota
 	// AlertFiring: a failed run — page the org's channels.
 	AlertFiring
 	// AlertResolved: a success that follows a failure — send the recovery notice.
 	AlertResolved
+	// AlertSucceeded: a success on a monitor that confirms every successful run
+	// (GitHubNotifyOnSuccess) and was not previously down — a positive "it ran".
+	AlertSucceeded
 )
 
 // Result is the decision for one ingested event. The transport turns it into a
@@ -130,11 +134,16 @@ func (s *Service) Ingest(ctx context.Context, token string, ev Event) (*Result, 
 		// product promise "notify whenever a workflow fails".
 		res.Alert = AlertFiring
 	case monitor.StatusUp:
-		// Only announce recovery when we were actually down; a routine green run is
-		// not news.
-		if m.LastStatus == monitor.StatusDown {
+		switch {
+		case m.LastStatus == monitor.StatusDown:
+			// Recovery: we were down and are now green — always worth announcing.
 			res.Alert = AlertResolved
+		case m.Settings.GitHubNotifyOnSuccess:
+			// This monitor confirms every successful run (e.g. a backup), so send a
+			// positive green notice even though nothing was broken.
+			res.Alert = AlertSucceeded
 		}
+		// Otherwise a routine green run is not news — stay quiet.
 	}
 
 	// Record the new status (best-effort: a bookkeeping failure must not lose the

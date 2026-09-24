@@ -53,6 +53,8 @@ export interface MonitorSettings {
   dns_query_type?: string;
   /** GitHub Actions: optional workflow-name filter. Empty = alert on any workflow. */
   github_workflow?: string;
+  /** GitHub Actions: also send a green confirmation on every successful run. */
+  github_notify_on_success?: boolean;
 }
 
 export interface Monitor {

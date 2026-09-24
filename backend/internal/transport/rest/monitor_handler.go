@@ -67,6 +67,7 @@ type monitorSettingsDTO struct {
 	DNSQueryType          string            `json:"dns_query_type,omitempty" validate:"omitempty,oneof=A AAAA CNAME MX TXT NS SOA CAA"`
 	DNSExpectedIPs        []string          `json:"dns_expected_ips,omitempty"`
 	GitHubWorkflow        string            `json:"github_workflow,omitempty" validate:"omitempty,max=200"`
+	GitHubNotifyOnSuccess bool              `json:"github_notify_on_success,omitempty"`
 }
 
 func (d monitorSettingsDTO) toDomain() monitor.Settings {
@@ -85,6 +86,7 @@ func (d monitorSettingsDTO) toDomain() monitor.Settings {
 		DNSQueryType:          d.DNSQueryType,
 		DNSExpectedIPs:        d.DNSExpectedIPs,
 		GitHubWorkflow:        d.GitHubWorkflow,
+		GitHubNotifyOnSuccess: d.GitHubNotifyOnSuccess,
 	}
 }
 
