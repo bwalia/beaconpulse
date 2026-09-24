@@ -114,6 +114,10 @@ type Settings struct {
 	// (matched against the value the Action reports). Empty means every workflow in
 	// the repo that reports a failure alerts on this monitor.
 	GitHubWorkflow string `json:"github_workflow,omitempty"`
+	// GitHubNotifyOnSuccess sends a green confirmation on EVERY successful run, not
+	// just when recovering from a failure. Off by default (no-news-is-good-news);
+	// on for cases like a backup where a positive "it ran" is the point.
+	GitHubNotifyOnSuccess bool `json:"github_notify_on_success,omitempty"`
 }
 
 // Monitor is a single monitored resource.

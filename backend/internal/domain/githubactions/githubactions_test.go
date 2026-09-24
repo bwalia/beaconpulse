@@ -99,6 +99,38 @@ func TestIngest_SuccessWhenUpIsQuiet(t *testing.T) {
 	}
 }
 
+func TestIngest_NotifyOnSuccessConfirmsEveryGreenRun(t *testing.T) {
+	m := baseMonitor()
+	m.LastStatus = monitor.StatusUp
+	m.Settings.GitHubNotifyOnSuccess = true
+	svc, repo, token := newFixture(m)
+	res, err := svc.Ingest(context.Background(), token, Event{Status: "success"})
+	if err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if res.Alert != AlertSucceeded {
+		t.Fatalf("want AlertSucceeded for a confirmed success, got %v", res.Alert)
+	}
+	if repo.lastStatus != monitor.StatusUp {
+		t.Fatalf("want status up applied, got %q", repo.lastStatus)
+	}
+}
+
+func TestIngest_NotifyOnSuccessStillRecoversFromDown(t *testing.T) {
+	m := baseMonitor()
+	m.LastStatus = monitor.StatusDown
+	m.Settings.GitHubNotifyOnSuccess = true
+	svc, _, token := newFixture(m)
+	res, err := svc.Ingest(context.Background(), token, Event{Status: "success"})
+	if err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	// A success after a failure is a recovery, not a routine confirmation.
+	if res.Alert != AlertResolved {
+		t.Fatalf("want AlertResolved when recovering, got %v", res.Alert)
+	}
+}
+
 func TestIngest_CancelledIsIgnored(t *testing.T) {
 	svc, repo, token := newFixture(baseMonitor())
 	res, err := svc.Ingest(context.Background(), token, Event{Status: "cancelled"})
