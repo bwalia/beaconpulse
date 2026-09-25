@@ -11,6 +11,9 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: {{ .Values.app.replicas.api }}
+  # Give a slow registry pull room to finish before the rollout is marked failed —
+  # see values.yaml app.progressDeadlineSeconds.
+  progressDeadlineSeconds: {{ .Values.app.progressDeadlineSeconds }}
   # Shares an RWO control-plane volume with prometheus/blackbox; Recreate avoids
   # two writers racing during a rollout.
   strategy:

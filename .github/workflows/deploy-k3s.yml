@@ -384,7 +384,7 @@ jobs:
             --set image.tag="$TAG" \
             $EXTRA \
             --namespace "$NAMESPACE" --create-namespace \
-            --wait --timeout 10m
+            --wait --timeout 20m
 
       # `helm --wait` reports only WHICH resources were not ready, never why, and the
       # steps after it are skipped once it fails — so a failed deploy left no trace of
