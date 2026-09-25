@@ -87,6 +87,13 @@ app:
   replicas:
     api: 1
     frontend: 1
+  # progressDeadlineSeconds for the api/frontend Deployments — how long a rollout
+  # may take before Kubernetes marks it Failed ("Progress deadline exceeded").
+  # Raised above the 600s (10m) default: a node with a slow link to the registry
+  # can take longer than 10m to pull the larger frontend image, and a slow first
+  # pull should never fail an otherwise-healthy deploy. Keep this <= the Helm
+  # `--wait --timeout` in deploy-k3s.yml (currently 20m).
+  progressDeadlineSeconds: 1200
 
 # ── AI alert enrichment (non-secret parts; API key comes from Vault) ───────
 ai:

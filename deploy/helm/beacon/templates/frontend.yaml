@@ -7,6 +7,9 @@ metadata:
     {{- include "beacon.selector" "frontend" | nindent 4 }}
 spec:
   replicas: {{ .Values.app.replicas.frontend }}
+  # Give a slow registry pull of this (larger, Next.js) image room to finish before
+  # the rollout is marked failed — see values.yaml app.progressDeadlineSeconds.
+  progressDeadlineSeconds: {{ .Values.app.progressDeadlineSeconds }}
   # In-place rollout: every Beacon pod is pinned to a single node (values.yaml
   # nodeSelector), and a busy node can sit at its max-pods limit — so the default
   # surge (add a new pod before removing an old one) can never schedule and the
