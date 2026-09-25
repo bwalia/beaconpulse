@@ -535,6 +535,17 @@ function StatusFilterBar({
   );
 }
 
+// PUSH_STATE styles the last-result bar for push monitors (github_actions,
+// heartbeat), which have no Prometheus probe history to draw a 24h strip from —
+// their card reflects last_status instead of an empty "no data" strip.
+const PUSH_STATE: Record<string, { bar: string; dot: string; label: string }> = {
+  up: { bar: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", dot: "bg-emerald-500", label: "Passing" },
+  down: { bar: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300", dot: "bg-red-500", label: "Failing" },
+  degraded: { bar: "bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200", dot: "bg-amber-500", label: "Degraded" },
+  paused: { bar: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300", dot: "bg-slate-400", label: "Paused" },
+  unknown: { bar: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300", dot: "bg-slate-400", label: "Awaiting first result" },
+};
+
 // MonitorCard is one monitor as a rich card: identity, headline uptime/response,
 // the 24h uptime strip that is the product's whole point, and the management
 // actions. `hist` is that monitor's slice of the org overview, joined by id.
@@ -560,6 +571,13 @@ function MonitorCard({
   // A heartbeat has no probe target; show its ping URL instead, so the owner can
   // retrieve it any time.
   const target = monitor.type === "heartbeat" && monitor.ping_url ? monitor.ping_url : monitor.target;
+
+  // Push monitors report their own results (no Prometheus probe series), so their
+  // card shows a last-result bar keyed on last_status instead of an uptime strip.
+  const isPush = monitor.type === "github_actions" || monitor.type === "heartbeat";
+  const pushState = PUSH_STATE[status] ?? PUSH_STATE.unknown;
+  const runWord = monitor.type === "github_actions" ? "run" : "ping";
+  const lastEventAt = monitor.type === "heartbeat" ? monitor.last_ping_at : monitor.last_checked_at;
 
   const pts = hist?.points ?? [];
   const passed = pts.filter((p) => p.v === 1).length;
@@ -601,39 +619,62 @@ function MonitorCard({
             {target}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-6 text-right">
-          <div>
-            <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
-              {uptimePct != null ? `${uptimePct}%` : "—"}
-            </p>
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">uptime 24h</p>
+        {/* Uptime/response are Prometheus probe metrics — meaningless for push
+            monitors, which show a last-result bar below instead. */}
+        {!isPush && (
+          <div className="flex shrink-0 items-center gap-6 text-right">
+            <div>
+              <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
+                {uptimePct != null ? `${uptimePct}%` : "—"}
+              </p>
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">uptime 24h</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
+                {respMs ? `${Math.round(respMs)}ms` : "—"}
+              </p>
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">avg resp</p>
+            </div>
           </div>
-          <div>
-            <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">
-              {respMs ? `${Math.round(respMs)}ms` : "—"}
-            </p>
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">avg resp</p>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Uptime history — the strip is the visible proof that we're probing this. */}
-      <div className="mt-3">
-        <UptimeStrip points={pts} uptimePct={uptimePct} winShort="24h" />
-        <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span>24h ago</span>
-          <span>now</span>
+      {/* Push monitors have no probe history; show a last-result bar reflecting the
+          latest reported run/ping. Probed monitors get the 24h uptime strip. */}
+      {isPush ? (
+        <div className="mt-3">
+          <div className={`flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium ${pushState.bar}`}>
+            <span className={`h-2.5 w-2.5 rounded-full ${pushState.dot}`} aria-hidden />
+            {pushState.label}
+            <span className="ml-auto text-xs font-normal opacity-70">
+              {lastEventAt ? `last ${runWord} ${timeAgo(lastEventAt)}` : `no ${runWord} yet`}
+            </span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="mt-3">
+          <UptimeStrip points={pts} uptimePct={uptimePct} winShort="24h" />
+          <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span>24h ago</span>
+            <span>now</span>
+          </div>
+        </div>
+      )}
 
       {/* Meta + actions. Safe actions recede; the destructive one keeps its danger
           colour but is separated and de-emphasised. */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-          <ClockIcon className="h-3.5 w-3.5" />
-          {monitor.last_checked_at ? `Checked ${timeAgo(monitor.last_checked_at)}` : "Awaiting first check"}
-          {monitor.type !== "github_actions" && ` · every ${monitor.interval_seconds}s`}
-        </span>
+        {/* Push monitors carry their timing in the last-result bar above, so the
+            probe-style "Checked … · every Ns" line is omitted for them. */}
+        {isPush ? (
+          <span />
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <ClockIcon className="h-3.5 w-3.5" />
+            {monitor.last_checked_at ? `Checked ${timeAgo(monitor.last_checked_at)}` : "Awaiting first check"}
+            {` · every ${monitor.interval_seconds}s`}
+          </span>
+        )}
         <div className="flex items-center gap-1">
           {/* Diagnosis probes a network target; push-based monitors have none. */}
           {isFailing(monitor) && monitor.type !== "heartbeat" && monitor.type !== "github_actions" && (
