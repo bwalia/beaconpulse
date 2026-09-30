@@ -56,6 +56,7 @@ For go-live you only care about **`sealed`**.
 | `POSTGRES_PASSWORD`          | **generated** (alnum, 32)     | cached, stable — **rotating breaks the existing DB volume** |
 | `BEACON_AI_API_KEY`          | `deploy/.env`                 | optional — absent ⇒ AI enrichment off |
 | `BEACON_GOOGLE_CLIENT_ID`    | `deploy/.env`                 | optional — absent ⇒ Google sign-in off (backend side) |
+| `BEACON_CMS_REVALIDATE_SECRET` | `deploy/.env`               | optional — absent ⇒ OpsAPI publish webhook (`/cms/revalidate`) off; Blog/Articles refresh hourly |
 | `STRIPE_*`                   | `deploy/.env`(+overlay)       | optional — present-but-empty in `.env.<env>` = billing OFF for that env |
 
 The four **generated** values are written once to `deploy/.secrets/<env>.env` and

@@ -53,6 +53,30 @@ spec:
             # a server-side fetch throw "Invalid URL".
             - name: BEACON_INTERNAL_API_URL
               value: "http://{{ include "beacon.name" "api" }}:8080"
+            # Blog / Articles content from the OpsAPI CMS (frontend/src/lib/cms.ts).
+            # Empty opsapiUrl turns both sections into their empty state.
+            - name: BEACON_OPSAPI_URL
+              value: {{ .Values.cms.opsapiUrl | quote }}
+            - name: BEACON_CMS_NAMESPACE
+              value: {{ .Values.cms.namespace | quote }}
+            - name: BEACON_CMS_BLOG_CATEGORY
+              value: {{ .Values.cms.blogCategory | quote }}
+            - name: BEACON_CMS_ARTICLES_CATEGORY
+              value: {{ .Values.cms.articlesCategory | quote }}
+            - name: BEACON_CMS_REVALIDATE_SECONDS
+              value: {{ .Values.cms.revalidateSeconds | quote }}
+            # HMAC secret for the OpsAPI publish webhook (/cms/revalidate). Optional:
+            # without it the webhook answers 503 and content refreshes on the timer.
+            - name: BEACON_CMS_REVALIDATE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: beacon-secrets
+                  key: BEACON_CMS_REVALIDATE_SECRET
+                  optional: true
+            # Shared ISR/data cache across replicas (frontend/cache-handler.mjs), so
+            # a webhook revalidation reaches every pod. Keys are prefixed beacon:isr:.
+            - name: BEACON_ISR_REDIS_URL
+              value: "redis://{{ include "beacon.name" "redis" }}:6379"
           ports:
             - containerPort: 3000
           readinessProbe:
