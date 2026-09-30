@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import createNextIntlPlugin from "next-intl/plugin";
 
 // Points next-intl at the request config that resolves the locale (from a cookie) and
@@ -21,6 +22,16 @@ const nextConfig = {
   // lib/time.ts, and the react-hooks lint rules (purity, immutability,
   // set-state-in-effect) are what keep it true. Keep them passing.
   reactCompiler: true,
+
+  // Shared ISR/data cache (see cache-handler.mjs): a Redis-backed handler so the OpsAPI
+  // webhook's revalidateTag("cms-posts") busts every replica, not just one pod. Active
+  // only in production; local-only when BEACON_ISR_REDIS_URL is unset.
+  // cacheMaxMemorySize: 0 defers entirely to the handler (no extra in-memory tier).
+  cacheHandler:
+    process.env.NODE_ENV === "production"
+      ? fileURLToPath(new URL("./cache-handler.mjs", import.meta.url))
+      : undefined,
+  cacheMaxMemorySize: 0,
 };
 
 export default withNextIntl(nextConfig);

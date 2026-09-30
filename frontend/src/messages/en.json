@@ -4,6 +4,8 @@
     "howItWorks": "How it works",
     "pricing": "Pricing",
     "statusPages": "Status pages",
+    "blog": "Blog",
+    "articles": "Articles",
     "docs": "Docs",
     "signIn": "Sign in",
     "getStarted": "Get started",
@@ -202,5 +204,25 @@
       "title": "System",
       "subtitle": "Operator access to the underlying monitoring engines."
     }
+  },
+  "cms": {
+    "blog": {
+      "title": "Blog",
+      "subtitle": "Product news, engineering notes and lessons from running monitoring in production."
+    },
+    "articles": {
+      "title": "Articles",
+      "subtitle": "In-depth guides to uptime, SSL, DNS and incident response."
+    },
+    "empty": "Nothing published here yet — check back soon.",
+    "readMore": "Read",
+    "minRead": "{minutes} min read",
+    "pagination": "Pagination",
+    "newer": "← Newer",
+    "older": "Older →",
+    "pageOf": "Page {page} of {total}",
+    "breadcrumb": "Breadcrumb",
+    "home": "Home",
+    "backTo": "← Back to {section}"
   }
 }

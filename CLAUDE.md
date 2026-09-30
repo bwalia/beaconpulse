@@ -15,7 +15,11 @@ selected at build time by `NEXT_PUBLIC_BRAND`), `deploy/helm/beacon/values-<bran
   Layering: `transport/rest` (handlers) → `domain/<x>` (services + interfaces) →
   `adapter/<x>` (postgres, notifiers, verifiers). Migrations in `backend/migrations`
   auto-apply on startup.
-- `frontend/` — Next.js web app.
+- `frontend/` — Next.js web app. Public `/blog` and `/articles` read posts from the
+  OpsAPI CMS (`src/lib/cms.ts`; namespace `BEACON_CMS_NAMESPACE`, default
+  `beaconpulse`; split by category slug) through a tagged data cache shared across
+  replicas via Redis (`cache-handler.mjs`), busted by the signed OpsAPI webhook at
+  `/cms/revalidate` — same pattern as `../workstation-website`.
 - `ios/` — native SwiftUI iPhone/iPad app (added recently — see below).
 
 ## iOS app — current status

@@ -250,6 +250,11 @@ services:
       # use the empty same-origin base above — it needs a real host to fetch from.
       # This is the in-network API service, never exposed to the browser.
       BEACON_INTERNAL_API_URL: http://api:8080
+      # Blog / Articles from the OpsAPI CMS (see frontend/src/lib/cms.ts).
+      BEACON_OPSAPI_URL: ${BEACON_OPSAPI_URL:-https://opsapi.workstation.co.uk}
+      BEACON_CMS_NAMESPACE: ${BEACON_CMS_NAMESPACE:-beaconpulse}
+      BEACON_CMS_REVALIDATE_SECRET: ${BEACON_CMS_REVALIDATE_SECRET:-}
+      BEACON_ISR_REDIS_URL: redis://redis:6379
     # No host port — reached through the nginx gateway at /.
     depends_on:
       - api

@@ -12,13 +12,16 @@ import { DUR } from "@/lib/motion";
 import { brand } from "@/brand";
 
 // href + which translation key labels it. Labels come from the catalog so the whole nav
-// speaks the reader's language.
+// speaks the reader's language. Section anchors are rooted at "/" because the nav is
+// also the header of the Blog and Articles pages; on the landing page itself a
+// "/#features" link is still an in-page scroll, not a reload.
 const LINKS = [
-  { href: "#features", key: "features" },
-  { href: "#how", key: "howItWorks" },
-  { href: "#pricing", key: "pricing" },
-  { href: "#status", key: "statusPages" },
-  // Absolute, not an anchor: this one leaves the page.
+  { href: "/#features", key: "features" },
+  { href: "/#how", key: "howItWorks" },
+  { href: "/#pricing", key: "pricing" },
+  { href: "/#status", key: "statusPages" },
+  { href: "/blog", key: "blog" },
+  { href: "/articles", key: "articles" },
   { href: "/docs", key: "docs" },
 ] as const;
 
@@ -62,15 +65,15 @@ export function MarketingNav() {
           </span>
         </Link>
 
-        <ul className="ml-4 hidden items-center gap-1 md:flex">
+        <ul className="ml-4 hidden items-center gap-1 lg:flex">
           {LINKS.map((l) => (
             <li key={l.href}>
-              <a
+              <Link
                 href={l.href}
                 className="rounded-lg px-3.5 py-2 text-lg text-slate-600 transition-colors hover:bg-slate-900/5 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
               >
                 {t(l.key)}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>

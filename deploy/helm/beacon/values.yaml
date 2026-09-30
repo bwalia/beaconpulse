@@ -95,6 +95,19 @@ app:
   # `--wait --timeout` in deploy-k3s.yml (currently 20m).
   progressDeadlineSeconds: 1200
 
+# ── Blog / Articles content (OpsAPI CMS, public read-only API) ─────────────
+# Both sections are published posts in one OpsAPI CMS namespace, split by category
+# slug (an empty category = no filter). Per brand: a white-label points `namespace`
+# at its own CMS namespace in values-<brand>-<env>.yaml. Empty opsapiUrl = sections
+# show their empty state. Optional BEACON_CMS_REVALIDATE_SECRET in beacon-secrets
+# enables the instant-publish webhook at https://<host>/cms/revalidate.
+cms:
+  opsapiUrl: "https://opsapi.workstation.co.uk"
+  namespace: beaconpulse
+  blogCategory: blog
+  articlesCategory: articles
+  revalidateSeconds: 3600
+
 # ── AI alert enrichment (non-secret parts; API key comes from Vault) ───────
 ai:
   enabled: false

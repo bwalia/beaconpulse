@@ -507,25 +507,37 @@ function Footer() {
             — {tm("footerTagline")}
           </span>
         </div>
-        <nav aria-label="Footer" className="flex items-center gap-5 text-sm">
-          <a
-            href="#features"
+        <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-5 text-sm">
+          <Link
+            href="/#features"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
             {t("features")}
-          </a>
-          <a
-            href="#pricing"
+          </Link>
+          <Link
+            href="/#pricing"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
             {t("pricing")}
-          </a>
-          <a
-            href="#status"
+          </Link>
+          <Link
+            href="/#status"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
           >
             {t("statusPages")}
-          </a>
+          </Link>
+          <Link
+            href="/blog"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+          >
+            {t("blog")}
+          </Link>
+          <Link
+            href="/articles"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+          >
+            {t("articles")}
+          </Link>
           <Link
             href="/docs"
             className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
