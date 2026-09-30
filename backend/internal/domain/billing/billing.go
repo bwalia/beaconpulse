@@ -109,6 +109,28 @@ type Payments interface {
 	// could not confirm delivering to us. It is what lets billing be pull-based as
 	// well as push-based; see Service.Reconcile.
 	RecentTopUps(ctx context.Context, since time.Time) ([]WebhookEvent, error)
+	// ListInvoices returns the customer's invoices (subscription charges and one-time
+	// top-ups), newest first, capped at limit. An empty customerID returns none.
+	ListInvoices(ctx context.Context, customerID string, limit int) ([]Invoice, error)
+	// BillingPortalURL returns a Stripe Customer Portal link where the customer can
+	// review invoices, update their card, and cancel a subscription.
+	BillingPortalURL(ctx context.Context, customerID string) (string, error)
+}
+
+// Invoice is one billing document from the provider — a paid subscription period or
+// a one-time top-up. Amounts are in the smallest currency unit (cents). It is a thin
+// view: the provider stays the system of record, so we never persist these, we read
+// them on demand and link to the provider's hosted copy and PDF.
+type Invoice struct {
+	ID         string
+	Number     string
+	Created    time.Time
+	AmountPaid int64 // what the customer actually paid, in cents
+	Total      int64 // invoice total, in cents
+	Currency   string
+	Status     string // paid, open, void, uncollectible, draft
+	HostedURL  string // provider-hosted invoice page
+	PDFURL     string // direct PDF download
 }
 
 // CheckoutInput / TopUpInput are what the service hands the payment provider.
@@ -189,16 +211,50 @@ func (s *Service) Overview(ctx context.Context, actor Actor) (Overview, error) {
 	usedDiagnoses, _ := s.repo.CountRunsSince(ctx, actor.OrgID, plan.MonthStart(time.Now()))
 
 	return Overview{
-		SubscribedPlan:        st.Plan,
-		EffectivePlan:         eff,
-		SubscriptionStatus:    st.SubscriptionStatus,
-		PeriodEnd:             st.PeriodEnd,
-		CreditSeconds:         st.CreditSeconds,
-		Limits:                plan.LimitsFor(eff),
+		SubscribedPlan:         st.Plan,
+		EffectivePlan:          eff,
+		SubscriptionStatus:     st.SubscriptionStatus,
+		PeriodEnd:              st.PeriodEnd,
+		CreditSeconds:          st.CreditSeconds,
+		Limits:                 plan.LimitsFor(eff),
 		GrantedCreditSeconds:   granted,
 		ConsumedCreditSeconds:  consumed,
 		DiagnosesUsedThisMonth: usedDiagnoses,
 	}, nil
+}
+
+// Invoices lists the org's invoices, newest first. Empty when the org has never had
+// a provider customer (nothing paid yet) or billing is disabled. Readable by any org
+// member, like Overview — it is the org's own financial history, not a mutation.
+func (s *Service) Invoices(ctx context.Context, actor Actor) ([]Invoice, error) {
+	if s.pay == nil {
+		return nil, nil
+	}
+	st, err := s.repo.State(ctx, actor.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	if st.StripeCustomerID == "" {
+		return nil, nil
+	}
+	return s.pay.ListInvoices(ctx, st.StripeCustomerID, 24)
+}
+
+// PortalURL returns a provider Customer Portal link for managing the subscription,
+// payment method, and invoice history. Admins/owners only — the portal can cancel
+// the subscription and change the card.
+func (s *Service) PortalURL(ctx context.Context, actor Actor) (string, error) {
+	if err := s.guard(actor); err != nil {
+		return "", err
+	}
+	st, err := s.repo.State(ctx, actor.OrgID)
+	if err != nil {
+		return "", err
+	}
+	if st.StripeCustomerID == "" {
+		return "", apperror.Validation("no billing account yet — make a purchase first")
+	}
+	return s.pay.BillingPortalURL(ctx, st.StripeCustomerID)
 }
 
 // StartTopUp creates a Stripe Checkout session for a one-time pay-as-you-go top-up

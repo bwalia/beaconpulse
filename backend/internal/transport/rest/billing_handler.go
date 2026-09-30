@@ -45,8 +45,10 @@ func (h *BillingHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(h.auth.Require)
 	r.Get("/", h.get)
+	r.Get("/invoices", h.invoices)
 	r.With(h.auth.RequireWriter).Post("/checkout/subscription", h.subscribe)
 	r.With(h.auth.RequireWriter).Post("/checkout/topup", h.topup)
+	r.With(h.auth.RequireWriter).Post("/portal", h.portal)
 	return r
 }
 
@@ -66,22 +68,22 @@ type billingResponse struct {
 	// SubscribedPlan is the tier the org subscribed to; EffectivePlan is what
 	// actually applies right now (may be payg or free even while subscribed==pro
 	// if the subscription lapsed).
-	SubscribedPlan        string             `json:"subscribed_plan"`
-	EffectivePlan         string             `json:"effective_plan"`
-	SubscriptionStatus    string             `json:"subscription_status"`
-	PeriodEnd             *time.Time         `json:"period_end,omitempty"`
-	CreditSeconds         int64              `json:"credit_seconds"`
+	SubscribedPlan     string     `json:"subscribed_plan"`
+	EffectivePlan      string     `json:"effective_plan"`
+	SubscriptionStatus string     `json:"subscription_status"`
+	PeriodEnd          *time.Time `json:"period_end,omitempty"`
+	CreditSeconds      int64      `json:"credit_seconds"`
 	// Granted/Consumed answer "how long have I had, and how long is left?" — the
 	// question a bare balance leaves people reconstructing from Stripe receipts.
-	GrantedCreditSeconds  int64              `json:"granted_credit_seconds"`
-	ConsumedCreditSeconds int64              `json:"consumed_credit_seconds"`
-	MonthlyDiagnoses       int               `json:"monthly_diagnoses"`
-	DiagnosesUsedThisMonth int               `json:"diagnoses_used_this_month"`
-	DiagnosisCostSeconds  int64              `json:"diagnosis_cost_seconds"`
-	MaxMonitors           int                `json:"max_monitors"`
-	MonitorHoursPerDollar int                `json:"monitor_hours_per_dollar"`
-	BillingEnabled        bool               `json:"billing_enabled"`
-	Plans                 []planInfoResponse `json:"plans"`
+	GrantedCreditSeconds   int64              `json:"granted_credit_seconds"`
+	ConsumedCreditSeconds  int64              `json:"consumed_credit_seconds"`
+	MonthlyDiagnoses       int                `json:"monthly_diagnoses"`
+	DiagnosesUsedThisMonth int                `json:"diagnoses_used_this_month"`
+	DiagnosisCostSeconds   int64              `json:"diagnosis_cost_seconds"`
+	MaxMonitors            int                `json:"max_monitors"`
+	MonitorHoursPerDollar  int                `json:"monitor_hours_per_dollar"`
+	BillingEnabled         bool               `json:"billing_enabled"`
+	Plans                  []planInfoResponse `json:"plans"`
 }
 
 func presentCatalog(items []plan.Info, subscribable func(plan.Plan) bool) []planInfoResponse {
@@ -112,24 +114,65 @@ func (h *BillingHandler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := billingResponse{
-		SubscribedPlan:        string(ov.SubscribedPlan),
-		EffectivePlan:         string(ov.EffectivePlan),
-		SubscriptionStatus:    ov.SubscriptionStatus,
-		CreditSeconds:         ov.CreditSeconds,
-		GrantedCreditSeconds:  ov.GrantedCreditSeconds,
-		ConsumedCreditSeconds: ov.ConsumedCreditSeconds,
+		SubscribedPlan:         string(ov.SubscribedPlan),
+		EffectivePlan:          string(ov.EffectivePlan),
+		SubscriptionStatus:     ov.SubscriptionStatus,
+		CreditSeconds:          ov.CreditSeconds,
+		GrantedCreditSeconds:   ov.GrantedCreditSeconds,
+		ConsumedCreditSeconds:  ov.ConsumedCreditSeconds,
 		MonthlyDiagnoses:       ov.Limits.MonthlyDiagnoses,
 		DiagnosesUsedThisMonth: ov.DiagnosesUsedThisMonth,
-		DiagnosisCostSeconds:  h.diagnosisCostSeconds,
-		MaxMonitors:           ov.Limits.MaxMonitors,
-		MonitorHoursPerDollar: h.svc.MonitorHoursPerDollar(),
-		BillingEnabled:        h.svc.Enabled(),
-		Plans:                 presentCatalog(h.svc.Catalog(), h.svc.Subscribable),
+		DiagnosisCostSeconds:   h.diagnosisCostSeconds,
+		MaxMonitors:            ov.Limits.MaxMonitors,
+		MonitorHoursPerDollar:  h.svc.MonitorHoursPerDollar(),
+		BillingEnabled:         h.svc.Enabled(),
+		Plans:                  presentCatalog(h.svc.Catalog(), h.svc.Subscribable),
 	}
 	if !ov.PeriodEnd.IsZero() {
 		resp.PeriodEnd = &ov.PeriodEnd
 	}
 	httpx.OK(w, resp)
+}
+
+type invoiceResponse struct {
+	ID              string    `json:"id"`
+	Number          string    `json:"number"`
+	Created         time.Time `json:"created"`
+	AmountPaidCents int64     `json:"amount_paid_cents"`
+	TotalCents      int64     `json:"total_cents"`
+	Currency        string    `json:"currency"`
+	Status          string    `json:"status"`
+	HostedURL       string    `json:"hosted_url,omitempty"`
+	PDFURL          string    `json:"pdf_url,omitempty"`
+}
+
+// invoices returns the org's provider invoices. Empty (never null) when nothing has
+// been paid yet, so the UI renders an empty state instead of an error.
+func (h *BillingHandler) invoices(w http.ResponseWriter, r *http.Request) {
+	list, err := h.svc.Invoices(r.Context(), billingActor(r))
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	out := make([]invoiceResponse, 0, len(list))
+	for _, in := range list {
+		out = append(out, invoiceResponse{
+			ID: in.ID, Number: in.Number, Created: in.Created,
+			AmountPaidCents: in.AmountPaid, TotalCents: in.Total, Currency: in.Currency,
+			Status: in.Status, HostedURL: in.HostedURL, PDFURL: in.PDFURL,
+		})
+	}
+	httpx.OK(w, map[string]any{"invoices": out})
+}
+
+// portal returns a Stripe Customer Portal URL for the caller's org (admins/owners).
+func (h *BillingHandler) portal(w http.ResponseWriter, r *http.Request) {
+	url, err := h.svc.PortalURL(r.Context(), billingActor(r))
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	httpx.OK(w, map[string]any{"portal_url": url})
 }
 
 type subscribeRequest struct {

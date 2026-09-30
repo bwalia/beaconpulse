@@ -200,6 +200,19 @@ export interface BillingInfo {
   plans: PlanInfo[];
 }
 
+/** One billing document (a subscription charge or a top-up), read live from Stripe. */
+export interface Invoice {
+  id: string;
+  number: string;
+  created: string;
+  amount_paid_cents: number;
+  total_cents: number;
+  currency: string;
+  status: string;
+  hosted_url?: string;
+  pdf_url?: string;
+}
+
 export interface MonitorUptime {
   monitor_id: string;
   monitor_name: string;
