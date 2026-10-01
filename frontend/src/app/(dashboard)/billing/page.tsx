@@ -6,12 +6,19 @@ import { Suspense, useEffect, useState } from "react";
 
 import { useNow } from "@/lib/time";
 
-import { useBilling, useStartSubscription, useStartTopUp, useUsage } from "@/lib/hooks";
+import {
+  useBilling,
+  useBillingPortal,
+  useInvoices,
+  useStartSubscription,
+  useStartTopUp,
+  useUsage,
+} from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
 import { ApiRequestError } from "@/lib/api";
 import { Button, Card, PageHeader, Skeleton } from "@/components/ui";
 import { CheckIcon } from "@/components/icons";
-import type { BillingInfo, PlanInfo } from "@/lib/types";
+import type { BillingInfo, Invoice, PlanInfo } from "@/lib/types";
 
 type Notice = { kind: "ok" | "err"; text: string } | null;
 
@@ -116,9 +123,136 @@ function BillingContent() {
             setNotice={setNotice}
           />
           <PlansGrid info={data} canManage={canManage} setNotice={setNotice} />
+          {data.billing_enabled && (
+            <InvoicesCard canManage={canManage} setNotice={setNotice} />
+          )}
         </>
       )}
     </div>
+  );
+}
+
+// ---- Invoices & billing management ----
+
+const INVOICE_STATUS_STYLE: Record<string, string> = {
+  paid: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  open: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  draft: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  void: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+  uncollectible: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+};
+
+function formatMoney(cents: number, currency: string): string {
+  try {
+    return (cents / 100).toLocaleString(undefined, { style: "currency", currency: currency || "USD" });
+  } catch {
+    // Unknown/absent currency code — fall back to a plain amount rather than throwing.
+    return `${(cents / 100).toFixed(2)} ${currency}`.trim();
+  }
+}
+
+function InvoicesCard({
+  canManage,
+  setNotice,
+}: {
+  canManage: boolean;
+  setNotice: (n: Notice) => void;
+}) {
+  const { data, isLoading } = useInvoices();
+  const portal = useBillingPortal();
+  const invoices: Invoice[] = data?.invoices ?? [];
+
+  const openPortal = async () => {
+    setNotice(null);
+    try {
+      const { portal_url } = await portal.mutateAsync();
+      window.location.assign(portal_url);
+    } catch (err) {
+      setNotice({
+        kind: "err",
+        text: err instanceof ApiRequestError ? err.message : "Could not open billing management",
+      });
+    }
+  };
+
+  return (
+    <Card>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Invoices &amp; receipts</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Every payment, with a downloadable invoice. Stripe also emails these to the account owner.
+          </p>
+        </div>
+        {canManage && (
+          <Button variant="secondary" onClick={openPortal} disabled={portal.isPending} className="shrink-0">
+            {portal.isPending ? "Opening…" : "Manage billing"}
+          </Button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-24 w-full" />
+      ) : invoices.length === 0 ? (
+        <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          No invoices yet. They appear here after your first payment.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                <th className="py-2 pr-4 font-medium">Date</th>
+                <th className="py-2 pr-4 font-medium">Invoice</th>
+                <th className="py-2 pr-4 font-medium">Amount</th>
+                <th className="py-2 pr-4 font-medium">Status</th>
+                <th className="py-2 font-medium text-right">Download</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv) => (
+                <tr key={inv.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                  <td className="py-2.5 pr-4 tabular-nums text-slate-600 dark:text-slate-300">
+                    {new Date(inv.created).toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </td>
+                  <td className="py-2.5 pr-4 text-slate-500 dark:text-slate-400">{inv.number || "—"}</td>
+                  <td className="py-2.5 pr-4 font-medium tabular-nums text-slate-900 dark:text-white">
+                    {formatMoney(inv.amount_paid_cents || inv.total_cents, inv.currency)}
+                  </td>
+                  <td className="py-2.5 pr-4">
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                        INVOICE_STATUS_STYLE[inv.status] ?? INVOICE_STATUS_STYLE.draft
+                      }`}
+                    >
+                      {inv.status}
+                    </span>
+                  </td>
+                  <td className="py-2.5 text-right">
+                    {inv.pdf_url || inv.hosted_url ? (
+                      <a
+                        href={inv.pdf_url || inv.hosted_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                      >
+                        {inv.pdf_url ? "PDF" : "View"}
+                      </a>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }
 

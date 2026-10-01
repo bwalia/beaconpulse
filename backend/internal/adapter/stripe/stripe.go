@@ -13,9 +13,11 @@ import (
 
 	"github.com/google/uuid"
 	stripe "github.com/stripe/stripe-go/v86"
+	portalsession "github.com/stripe/stripe-go/v86/billingportal/session"
 	"github.com/stripe/stripe-go/v86/checkout/session"
 	"github.com/stripe/stripe-go/v86/customer"
 	"github.com/stripe/stripe-go/v86/event"
+	"github.com/stripe/stripe-go/v86/invoice"
 	"github.com/stripe/stripe-go/v86/webhook"
 
 	"beacon/internal/domain/billing"
@@ -148,6 +150,10 @@ func (c *Client) TopUpCheckoutURL(ctx context.Context, in billing.TopUpInput) (s
 			},
 		},
 	}
+	// Emit a real invoice for the payment (not just a card receipt), so a business
+	// customer gets a downloadable document with a number for their records. Stripe
+	// then also emails it when invoice emails are enabled on the account.
+	params.InvoiceCreation = &stripe.CheckoutSessionInvoiceCreationParams{Enabled: stripe.Bool(true)}
 	params.Context = ctx
 	params.AddMetadata("org_id", in.OrgID.String())
 	params.AddMetadata("kind", "topup")
@@ -269,6 +275,59 @@ func (c *Client) RecentTopUps(ctx context.Context, since time.Time) ([]billing.W
 		return nil, fmt.Errorf("stripe list events: %w", err)
 	}
 	return out, nil
+}
+
+// ListInvoices returns the customer's invoices newest-first (Stripe's default order),
+// mapped to the domain shape. Only fields the UI needs are carried across.
+func (c *Client) ListInvoices(ctx context.Context, customerID string, limit int) ([]billing.Invoice, error) {
+	if customerID == "" {
+		return nil, nil
+	}
+	params := &stripe.InvoiceListParams{Customer: stripe.String(customerID)}
+	params.Context = ctx
+	if limit > 0 {
+		params.Limit = stripe.Int64(int64(limit))
+	}
+	var out []billing.Invoice
+	iter := invoice.List(params)
+	for iter.Next() {
+		in := iter.Invoice()
+		out = append(out, billing.Invoice{
+			ID:         in.ID,
+			Number:     in.Number,
+			Created:    time.Unix(in.Created, 0).UTC(),
+			AmountPaid: in.AmountPaid,
+			Total:      in.Total,
+			Currency:   strings.ToUpper(string(in.Currency)),
+			Status:     string(in.Status),
+			HostedURL:  in.HostedInvoiceURL,
+			PDFURL:     in.InvoicePDF,
+		})
+	}
+	if err := iter.Err(); err != nil {
+		return nil, fmt.Errorf("stripe list invoices: %w", err)
+	}
+	return out, nil
+}
+
+// BillingPortalURL opens a Stripe Customer Portal session for the customer. The
+// return link drops them back on the billing page (query stripped so it doesn't
+// replay a stale checkout notice). Requires a portal configuration in the Stripe
+// dashboard; without one, Stripe returns an error naming that setup step.
+func (c *Client) BillingPortalURL(ctx context.Context, customerID string) (string, error) {
+	params := &stripe.BillingPortalSessionParams{
+		Customer:  stripe.String(customerID),
+		ReturnURL: stripe.String(strings.SplitN(c.cancelURL, "?", 2)[0]),
+	}
+	params.Context = ctx
+	sess, err := portalsession.New(params)
+	if err != nil {
+		if customerInvalid(err) {
+			return "", fmt.Errorf("stripe billing portal: %w", billing.ErrCustomerInvalid)
+		}
+		return "", fmt.Errorf("stripe billing portal: %w", err)
+	}
+	return sess.URL, nil
 }
 
 func (c *Client) priceFor(p plan.Plan) (string, error) {

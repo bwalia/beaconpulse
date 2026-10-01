@@ -29,14 +29,18 @@ type BillingHandler struct {
 	stripe    StripeWebhook
 	validator *validate.Validator
 	auth      *middleware.Authenticator
+	// users resolves the caller's email for the Stripe customer. The JWT does not
+	// carry email, so without this the customer is created with no address and Stripe
+	// has nobody to send the invoice/receipt to.
+	users userLookup
 	// diagnosisCostSeconds is shown so the billing page can price the button before
 	// it is pressed, rather than after.
 	diagnosisCostSeconds int64
 }
 
 // NewBillingHandler builds a BillingHandler. stripe may be nil (billing disabled).
-func NewBillingHandler(svc *billing.Service, stripe StripeWebhook, v *validate.Validator, a *middleware.Authenticator, diagnosisCostSeconds int64) *BillingHandler {
-	return &BillingHandler{svc: svc, stripe: stripe, validator: v, auth: a, diagnosisCostSeconds: diagnosisCostSeconds}
+func NewBillingHandler(svc *billing.Service, stripe StripeWebhook, users userLookup, v *validate.Validator, a *middleware.Authenticator, diagnosisCostSeconds int64) *BillingHandler {
+	return &BillingHandler{svc: svc, stripe: stripe, users: users, validator: v, auth: a, diagnosisCostSeconds: diagnosisCostSeconds}
 }
 
 // Routes returns the AUTHENTICATED billing routes. The webhook is mounted
@@ -45,8 +49,10 @@ func (h *BillingHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(h.auth.Require)
 	r.Get("/", h.get)
+	r.Get("/invoices", h.invoices)
 	r.With(h.auth.RequireWriter).Post("/checkout/subscription", h.subscribe)
 	r.With(h.auth.RequireWriter).Post("/checkout/topup", h.topup)
+	r.With(h.auth.RequireWriter).Post("/portal", h.portal)
 	return r
 }
 
@@ -66,22 +72,22 @@ type billingResponse struct {
 	// SubscribedPlan is the tier the org subscribed to; EffectivePlan is what
 	// actually applies right now (may be payg or free even while subscribed==pro
 	// if the subscription lapsed).
-	SubscribedPlan        string             `json:"subscribed_plan"`
-	EffectivePlan         string             `json:"effective_plan"`
-	SubscriptionStatus    string             `json:"subscription_status"`
-	PeriodEnd             *time.Time         `json:"period_end,omitempty"`
-	CreditSeconds         int64              `json:"credit_seconds"`
+	SubscribedPlan     string     `json:"subscribed_plan"`
+	EffectivePlan      string     `json:"effective_plan"`
+	SubscriptionStatus string     `json:"subscription_status"`
+	PeriodEnd          *time.Time `json:"period_end,omitempty"`
+	CreditSeconds      int64      `json:"credit_seconds"`
 	// Granted/Consumed answer "how long have I had, and how long is left?" — the
 	// question a bare balance leaves people reconstructing from Stripe receipts.
-	GrantedCreditSeconds  int64              `json:"granted_credit_seconds"`
-	ConsumedCreditSeconds int64              `json:"consumed_credit_seconds"`
-	MonthlyDiagnoses       int               `json:"monthly_diagnoses"`
-	DiagnosesUsedThisMonth int               `json:"diagnoses_used_this_month"`
-	DiagnosisCostSeconds  int64              `json:"diagnosis_cost_seconds"`
-	MaxMonitors           int                `json:"max_monitors"`
-	MonitorHoursPerDollar int                `json:"monitor_hours_per_dollar"`
-	BillingEnabled        bool               `json:"billing_enabled"`
-	Plans                 []planInfoResponse `json:"plans"`
+	GrantedCreditSeconds   int64              `json:"granted_credit_seconds"`
+	ConsumedCreditSeconds  int64              `json:"consumed_credit_seconds"`
+	MonthlyDiagnoses       int                `json:"monthly_diagnoses"`
+	DiagnosesUsedThisMonth int                `json:"diagnoses_used_this_month"`
+	DiagnosisCostSeconds   int64              `json:"diagnosis_cost_seconds"`
+	MaxMonitors            int                `json:"max_monitors"`
+	MonitorHoursPerDollar  int                `json:"monitor_hours_per_dollar"`
+	BillingEnabled         bool               `json:"billing_enabled"`
+	Plans                  []planInfoResponse `json:"plans"`
 }
 
 func presentCatalog(items []plan.Info, subscribable func(plan.Plan) bool) []planInfoResponse {
@@ -105,6 +111,19 @@ func billingActor(r *http.Request) billing.Actor {
 	return billing.Actor{UserID: p.UserID, OrgID: p.OrgID, Role: p.Role}
 }
 
+// checkoutActor is billingActor plus the caller's email, resolved from the store so
+// the Stripe customer is created WITH an address — the prerequisite for Stripe
+// emailing the invoice. Only the checkout paths need it (they create the customer).
+// Best-effort: an API-key caller has no user row, so the lookup simply yields no
+// email and checkout still proceeds rather than 500ing.
+func (h *BillingHandler) checkoutActor(r *http.Request) billing.Actor {
+	a := billingActor(r)
+	if u, err := h.users.GetUserByID(r.Context(), a.UserID); err == nil && u != nil {
+		a.Email = u.Email
+	}
+	return a
+}
+
 func (h *BillingHandler) get(w http.ResponseWriter, r *http.Request) {
 	ov, err := h.svc.Overview(r.Context(), billingActor(r))
 	if err != nil {
@@ -112,24 +131,65 @@ func (h *BillingHandler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := billingResponse{
-		SubscribedPlan:        string(ov.SubscribedPlan),
-		EffectivePlan:         string(ov.EffectivePlan),
-		SubscriptionStatus:    ov.SubscriptionStatus,
-		CreditSeconds:         ov.CreditSeconds,
-		GrantedCreditSeconds:  ov.GrantedCreditSeconds,
-		ConsumedCreditSeconds: ov.ConsumedCreditSeconds,
+		SubscribedPlan:         string(ov.SubscribedPlan),
+		EffectivePlan:          string(ov.EffectivePlan),
+		SubscriptionStatus:     ov.SubscriptionStatus,
+		CreditSeconds:          ov.CreditSeconds,
+		GrantedCreditSeconds:   ov.GrantedCreditSeconds,
+		ConsumedCreditSeconds:  ov.ConsumedCreditSeconds,
 		MonthlyDiagnoses:       ov.Limits.MonthlyDiagnoses,
 		DiagnosesUsedThisMonth: ov.DiagnosesUsedThisMonth,
-		DiagnosisCostSeconds:  h.diagnosisCostSeconds,
-		MaxMonitors:           ov.Limits.MaxMonitors,
-		MonitorHoursPerDollar: h.svc.MonitorHoursPerDollar(),
-		BillingEnabled:        h.svc.Enabled(),
-		Plans:                 presentCatalog(h.svc.Catalog(), h.svc.Subscribable),
+		DiagnosisCostSeconds:   h.diagnosisCostSeconds,
+		MaxMonitors:            ov.Limits.MaxMonitors,
+		MonitorHoursPerDollar:  h.svc.MonitorHoursPerDollar(),
+		BillingEnabled:         h.svc.Enabled(),
+		Plans:                  presentCatalog(h.svc.Catalog(), h.svc.Subscribable),
 	}
 	if !ov.PeriodEnd.IsZero() {
 		resp.PeriodEnd = &ov.PeriodEnd
 	}
 	httpx.OK(w, resp)
+}
+
+type invoiceResponse struct {
+	ID              string    `json:"id"`
+	Number          string    `json:"number"`
+	Created         time.Time `json:"created"`
+	AmountPaidCents int64     `json:"amount_paid_cents"`
+	TotalCents      int64     `json:"total_cents"`
+	Currency        string    `json:"currency"`
+	Status          string    `json:"status"`
+	HostedURL       string    `json:"hosted_url,omitempty"`
+	PDFURL          string    `json:"pdf_url,omitempty"`
+}
+
+// invoices returns the org's provider invoices. Empty (never null) when nothing has
+// been paid yet, so the UI renders an empty state instead of an error.
+func (h *BillingHandler) invoices(w http.ResponseWriter, r *http.Request) {
+	list, err := h.svc.Invoices(r.Context(), billingActor(r))
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	out := make([]invoiceResponse, 0, len(list))
+	for _, in := range list {
+		out = append(out, invoiceResponse{
+			ID: in.ID, Number: in.Number, Created: in.Created,
+			AmountPaidCents: in.AmountPaid, TotalCents: in.Total, Currency: in.Currency,
+			Status: in.Status, HostedURL: in.HostedURL, PDFURL: in.PDFURL,
+		})
+	}
+	httpx.OK(w, map[string]any{"invoices": out})
+}
+
+// portal returns a Stripe Customer Portal URL for the caller's org (admins/owners).
+func (h *BillingHandler) portal(w http.ResponseWriter, r *http.Request) {
+	url, err := h.svc.PortalURL(r.Context(), billingActor(r))
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	httpx.OK(w, map[string]any{"portal_url": url})
 }
 
 type subscribeRequest struct {
@@ -146,7 +206,7 @@ func (h *BillingHandler) subscribe(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, err)
 		return
 	}
-	url, err := h.svc.StartSubscription(r.Context(), billingActor(r), plan.Plan(req.Plan))
+	url, err := h.svc.StartSubscription(r.Context(), h.checkoutActor(r), plan.Plan(req.Plan))
 	if err != nil {
 		httpx.Error(w, r, err)
 		return
@@ -169,7 +229,7 @@ func (h *BillingHandler) topup(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, err)
 		return
 	}
-	url, err := h.svc.StartTopUp(r.Context(), billingActor(r), req.AmountCents)
+	url, err := h.svc.StartTopUp(r.Context(), h.checkoutActor(r), req.AmountCents)
 	if err != nil {
 		httpx.Error(w, r, err)
 		return

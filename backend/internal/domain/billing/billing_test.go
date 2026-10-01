@@ -15,8 +15,8 @@ import (
 
 // fakeRepo records credit and lets tests simulate a duplicate webhook.
 type fakeRepo struct {
-	state    State
-	credited int64
+	state     State
+	credited  int64
 	seen      map[string]bool // stripe event ids already applied
 	diagnoses int
 }
@@ -81,6 +81,10 @@ func (p *fakePay) RecentTopUps(_ context.Context, since time.Time) ([]WebhookEve
 	p.listCalls++
 	p.since = since
 	return p.undelivered, p.listErr
+}
+func (fakePay) ListInvoices(context.Context, string, int) ([]Invoice, error) { return nil, nil }
+func (fakePay) BillingPortalURL(context.Context, string) (string, error) {
+	return "https://portal", nil
 }
 
 type noopRecorder struct{}

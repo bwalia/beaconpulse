@@ -11,6 +11,7 @@ import type {
   ApiKeyCreated,
   BillingInfo,
   Diagnosis,
+  Invoice,
   ListResponse,
   MaintenanceScope,
   MaintenanceWindow,
@@ -358,6 +359,23 @@ export function useStartTopUp() {
   return useMutation({
     mutationFn: (amountCents: number) =>
       api.post<{ checkout_url: string }>("/api/v1/billing/checkout/topup", { amount_cents: amountCents }),
+  });
+}
+
+// Invoices are read live from Stripe (never stored locally), so they refetch on focus
+// after a checkout returns rather than needing manual cache wiring.
+export function useInvoices() {
+  return useQuery({
+    queryKey: ["billing", "invoices"],
+    queryFn: () => api.get<{ invoices: Invoice[] }>("/api/v1/billing/invoices"),
+  });
+}
+
+// useBillingPortal opens a Stripe Customer Portal session (manage card, cancel,
+// download invoices) and returns its URL; the page redirects the browser there.
+export function useBillingPortal() {
+  return useMutation({
+    mutationFn: () => api.post<{ portal_url: string }>("/api/v1/billing/portal", {}),
   });
 }
 
