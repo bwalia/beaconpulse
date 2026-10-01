@@ -376,7 +376,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Maintenance:        rest.NewMaintenanceHandler(maintenanceSvc, validator, authn),
 		Alert:              rest.NewAlertHandler(dispatcher, cfg.Notify.WebhookToken),
 		Insight:            rest.NewInsightHandler(insightSvc, maintenanceSvc),
-		Billing:            rest.NewBillingHandler(billingSvc, stripeWebhook, validator, authn, cfg.AI.DiagnoseCostSeconds),
+		Billing:            rest.NewBillingHandler(billingSvc, stripeWebhook, userRepo, validator, authn, cfg.AI.DiagnoseCostSeconds),
 		StatusPage:         rest.NewStatusPageHandler(statusPageSvc),
 		Heartbeat:          rest.NewHeartbeatHandler(heartbeatSvc),
 		GitHubActions:      rest.NewGitHubActionsHandler(githubActionsSvc, dispatcher),

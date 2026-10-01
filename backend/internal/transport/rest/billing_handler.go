@@ -29,14 +29,18 @@ type BillingHandler struct {
 	stripe    StripeWebhook
 	validator *validate.Validator
 	auth      *middleware.Authenticator
+	// users resolves the caller's email for the Stripe customer. The JWT does not
+	// carry email, so without this the customer is created with no address and Stripe
+	// has nobody to send the invoice/receipt to.
+	users userLookup
 	// diagnosisCostSeconds is shown so the billing page can price the button before
 	// it is pressed, rather than after.
 	diagnosisCostSeconds int64
 }
 
 // NewBillingHandler builds a BillingHandler. stripe may be nil (billing disabled).
-func NewBillingHandler(svc *billing.Service, stripe StripeWebhook, v *validate.Validator, a *middleware.Authenticator, diagnosisCostSeconds int64) *BillingHandler {
-	return &BillingHandler{svc: svc, stripe: stripe, validator: v, auth: a, diagnosisCostSeconds: diagnosisCostSeconds}
+func NewBillingHandler(svc *billing.Service, stripe StripeWebhook, users userLookup, v *validate.Validator, a *middleware.Authenticator, diagnosisCostSeconds int64) *BillingHandler {
+	return &BillingHandler{svc: svc, stripe: stripe, users: users, validator: v, auth: a, diagnosisCostSeconds: diagnosisCostSeconds}
 }
 
 // Routes returns the AUTHENTICATED billing routes. The webhook is mounted
@@ -105,6 +109,19 @@ func presentCatalog(items []plan.Info, subscribable func(plan.Plan) bool) []plan
 func billingActor(r *http.Request) billing.Actor {
 	p := mustPrincipal(r)
 	return billing.Actor{UserID: p.UserID, OrgID: p.OrgID, Role: p.Role}
+}
+
+// checkoutActor is billingActor plus the caller's email, resolved from the store so
+// the Stripe customer is created WITH an address — the prerequisite for Stripe
+// emailing the invoice. Only the checkout paths need it (they create the customer).
+// Best-effort: an API-key caller has no user row, so the lookup simply yields no
+// email and checkout still proceeds rather than 500ing.
+func (h *BillingHandler) checkoutActor(r *http.Request) billing.Actor {
+	a := billingActor(r)
+	if u, err := h.users.GetUserByID(r.Context(), a.UserID); err == nil && u != nil {
+		a.Email = u.Email
+	}
+	return a
 }
 
 func (h *BillingHandler) get(w http.ResponseWriter, r *http.Request) {
@@ -189,7 +206,7 @@ func (h *BillingHandler) subscribe(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, err)
 		return
 	}
-	url, err := h.svc.StartSubscription(r.Context(), billingActor(r), plan.Plan(req.Plan))
+	url, err := h.svc.StartSubscription(r.Context(), h.checkoutActor(r), plan.Plan(req.Plan))
 	if err != nil {
 		httpx.Error(w, r, err)
 		return
@@ -212,7 +229,7 @@ func (h *BillingHandler) topup(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, r, err)
 		return
 	}
-	url, err := h.svc.StartTopUp(r.Context(), billingActor(r), req.AmountCents)
+	url, err := h.svc.StartTopUp(r.Context(), h.checkoutActor(r), req.AmountCents)
 	if err != nil {
 		httpx.Error(w, r, err)
 		return
