@@ -70,7 +70,7 @@
   },
   "marketing": {
     "skipToContent": "Skip to content",
-    "badge": "Self-hosted & multi-tenant",
+    "badge": "Monitoring, alerting & status pages",
     "headlineLine1": "Know it's down",
     "headlineLine2": "before they do.",
     "heroBlurb": "{brand} watches your endpoints, certificates and DNS every 30 seconds — then tells the right person the moment something breaks. Own your data, run it anywhere, and give customers a status page they actually trust.",
@@ -85,7 +85,7 @@
     "liveSummary": "3 of 4 operational — alert sent 12s ago",
     "featuresEyebrow": "Everything, one place",
     "featuresTitle": "Replace the five tools you're duct-taping together",
-    "featuresBlurb": "{brand} is one control plane for uptime, latency, certificates and alerting — self-hosted, so the data never leaves your infrastructure.",
+    "featuresBlurb": "{brand} is one control plane for uptime, latency, certificates and alerting, so problems reach the right person before your customers notice.",
     "feature1Title": "Six monitor types",
     "feature1Body": "HTTP, HTTPS, TCP, ICMP, DNS and SSL-expiry checks — one control plane instead of five tools.",
     "feature2Title": "Alerts that reach a human",

@@ -17,6 +17,9 @@ spec:
       labels:
         {{- include "beacon.labels" . | nindent 8 }}
         {{- include "beacon.selector" "prometheus" | nindent 8 }}
+      annotations:
+        # Base config and platform rules are ConfigMaps: roll the pod when they change.
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
     spec:
       # Same fsGroup as api/worker so the shared generated volume (written by
       # them, read here) needs no per-pod ownership dance.
@@ -74,6 +77,9 @@ spec:
               readOnly: true
             - name: data
               mountPath: /prometheus
+            - name: platform-rules
+              mountPath: /etc/prometheus/platform-rules
+              readOnly: true
             {{- if .Values.controlPlaneMonitoring.enabled }}
             # Rules owned by the infra repo, applied there as a ConfigMap and
             # mounted here by name. Kept OUT of /etc/prometheus/generated, which
@@ -86,6 +92,9 @@ spec:
         - name: config
           configMap:
             name: beacon-prometheus-config
+        - name: platform-rules
+          configMap:
+            name: beacon-platform-rules
         {{- if .Values.controlPlaneMonitoring.enabled }}
         - name: cp-rules
           configMap:

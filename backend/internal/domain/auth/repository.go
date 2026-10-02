@@ -25,12 +25,17 @@ type UserRepository interface {
 
 	// SetPassword replaces a user's password hash (password reset).
 	SetPassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
+
+	// MarkEmailVerified records that the user proved they own their email. Keeps
+	// the first verification time; a no-op if already verified.
+	MarkEmailVerified(ctx context.Context, userID uuid.UUID) error
 }
 
 // Mailer delivers transactional account email. Implemented over the platform SMTP
-// relay; nil disables forgot-password.
+// relay; nil disables forgot-password and verification email.
 type Mailer interface {
 	SendPasswordReset(ctx context.Context, to, name, link string) error
+	SendEmailVerification(ctx context.Context, to, name, link string) error
 }
 
 // GoogleIdentity is the verified result of a Google ID token.

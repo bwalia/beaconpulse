@@ -153,6 +153,9 @@ func NewRouter(d RouterDeps) http.Handler {
 			api.Mount("/auth/oidc", d.SSO.Routes())
 		}
 		api.With(d.Authenticator.Require).Get("/me", d.Auth.Me)
+		// Sends email, so it shares the tight signup bucket; a person, not a key.
+		api.With(d.Authenticator.RequireSession, middleware.RateLimit(signupLimiter, middleware.ByIP, time.Minute)).
+			Post("/me/verify-email/resend", d.Auth.ResendVerification)
 		// Gateway auth_request target: validates the proxy cookie and returns the
 		// tenant org id. Unauthenticated (does its own cookie check).
 		api.Get("/proxy/authorize", d.Auth.Authorize)

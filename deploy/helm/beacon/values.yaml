@@ -56,6 +56,8 @@ images:
   nginx: nginx:1.27-alpine
   # busybox is used by the blackbox init container to seed its config.
   busybox: busybox:1.36
+  # rclone ships each database backup to off-site object storage (see `backup`).
+  rclone: rclone/rclone:1.68.2
 
 # ── Beacon runtime configuration (non-secret) ──────────────────────────────
 app:
@@ -300,3 +302,31 @@ tolerations: []
 controlPlaneMonitoring:
   enabled: false
   rulesConfigMap: etcd-control-plane-rules
+
+# ── Database backups ────────────────────────────────────────────────────────
+# A nightly pg_dump (custom format, compressed, verified with pg_restore --list).
+# The last `keepLocal` dumps stay on a volume beside the database — protection
+# against a bad migration or an accidental delete. Each dump is ALSO copied to
+# S3-compatible object storage (AWS S3, Backblaze B2, Cloudflare R2, MinIO) when
+# these keys exist in the env's Vault path (picked up by the ExternalSecret):
+#   BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY,
+#   BACKUP_S3_ENDPOINT (omit for AWS), BACKUP_S3_REGION, BACKUP_S3_PROVIDER
+#   (AWS | Cloudflare | Backblaze-compatible "Other" | Minio; default Other).
+# Without them the job still succeeds and says loudly that the copy is local-only
+# — which does NOT survive losing the node's disk. Restore: see README.md.
+backup:
+  enabled: true
+  schedule: "30 2 * * *"   # 02:30 UTC daily
+  keepLocal: 7
+  # Off-site copies older than this are deleted after each successful upload.
+  retentionDays: 30
+  size: 5Gi
+
+# ── Search-engine indexing ──────────────────────────────────────────────────
+# Non-production sites must never compete with production in search results, so
+# the gateway sends `X-Robots-Tag: noindex, nofollow` on every response unless an
+# env opts out. Only the production values files set `noindex: false`. It is a
+# runtime header (not a build flag) because int and prod run the same frontend
+# image tag.
+seo:
+  noindex: true

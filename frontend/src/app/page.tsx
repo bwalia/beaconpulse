@@ -41,8 +41,10 @@ export const revalidate = 60;
 // the nav swaps its CTA to "Go to dashboard", which is the least surprising
 // behaviour and keeps the page shareable by people who are already customers.
 
+// Keep claims true of the hosted service: no "self-hosted", and no fixed check
+// interval (plan limits are operator-editable at /platform).
 const HERO_DESCRIPTION =
-  "Self-hosted, multi-tenant infrastructure monitoring. Watch endpoints, certificates and DNS every 30 seconds, alert the right person, and publish a status page your customers trust.";
+  "Infrastructure monitoring for websites, APIs, certificates and DNS. Get alerted the moment something breaks, reach the right person, and publish a status page your customers trust.";
 
 export const metadata: Metadata = {
   title: `${brand.name} — Know it's down before your customers do`,
@@ -52,12 +54,12 @@ export const metadata: Metadata = {
     type: "website",
     siteName: brand.name,
     url: "/",
-    title: `${brand.name} — Infrastructure monitoring you own`,
+    title: `${brand.name} — Know it's down before your customers do`,
     description: HERO_DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: `${brand.name} — Infrastructure monitoring you own`,
+    title: `${brand.name} — Know it's down before your customers do`,
     description: HERO_DESCRIPTION,
   },
 };

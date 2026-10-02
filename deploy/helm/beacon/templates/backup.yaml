@@ -1,0 +1,152 @@
+{{- if .Values.backup.enabled }}
+{{- /*
+Nightly database backup. See `backup` in values.yaml for configuration and
+README.md ("Backups & restore") for how to restore.
+
+  dump    (init)  pg_dump -> custom-format archive, verified with pg_restore --list,
+                  renamed into place only when complete; keeps the newest N locally.
+  offsite (main)  copies that archive to S3-compatible storage with rclone when the
+                  BACKUP_S3_* keys are present in beacon-secrets; otherwise logs a
+                  loud warning and succeeds (the local copy still exists).
+
+Runs on the same pinned node as Postgres (the global nodeSelector): the node-local
+volume lives there, and some nodes cannot reach pods on others.
+*/}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: beacon-postgres-backups
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ .Values.storage.className }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.size }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "beacon.name" "postgres-backup" }}
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            {{- include "beacon.labels" . | nindent 12 }}
+            {{- include "beacon.selector" "postgres-backup" | nindent 12 }}
+        spec:
+          restartPolicy: OnFailure
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          initContainers:
+            - name: dump
+              image: {{ .Values.images.postgres }}
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: PGHOST
+                  value: {{ include "beacon.name" "postgres" }}
+                - name: PGUSER
+                  value: {{ .Values.postgres.user | quote }}
+                - name: PGDATABASE
+                  value: {{ .Values.postgres.database | quote }}
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: beacon-secrets
+                      key: POSTGRES_PASSWORD
+                - name: KEEP
+                  value: {{ .Values.backup.keepLocal | quote }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  rm -f /backups/*.partial
+                  f="/backups/beacon-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                  pg_dump --format=custom --compress=6 --no-owner --no-privileges --file="$f.partial"
+                  # Prove the archive reads end to end before it counts as a backup.
+                  pg_restore --list "$f.partial" > /dev/null
+                  mv "$f.partial" "$f"
+                  echo "$f" > /backups/LATEST
+                  ls -1t /backups/beacon-*.dump | tail -n +$((KEEP + 1)) | xargs -r rm -f --
+                  echo "backup ok: $f ($(du -h "$f" | cut -f1)); keeping $(ls /backups/beacon-*.dump | wc -l) locally"
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 512Mi }
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          containers:
+            - name: offsite
+              image: {{ .Values.images.rclone }}
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: PREFIX
+                  value: {{ .Values.env | quote }}
+                - name: RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
+                - name: RCLONE_CONFIG_OFFSITE_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_OFFSITE_ENV_AUTH
+                  value: "false"
+                {{- range $env, $key := dict
+                  "BUCKET" "BACKUP_S3_BUCKET"
+                  "RCLONE_CONFIG_OFFSITE_PROVIDER" "BACKUP_S3_PROVIDER"
+                  "RCLONE_CONFIG_OFFSITE_ENDPOINT" "BACKUP_S3_ENDPOINT"
+                  "RCLONE_CONFIG_OFFSITE_REGION" "BACKUP_S3_REGION"
+                  "RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID" "BACKUP_S3_ACCESS_KEY_ID"
+                  "RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY" "BACKUP_S3_SECRET_ACCESS_KEY" }}
+                - name: {{ $env }}
+                  valueFrom:
+                    secretKeyRef:
+                      name: beacon-secrets
+                      key: {{ $key }}
+                      optional: true
+                {{- end }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  f="$(cat /backups/LATEST)"
+                  if [ -z "${BUCKET:-}" ] || [ -z "${RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID:-}" ]; then
+                    echo "WARNING: off-site backup copy is NOT configured (add BACKUP_S3_* to Vault)."
+                    echo "WARNING: $f exists only on this node's disk and will not survive losing it."
+                    exit 0
+                  fi
+                  export RCLONE_CONFIG_OFFSITE_PROVIDER="${RCLONE_CONFIG_OFFSITE_PROVIDER:-Other}"
+                  dest="offsite:$BUCKET/$PREFIX"
+                  rclone copyto "$f" "$dest/$(basename "$f")" --s3-no-check-bucket
+                  rclone delete "$dest" --min-age "${RETENTION_DAYS}d" --include "beacon-*.dump" --s3-no-check-bucket
+                  echo "off-site copy ok: $dest/$(basename "$f")"
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 256Mi }
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+                  readOnly: true
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: beacon-postgres-backups
+{{- end }}

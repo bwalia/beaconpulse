@@ -18,6 +18,9 @@ spec:
       labels:
         {{- include "beacon.labels" . | nindent 8 }}
         {{- include "beacon.selector" "nginx" | nindent 8 }}
+      annotations:
+        # nginx reads its config once at startup: roll the pod when it changes.
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
     spec:
       {{- with .Values.nodeSelector }}
       nodeSelector:
