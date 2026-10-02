@@ -78,3 +78,7 @@ image:
   registry: int-spectoncr.diytaxreturn.co.uk
   pullSecret: beacon-registry-pull
   pullSecretCreate: false
+
+# Production is the one site search engines should index (see seo in values.yaml).
+seo:
+  noindex: false

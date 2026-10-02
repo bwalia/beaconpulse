@@ -42,6 +42,45 @@ func NewDefaultEmailNotifier(cfg DefaultEmailConfig, lookup OrgEmailLookup, bran
 	return &DefaultEmailNotifier{cfg: cfg, email: NewEmailNotifier(brand), lookup: lookup}
 }
 
+// OperatorNotifier emails platform-health alerts — problems with the service itself,
+// raised by the chart's platform rules — to the platform operators over the same
+// relay. It is how an operator hears that the API is erroring or the worker is down.
+type OperatorNotifier struct {
+	cfg   DefaultEmailConfig
+	email notification.Notifier
+	to    []string
+}
+
+// NewOperatorNotifier builds an OperatorNotifier for the given operator list. Entries
+// without an "@" (the admin allowlist also accepts bare domains) cannot receive mail
+// and are skipped.
+func NewOperatorNotifier(cfg DefaultEmailConfig, operators []string, brand string) *OperatorNotifier {
+	var to []string
+	for _, o := range operators {
+		if o = strings.TrimSpace(o); strings.Contains(o, "@") {
+			to = append(to, o)
+		}
+	}
+	return &OperatorNotifier{cfg: cfg, email: NewEmailNotifier(brand), to: to}
+}
+
+// NotifyOperators emails msg to every operator address. A no-op when there are none.
+func (n *OperatorNotifier) NotifyOperators(ctx context.Context, msg notification.Message) error {
+	if len(n.to) == 0 {
+		return nil
+	}
+	return n.email.Send(ctx, notification.Decrypted{
+		Type: notification.TypeEmail,
+		Name: "Platform operators",
+		Config: map[string]string{
+			"host": n.cfg.Host, "port": n.cfg.Port, "from": n.cfg.From,
+			"username": n.cfg.Username, "security": n.cfg.Security,
+			"to": strings.Join(n.to, ","),
+		},
+		Secret: n.cfg.Password,
+	}, msg)
+}
+
 // Fallback emails the alert to the org's default recipients. Returns nil (a
 // no-op) when the org has no resolvable recipients, so an org whose only members
 // are viewers — or an org with none — is not treated as a delivery failure.

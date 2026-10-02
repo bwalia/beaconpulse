@@ -164,3 +164,50 @@ CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ZONE=beaconpulse.net \
   ./deploy/scripts/cloudflare-dns.sh --name preview.beaconpulse.net \
     --content lon1.pop0.uk --dry-run
 ```
+
+## Backups & restore
+
+`templates/backup.yaml` runs a nightly `pg_dump` (02:30 UTC, `backup.*` in `values.yaml`).
+Each dump is verified with `pg_restore --list` before it counts, and the newest 7 stay
+on the `beacon-postgres-backups` volume next to the database.
+
+**Off-site copies.** A copy on the same node doesn't survive losing that node's disk.
+Add these keys to the env's Vault path (`kv/beaconpulse/<env>/config`) and every dump
+is also uploaded to `<bucket>/<env>/` on any S3-compatible store, with copies older than
+`backup.retentionDays` pruned:
+
+| Key | Example |
+|---|---|
+| `BACKUP_S3_BUCKET` | `sysops-backups` |
+| `BACKUP_S3_ACCESS_KEY_ID` / `BACKUP_S3_SECRET_ACCESS_KEY` | an access key scoped to that bucket |
+| `BACKUP_S3_PROVIDER` | `AWS`, `Cloudflare`, `Minio`, or `Other` (default; use for Backblaze B2) |
+| `BACKUP_S3_ENDPOINT` | `https://s3.eu-central-003.backblazeb2.com` (omit for AWS) |
+| `BACKUP_S3_REGION` | `eu-west-2` |
+
+Until they are set the job still succeeds but logs `WARNING: off-site backup copy is
+NOT configured`. Check the latest run with:
+
+```sh
+kubectl -n <ns> logs job/$(kubectl -n <ns> get jobs --sort-by=.metadata.creationTimestamp -o name | grep postgres-backup | tail -1 | cut -d/ -f2) --all-containers
+```
+
+Run one now (for example right after setting the keys):
+
+```sh
+kubectl -n <ns> create job --from=cronjob/beacon-postgres-backup beacon-postgres-backup-manual
+```
+
+**Restore** (replaces the current database, so take a fresh dump first):
+
+```sh
+NS=sysops-prod
+PG=$(kubectl -n $NS get pod -l app=beacon-postgres -o name)
+kubectl -n $NS scale deploy/beacon-api deploy/beacon-worker --replicas=0
+# From the local volume: copy a dump out of a backup job pod, or download it from the bucket.
+kubectl -n $NS cp ./beacon-YYYYMMDDTHHMMSSZ.dump ${PG#pod/}:/tmp/restore.dump
+kubectl -n $NS exec ${PG#pod/} -- pg_restore -U beacon -d beacon --clean --if-exists --no-owner /tmp/restore.dump
+kubectl -n $NS scale deploy/beacon-api deploy/beacon-worker --replicas=2
+```
+
+Restore into a scratch database first (`createdb restored` and `-d restored`) when you
+only need to check what a backup contains.

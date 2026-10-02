@@ -22,6 +22,8 @@ data:
 
     rule_files:
       - /etc/prometheus/generated/rules_*.yml
+      # Platform health (API errors, worker down) — alerts the operators, not tenants.
+      - /etc/prometheus/platform-rules/*.yaml
     {{- if .Values.controlPlaneMonitoring.enabled }}
       - /etc/prometheus/cp-rules/*.yaml
     {{- end }}
@@ -168,6 +170,13 @@ data:
             # Relative Location headers on redirect. The default rebuilds the URL
             # from $host and drops the port, which breaks any non-:80 origin.
             absolute_redirect off;
+            {{- if .Values.seo.noindex }}
+
+            # Non-production: keep every response out of search indexes, so this
+            # site never competes with production (see seo.noindex in values.yaml).
+            # Inherited by every location below (none sets its own add_header).
+            add_header X-Robots-Tag "noindex, nofollow" always;
+            {{- end }}
 
             # ---- gateway auth subrequest (validates the beacon_proxy cookie) ----
             location = /__beacon_authz {
@@ -235,3 +244,13 @@ data:
             }
         }
     }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: beacon-platform-rules
+  labels:
+    {{- include "beacon.labels" . | nindent 4 }}
+data:
+  platform-rules.yaml: |
+    {{- .Files.Get "files/platform-rules.yaml" | nindent 4 }}

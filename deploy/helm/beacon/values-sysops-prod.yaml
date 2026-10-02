@@ -80,3 +80,7 @@ image:
   frontendTag: sysops-latest
   pullSecret: beacon-registry-pull
   pullSecretCreate: false
+
+# Production is the one site search engines should index (see seo in values.yaml).
+seo:
+  noindex: false
