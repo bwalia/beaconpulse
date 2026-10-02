@@ -53,6 +53,10 @@ func (f *fakeRepo) ListAllEnabled(_ context.Context) ([]Monitor, error) { return
 func (f *fakeRepo) ApplyStatusUpdates(_ context.Context, _ []StatusUpdate) (int64, error) {
 	return 0, nil
 }
+func (f *fakeRepo) RecordGitHubRun(_ context.Context, _ GitHubRun) error { return nil }
+func (f *fakeRepo) ListGitHubRuns(_ context.Context, _, _ uuid.UUID, _ int) ([]GitHubRun, error) {
+	return nil, nil
+}
 func (f *fakeRepo) CountByOrg(_ context.Context, orgID uuid.UUID) (int, error) {
 	n := 0
 	for _, m := range f.monitors {

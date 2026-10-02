@@ -77,6 +77,9 @@ type Repository interface {
 	// ApplyStatusUpdates writes observed statuses back (reused from the status-sync
 	// path; it skips paused/disabled monitors).
 	ApplyStatusUpdates(ctx context.Context, updates []monitor.StatusUpdate) (int64, error)
+	// RecordGitHubRun appends this run to the monitor's history log, so the dashboard
+	// can show every run and not just the latest status.
+	RecordGitHubRun(ctx context.Context, run monitor.GitHubRun) error
 }
 
 // Service records workflow-run results.
@@ -108,22 +111,44 @@ func (s *Service) Ingest(ctx context.Context, token string, ev Event) (*Result, 
 		return nil, apperror.NotFound("unknown ingest token")
 	}
 
-	// A paused monitor accepts the report (so the Action still succeeds) but stays
-	// quiet — pausing a monitor is an explicit "stop alerting me about this".
-	if !m.Enabled {
-		return &Result{Ignored: true, Monitor: m}, nil
-	}
-
-	// Optional workflow filter: when set, only runs of that workflow act on this
-	// monitor. A report for a different workflow is accepted and ignored.
+	// Optional workflow filter: when set, only runs of that workflow concern this
+	// monitor. A report for a different workflow is accepted (so the Action still
+	// succeeds) but neither recorded nor acted on — it is not this monitor's history.
 	if wf := m.Settings.GitHubWorkflow; wf != "" && ev.Workflow != "" && !strings.EqualFold(wf, ev.Workflow) {
 		return &Result{Ignored: true, Monitor: m}, nil
 	}
 
 	status, alertable := classify(ev.Status)
+
+	// Record the run for history regardless of what we alert on, so the dashboard
+	// shows every run — a cancelled one, or a run on a paused monitor — and a green
+	// run no longer erases the red one before it. Best-effort: a bookkeeping failure
+	// must never fail the Action's build or lose the alert the caller is about to send.
+	_ = s.repo.RecordGitHubRun(ctx, monitor.GitHubRun{
+		MonitorID:  m.ID,
+		Status:     status,
+		Conclusion: strings.ToLower(strings.TrimSpace(ev.Status)),
+		Workflow:   ev.Workflow,
+		RunNumber:  ev.RunNumber,
+		RunAttempt: ev.RunAttempt,
+		Branch:     ev.Branch,
+		SHA:        ev.SHA,
+		Actor:      ev.Actor,
+		EventName:  ev.EventName,
+		RunURL:     ev.RunURL,
+		CreatedAt:  s.now().UTC(),
+	})
+
+	// A paused monitor accepts the report (so the Action still succeeds) but stays
+	// quiet — pausing a monitor is an explicit "stop alerting me about this". The run
+	// is still in the history above.
+	if !m.Enabled {
+		return &Result{Ignored: true, Monitor: m}, nil
+	}
+
 	if !alertable {
 		// An outcome we neither fail nor recover on (cancelled, skipped, …): leave
-		// the monitor's state untouched and send nothing.
+		// the monitor's status untouched and send nothing.
 		return &Result{Ignored: true, Monitor: m}, nil
 	}
 

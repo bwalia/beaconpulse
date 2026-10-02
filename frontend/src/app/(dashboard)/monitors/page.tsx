@@ -11,6 +11,7 @@ import {
   useCreateMonitor,
   useDeleteMonitor,
   useMonitorMetrics,
+  useMonitorRuns,
   useMonitors,
   useMonitorsPage,
   useOverview,
@@ -32,14 +33,14 @@ import {
   Skeleton,
   Textarea,
 } from "@/components/ui";
-import { ActivityIcon, CheckCircleIcon, ClockIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
+import { ActivityIcon, CheckCircleIcon, ClockIcon, GlobeIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
 import { useConfirm } from "@/components/confirm";
 import { isFailing, useDiagnoseControl } from "@/components/diagnose-panel";
 import { STATUS_LABEL, StatusPill, StripLegend, TONE_COLOR, UptimeStrip, statusOf } from "@/components/uptime";
 import { Pagination, SearchInput } from "@/components/table-controls";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
-import { timeAgo } from "@/lib/viz";
-import type { MetricPoint, Monitor, MonitorUptime } from "@/lib/types";
+import { fullStamp, timeAgo, VIZ } from "@/lib/viz";
+import type { GitHubRun, MetricPoint, Monitor, MonitorUptime } from "@/lib/types";
 
 const PAGE_SIZE = 20;
 
@@ -546,6 +547,105 @@ const PUSH_STATE: Record<string, { bar: string; dot: string; label: string }> = 
   unknown: { bar: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300", dot: "bg-slate-400", label: "Awaiting first result" },
 };
 
+// visitUrl is the live thing a monitor points at, if it is openable in a browser:
+// the URL itself for http/https, the repo page for github_actions. Host/port targets
+// (tcp, dns, icmp, ssl) and heartbeats have nothing to "visit", so they return null
+// and the card shows no Visit button.
+function visitUrl(m: Monitor): string | null {
+  const t = (m.target ?? "").trim();
+  if (!t) return null;
+  if (m.type === "http" || m.type === "https") {
+    return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+  }
+  if (m.type === "github_actions") {
+    // Stored as "owner/repo"; if someone pasted a full URL, pass it through.
+    return /^https?:\/\//i.test(t) ? t : `https://github.com/${t}`;
+  }
+  return null;
+}
+
+const RUN_HATCH = `repeating-linear-gradient(45deg, ${VIZ.critical} 0 2px, rgba(255,255,255,0.5) 2px 4px)`;
+
+// runFill colours a run box by our classification: green pass, hatched-red fail
+// (texture, not hue alone — good↔critical sits in the CVD floor band), amber for an
+// outcome we don't score (cancelled, skipped).
+function runFill(status: string): string {
+  if (status === "up") return VIZ.good;
+  if (status === "down") return RUN_HATCH;
+  return VIZ.warning;
+}
+
+// runTooltip is the full story of one run, shown on hover — "what, and how we marked
+// it", exactly the detail the dashboard otherwise hides behind a single pass/fail word.
+function runTooltip(run: GitHubRun): string {
+  const lines: string[] = [];
+  const outcome = run.conclusion ? run.conclusion.replace(/_/g, " ") : run.status;
+  lines.push(run.run_number ? `#${run.run_number} · ${outcome}` : outcome);
+  if (run.workflow) lines.push(run.workflow);
+  const ctx = [run.branch, run.event_name].filter(Boolean).join(" · ");
+  if (ctx) lines.push(ctx);
+  if (run.actor) lines.push(`by ${run.actor}`);
+  if (run.sha) lines.push(run.sha.slice(0, 7));
+  lines.push(fullStamp(run.created_at));
+  if (run.run_url) lines.push("— click to open on GitHub");
+  return lines.join("\n");
+}
+
+// RunHistoryStrip draws a github_actions monitor's run history: one right-anchored
+// box per reported run, newest on the right, each hover-revealing the full outcome
+// and linking back to the run. This is what the plain "Passing/Failing" headline
+// hides — a red run stays red here even after the next one passes, so the trend is
+// visible and the owner can act on it.
+function RunHistoryStrip({ monitorId }: { monitorId: string }) {
+  const { data, isLoading } = useMonitorRuns(monitorId);
+  const runs = data?.runs ?? [];
+
+  if (isLoading && !data) {
+    return <div className="mt-2 h-6 animate-pulse rounded bg-slate-100 motion-reduce:animate-none dark:bg-slate-800" />;
+  }
+  if (runs.length === 0) {
+    return (
+      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+        No runs recorded yet — they&apos;ll appear here as workflows report in.
+      </p>
+    );
+  }
+
+  const passed = runs.filter((r) => r.status === "up").length;
+  const failed = runs.filter((r) => r.status === "down").length;
+  // API returns newest-first; show oldest→newest so "now" sits on the right.
+  const chronological = [...runs].reverse();
+
+  return (
+    <div className="mt-2">
+      <div
+        className="flex h-6 justify-end gap-[2px]"
+        role="img"
+        aria-label={`Last ${runs.length} runs: ${passed} passed, ${failed} failed. Newest on the right.`}
+      >
+        {chronological.map((run, i) => {
+          const common = {
+            className: "h-full w-2 shrink-0 rounded-[2px] transition-opacity hover:opacity-70 motion-reduce:transition-none",
+            style: { background: runFill(run.status) },
+            title: runTooltip(run),
+          };
+          return run.run_url ? (
+            <a key={i} href={run.run_url} target="_blank" rel="noopener noreferrer" aria-label={`Run ${run.run_number || i + 1} — open on GitHub`} {...common} />
+          ) : (
+            <div key={i} {...common} />
+          );
+        })}
+      </div>
+      <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
+        <span>
+          {passed} passed · {failed} failed
+        </span>
+        <span>latest →</span>
+      </div>
+    </div>
+  );
+}
+
 // MonitorCard is one monitor as a rich card: identity, headline uptime/response,
 // the 24h uptime strip that is the product's whole point, and the management
 // actions. `hist` is that monitor's slice of the org overview, joined by id.
@@ -571,6 +671,7 @@ function MonitorCard({
   // A heartbeat has no probe target; show its ping URL instead, so the owner can
   // retrieve it any time.
   const target = monitor.type === "heartbeat" && monitor.ping_url ? monitor.ping_url : monitor.target;
+  const visit = visitUrl(monitor);
 
   // Push monitors report their own results (no Prometheus probe series), so their
   // card shows a last-result bar keyed on last_status instead of an uptime strip.
@@ -650,6 +751,9 @@ function MonitorCard({
               {lastEventAt ? `last ${runWord} ${timeAgo(lastEventAt)}` : `no ${runWord} yet`}
             </span>
           </div>
+          {/* github_actions keeps a full run history; the headline bar above is only
+              the latest word. Heartbeats report pings, not scored runs, so no strip. */}
+          {monitor.type === "github_actions" && <RunHistoryStrip monitorId={monitor.id} />}
         </div>
       ) : (
         <div className="mt-3">
@@ -676,6 +780,20 @@ function MonitorCard({
           </span>
         )}
         <div className="flex items-center gap-1">
+          {/* Visit the live thing this monitor watches — the site, or the repo for a
+              github_actions monitor. Only shown when there is something to open. */}
+          {visit && (
+            <a
+              href={visit}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Open ${visit}`}
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 motion-reduce:transition-none dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+            >
+              <GlobeIcon className="h-3.5 w-3.5" />
+              Visit
+            </a>
+          )}
           {/* Diagnosis probes a network target; push-based monitors have none. */}
           {isFailing(monitor) && monitor.type !== "heartbeat" && monitor.type !== "github_actions" && (
             <Button

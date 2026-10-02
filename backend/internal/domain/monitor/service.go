@@ -302,6 +302,15 @@ func (s *Service) List(ctx context.Context, actor Actor, f ListFilter) ([]Monito
 	return s.repo.List(ctx, actor.OrgID, f)
 }
 
+// GitHubRuns returns a github_actions monitor's recent run history, newest first,
+// scoped to the actor's org. limit is clamped to a sane ceiling.
+func (s *Service) GitHubRuns(ctx context.Context, actor Actor, id uuid.UUID, limit int) ([]GitHubRun, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	return s.repo.ListGitHubRuns(ctx, actor.OrgID, id, limit)
+}
+
 // Update applies a partial update and re-syncs the control plane.
 func (s *Service) Update(ctx context.Context, actor Actor, id uuid.UUID, in UpdateInput) (*Monitor, error) {
 	if !actor.Role.CanWrite() {

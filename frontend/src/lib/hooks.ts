@@ -11,6 +11,7 @@ import type {
   ApiKeyCreated,
   BillingInfo,
   Diagnosis,
+  GitHubRun,
   Invoice,
   ListResponse,
   MaintenanceScope,
@@ -384,6 +385,17 @@ export function useMonitorMetrics(id: string | null) {
     queryKey: ["monitor-metrics", id],
     queryFn: () => api.get<MonitorMetrics>(`/api/v1/monitors/${id}/metrics`),
     enabled: !!id,
+    ...live(30_000),
+  });
+}
+
+// useMonitorRuns reads a github_actions monitor's run history (newest first). Only
+// push monitors report runs, so callers enable it just for those.
+export function useMonitorRuns(id: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["monitor-runs", id],
+    queryFn: () => api.get<{ runs: GitHubRun[] }>(`/api/v1/monitors/${id}/runs`),
+    enabled: enabled && !!id,
     ...live(30_000),
   });
 }
