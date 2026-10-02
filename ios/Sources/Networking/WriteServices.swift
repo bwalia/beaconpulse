@@ -74,3 +74,18 @@ struct MaintenanceService {
         try await client.send(.init(method: "DELETE", path: "/api/v1/maintenance-windows/\(id)"))
     }
 }
+
+/// Permanent account deletion — required in-app by App Store guideline 5.1.1(v).
+/// The server cancels any subscription first and refuses if that fails, then erases
+/// the organization and everything in it.
+struct AccountService {
+    let client: APIClient
+
+    private struct DeleteBody: Encodable { let confirmEmail: String }
+
+    /// Deletes the signed-in account. `confirmEmail` must match the account's email.
+    func deleteAccount(confirmEmail: String) async throws {
+        try await client.send(.init(method: "POST", path: "/api/v1/account/delete",
+                                    body: DeleteBody(confirmEmail: confirmEmail)))
+    }
+}
