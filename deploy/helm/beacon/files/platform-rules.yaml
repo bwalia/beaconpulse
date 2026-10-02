@@ -1,0 +1,34 @@
+# Platform-health alerts: problems with the service itself, not with a tenant's
+# monitors. `scope: platform` makes the API's alert webhook email them to the
+# platform operators (BEACON_PLATFORM_ADMIN_EMAILS) over the platform SMTP relay,
+# instead of routing them to a tenant's channels.
+#
+# There is deliberately no "API down" rule here: delivery goes THROUGH the API, so
+# it could never arrive. An external uptime check covers that case.
+groups:
+  - name: beacon-platform
+    rules:
+      - alert: BeaconAPIErrorRate
+        expr: |
+          (
+            sum(rate(beacon_http_requests_total{job="beacon-api", status=~"5.."}[5m]))
+              / sum(rate(beacon_http_requests_total{job="beacon-api"}[5m]))
+          ) > 0.05
+          and sum(rate(beacon_http_requests_total{job="beacon-api"}[5m])) > 0.05
+        for: 10m
+        labels:
+          scope: platform
+          severity: warning
+        annotations:
+          summary: API error rate above 5%
+          description: "{{ $value | humanizePercentage }} of API requests have been failing with a server error for 10 minutes. Check the beacon-api logs."
+
+      - alert: BeaconWorkerDown
+        expr: up{job="beacon-worker"} == 0
+        for: 5m
+        labels:
+          scope: platform
+          severity: critical
+        annotations:
+          summary: Background worker is down
+          description: "Prometheus hasn't reached beacon-worker for 5 minutes. Heartbeat checks and scheduled jobs are not running."
