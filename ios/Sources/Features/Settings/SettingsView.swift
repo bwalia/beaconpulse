@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @Environment(PushManager.self) private var push
     @Environment(\.openURL) private var openURL
+    @State private var showDeleteAccount = false
 
     var body: some View {
         List {
@@ -41,6 +42,22 @@ struct SettingsView: View {
                         await push.unregisterCurrentDevice()
                         await container.session.signOut()
                     }
+                }
+            }
+
+            if let user = session.user {
+                Section {
+                    if user.role == "owner" {
+                        Button("Delete Account", role: .destructive) { showDeleteAccount = true }
+                    } else {
+                        Text("Only your organization's owner can delete this account.")
+                            .foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text("Permanently deletes your organization and all its data.")
+                }
+                .sheet(isPresented: $showDeleteAccount) {
+                    DeleteAccountView(email: user.email)
                 }
             }
         }
