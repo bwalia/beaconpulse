@@ -20,6 +20,16 @@ export const siteUrl = resolveSiteUrl();
 // to keep them out of search results — robots.ts and the root robots meta both read this.
 export const noindex = process.env.NEXT_PUBLIC_NOINDEX === "true";
 
+// Server-side, requests go to the API service inside the cluster (the browser base URL
+// is deliberately empty for same-origin). `||`, not `??`: NEXT_PUBLIC_API_BASE_URL is
+// the empty string in every deployment, which must fall through to the internal host.
+// No trailing slash.
+export const apiInternal = (
+  process.env.BEACON_INTERNAL_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "http://api:8080"
+).replace(/\/$/, "");
+
 /** Turn a site-relative path into an absolute URL for metadata that needs one. */
 export function absoluteUrl(path = "/"): string {
   return `${siteUrl}${path.startsWith("/") ? path : `/${path}`}`;

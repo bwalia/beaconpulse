@@ -10,7 +10,10 @@ package settings
 
 import (
 	"context"
+	"net/mail"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 
@@ -40,7 +43,13 @@ type Settings struct {
 	Plans                 []PlanConfig
 	// PremiumGrants are emails and/or domains that get Pro free (bypassing billing).
 	PremiumGrants []string
-	UpdatedAt     time.Time
+	// SupportEmail, LegalEntity and LegalAddress are the public company & contact
+	// details shown on the Terms and Privacy pages: who operates the service, where to
+	// write, how to reach support. Empty = not set (the web app uses brand defaults).
+	SupportEmail string
+	LegalEntity  string
+	LegalAddress string
+	UpdatedAt    time.Time
 }
 
 // editableTiers are the tiers exposed in the admin page, in display order. PayAsYouGo
@@ -179,7 +188,30 @@ func toPlanConfig(s Settings) plan.Config {
 
 func normalize(s Settings) Settings {
 	s.PremiumGrants = emailmatch.Normalize(s.PremiumGrants)
+	s.SupportEmail = strings.ToLower(strings.TrimSpace(s.SupportEmail))
+	s.LegalEntity = strings.TrimSpace(s.LegalEntity)
+	s.LegalAddress = strings.TrimSpace(s.LegalAddress)
 	return s
+}
+
+// validPublicText bounds a single-line value printed on the public legal pages: no
+// control characters (line breaks included) and at most max bytes.
+func validPublicText(v string, max int) bool {
+	if len(v) > max {
+		return false
+	}
+	return !strings.ContainsFunc(v, unicode.IsControl)
+}
+
+// validSupportEmail accepts a bare address (no display name, no mailto:) or empty. It is
+// rendered into public pages and mailto: links, so anything else is refused.
+func validSupportEmail(e string) bool {
+	e = strings.TrimSpace(e)
+	if e == "" {
+		return true
+	}
+	a, err := mail.ParseAddress(e)
+	return err == nil && a.Name == "" && a.Address == e && len(e) <= 254
 }
 
 // validate bounds every editable value. Ceilings are generous but finite: they exist
@@ -189,6 +221,18 @@ func validate(s Settings) error {
 	if s.MonitorHoursPerDollar < 1 || s.MonitorHoursPerDollar > 1_000_000 {
 		return apperror.Validation("monitor hours per dollar must be between 1 and 1,000,000",
 			apperror.FieldError{Field: "monitor_hours_per_dollar", Message: "out of range"})
+	}
+	if !validSupportEmail(s.SupportEmail) {
+		return apperror.Validation("support email must be a plain email address, like support@example.com",
+			apperror.FieldError{Field: "support_email", Message: "not a valid email address"})
+	}
+	if !validPublicText(s.LegalEntity, 200) {
+		return apperror.Validation("company name must be a single line of 200 characters or fewer",
+			apperror.FieldError{Field: "legal_entity", Message: "too long or contains line breaks"})
+	}
+	if !validPublicText(s.LegalAddress, 500) {
+		return apperror.Validation("address must be a single line of 500 characters or fewer — separate parts with commas",
+			apperror.FieldError{Field: "legal_address", Message: "too long or contains line breaks"})
 	}
 	for _, p := range s.Plans {
 		if !p.Plan.Subscribable() {

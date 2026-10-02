@@ -86,6 +86,7 @@ func (fakePay) ListInvoices(context.Context, string, int) ([]Invoice, error) { r
 func (fakePay) BillingPortalURL(context.Context, string) (string, error) {
 	return "https://portal", nil
 }
+func (fakePay) DeleteCustomer(context.Context, string) error { return nil }
 
 type noopRecorder struct{}
 

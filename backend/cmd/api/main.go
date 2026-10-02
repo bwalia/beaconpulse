@@ -29,6 +29,7 @@ import (
 	"beacon/internal/adapter/queue"
 	stripeadapter "beacon/internal/adapter/stripe"
 	"beacon/internal/config"
+	"beacon/internal/domain/account"
 	"beacon/internal/domain/apikey"
 	"beacon/internal/domain/audit"
 	"beacon/internal/domain/auth"
@@ -309,6 +310,18 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		authSvc = authSvc.WithApple(appleauth.New(cfg.Apple.ClientIDs))
 		log.Info("apple sign-in enabled", "client_ids", len(cfg.Apple.ClientIDs))
 	}
+	// Forgot-password mails reset links over the same platform SMTP relay as the
+	// alert fallback. Without it the endpoint answers 503 and users contact support.
+	if de := cfg.Notify.DefaultEmail; de.Enabled() {
+		authSvc = authSvc.WithPasswordReset(notifier.NewAccountMailer(notifier.DefaultEmailConfig{
+			Host: de.Host, Port: de.Port, From: de.From,
+			Username: de.Username, Password: de.Password, Security: de.Security,
+		}, cfg.Notify.BrandName), cfg.Notify.DashboardURL)
+		log.Info("password reset by email enabled")
+	} else {
+		log.Warn("password reset by email disabled — set BEACON_DEFAULT_SMTP_HOST and BEACON_DEFAULT_SMTP_FROM")
+	}
+	accountSvc := account.NewService(userRepo, billingSvc, syncEnqueuer)
 	// "Sign in with <provider>" via generic OIDC (OpsAPI by default). Enabled only
 	// when the client credentials + endpoint URLs are configured; the routes are
 	// otherwise absent and the frontend hides the button.
@@ -386,6 +399,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		APIKey:             rest.NewAPIKeyHandler(apiKeySvc, validator, authn),
 		Sync:               rest.NewSyncHandler(syncSvc, validator, authn, rest.SyncLimiter()),
 		Device:             rest.NewDeviceHandler(deviceSvc, validator, authn),
+		Account:            rest.NewAccountHandler(accountSvc, authn),
 	}), nil
 }
 

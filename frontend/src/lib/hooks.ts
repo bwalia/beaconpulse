@@ -426,6 +426,9 @@ export interface UpdatePlatformSettingsInput {
     features: string[];
   }>;
   premium_grants: string[];
+  support_email: string;
+  legal_entity: string;
+  legal_address: string;
 }
 
 export function useUpdatePlatformSettings() {

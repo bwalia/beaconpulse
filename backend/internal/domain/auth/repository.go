@@ -22,6 +22,15 @@ type UserRepository interface {
 	// they sign in with Google using an email that already has an account). A
 	// conflict apperror is returned if that subject is already linked elsewhere.
 	LinkGoogleSub(ctx context.Context, userID uuid.UUID, googleSub string) error
+
+	// SetPassword replaces a user's password hash (password reset).
+	SetPassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
+}
+
+// Mailer delivers transactional account email. Implemented over the platform SMTP
+// relay; nil disables forgot-password.
+type Mailer interface {
+	SendPasswordReset(ctx context.Context, to, name, link string) error
 }
 
 // GoogleIdentity is the verified result of a Google ID token.

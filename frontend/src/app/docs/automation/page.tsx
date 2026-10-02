@@ -5,6 +5,7 @@ import Link from "next/link";
 import { C, Code, Fields, H2, H3, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/docs/automation" },
   title: "CI & automation",
   description: "Keep your monitors in your repository and apply them from a workflow.",
 };

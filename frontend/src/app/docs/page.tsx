@@ -5,6 +5,7 @@ import Link from "next/link";
 import { C, H2, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/docs" },
   title: "Introduction",
   description: `What ${brand.name} does, and how to find your way around these docs.`,
 };

@@ -45,6 +45,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
     { url: `${siteUrl}${CMS_BASE_PATH.blog}`, lastModified, changeFrequency: "daily", priority: 0.7 },
     { url: `${siteUrl}${CMS_BASE_PATH.articles}`, lastModified, changeFrequency: "daily", priority: 0.7 },
+    { url: `${siteUrl}/terms`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${siteUrl}/privacy`, changeFrequency: "yearly", priority: 0.3 },
     ...blog,
     ...articles,
   ];

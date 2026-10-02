@@ -115,6 +115,9 @@ type Payments interface {
 	// BillingPortalURL returns a Stripe Customer Portal link where the customer can
 	// review invoices, update their card, and cancel a subscription.
 	BillingPortalURL(ctx context.Context, customerID string) (string, error)
+	// DeleteCustomer removes the provider customer, which cancels any active
+	// subscription immediately. An already-missing customer is not an error.
+	DeleteCustomer(ctx context.Context, customerID string) error
 }
 
 // Invoice is one billing document from the provider — a paid subscription period or
@@ -255,6 +258,24 @@ func (s *Service) PortalURL(ctx context.Context, actor Actor) (string, error) {
 		return "", apperror.Validation("no billing account yet — make a purchase first")
 	}
 	return s.pay.BillingPortalURL(ctx, st.StripeCustomerID)
+}
+
+// CloseAccount stops all billing for an organization that is being deleted. Deleting
+// the provider customer cancels its subscription at once (no further charges) and
+// drops the stored card; the provider keeps past invoices for the accounting record.
+// Callers must not delete the org if this fails — that would orphan a live charge.
+func (s *Service) CloseAccount(ctx context.Context, orgID uuid.UUID) error {
+	if s.pay == nil {
+		return nil
+	}
+	st, err := s.repo.State(ctx, orgID)
+	if err != nil {
+		return err
+	}
+	if st.StripeCustomerID == "" {
+		return nil
+	}
+	return s.pay.DeleteCustomer(ctx, st.StripeCustomerID)
 }
 
 // StartTopUp creates a Stripe Checkout session for a one-time pay-as-you-go top-up

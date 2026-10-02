@@ -61,6 +61,22 @@ export interface Brand {
 
   /** Google OAuth 2.0 Client ID for "Sign in with Google". Empty = Google sign-in hidden. Per-brand so each white-label uses its own Google app. */
   googleClientId?: string;
+
+  /**
+   * Who operates this brand's service — named in /terms and /privacy. Company name,
+   * address and support email are normally managed live at /platform; these are only
+   * the fallbacks used until an admin sets them. See `src/lib/legal.ts`.
+   */
+  legal?: {
+    /** Fallback company name, e.g. "Acme Ltd". Defaults to `name`. */
+    entity?: string;
+    /** Fallback registered address. Omitted when unset. */
+    address?: string;
+    /** Governing law of the Terms. Defaults to "England and Wales". */
+    jurisdiction?: string;
+    /** Fallback support address. Defaults to support@<site host>. */
+    contactEmail?: string;
+  };
 }
 
 /** A Tailwind-style colour ramp, 50 (lightest) to 900 (darkest), as hex. */

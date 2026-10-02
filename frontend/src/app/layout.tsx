@@ -44,12 +44,13 @@ export const metadata: Metadata = {
   applicationName: brand.name,
   // Defaults every page inherits; the marketing page overrides title/description/canonical.
   // The social image comes from app/opengraph-image.tsx, which Next attaches automatically.
+  // No `url` here: every page would inherit it, telling crawlers and social cards that
+  // each docs/legal page IS the homepage. Pages set their own canonical instead.
   openGraph: {
     type: "website",
     siteName: brand.name,
     title: `${brand.name} — Infrastructure Monitoring`,
     description: brand.description,
-    url: "/",
   },
   twitter: {
     card: "summary_large_image",

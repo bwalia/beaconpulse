@@ -14,21 +14,14 @@ import {
 } from "@/components/marketing/sections";
 import { StructuredData } from "@/components/marketing/structured-data";
 import type { LivePlans } from "@/lib/plans";
-
-// Server-side, requests go to the API service inside the cluster (the browser base URL
-// is deliberately empty for same-origin). `||`, not `??`: NEXT_PUBLIC_API_BASE_URL is
-// the empty string in every deployment, which must fall through to the internal host.
-const API_INTERNAL =
-  process.env.BEACON_INTERNAL_API_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://api:8080";
+import { apiInternal } from "@/lib/site";
 
 // Live, operator-tuned pricing for the cards and the schema.org Offers. Never throws:
 // at build time (API unreachable) or on any error it returns null and the page renders
 // the static PLANS fallback, correcting itself on the next revalidation once live.
 async function fetchLivePlans(): Promise<LivePlans | null> {
   try {
-    const res = await fetch(`${API_INTERNAL.replace(/\/$/, "")}/api/v1/public/plans`, {
+    const res = await fetch(`${apiInternal}/api/v1/public/plans`, {
       next: { revalidate: 60 },
     });
     if (!res.ok) return null;

@@ -79,6 +79,15 @@ func (f *fakeUserRepo) LinkGoogleSub(_ context.Context, id uuid.UUID, googleSub 
 	return nil
 }
 
+func (f *fakeUserRepo) SetPassword(_ context.Context, id uuid.UUID, hash string) error {
+	u, ok := f.usersByID[id]
+	if !ok {
+		return apperror.NotFound("user not found")
+	}
+	u.PasswordHash = hash
+	return nil
+}
+
 type fakeRefreshRepo struct {
 	byHash map[string]*RefreshToken
 	byID   map[uuid.UUID]*RefreshToken

@@ -22,6 +22,9 @@ const (
 	ActionUserLogout     Action = "user.logout"
 	ActionTokenRefreshed Action = "token.refreshed"
 
+	ActionPasswordResetRequested Action = "password.reset_requested"
+	ActionPasswordReset          Action = "password.reset"
+
 	ActionProjectCreated Action = "project.created"
 	ActionProjectUpdated Action = "project.updated"
 	// ActionStatusPageUpdated — the org published/unpublished its public status
