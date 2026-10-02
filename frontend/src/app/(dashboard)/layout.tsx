@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui";
 import { BuildFooter } from "@/components/build-footer";
 import { BillingAlert } from "@/components/billing-alert";
+import { EmailVerifyBanner } from "@/components/email-verify-banner";
 import { ConfirmProvider } from "@/components/confirm";
 import { ThemeToggle } from "@/lib/theme";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -140,6 +141,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               and wide screens aren't wasted on empty gutters. */}
           <div className="mx-auto w-full max-w-[1600px]">
             <BillingAlert />
+            <EmailVerifyBanner />
             {children}
             {/* In the layout, so it is on every dashboard page: "which environment am
                 I on, and is this the build I just shipped?" is asked from wherever you

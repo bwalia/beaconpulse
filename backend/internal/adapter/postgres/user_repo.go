@@ -46,10 +46,12 @@ func (r *UserRepository) CreateOrgAndOwner(ctx context.Context, org *auth.Organi
 	}
 
 	if _, err := tx.Exec(ctx,
-		`INSERT INTO users (id, org_id, email, password_hash, google_sub, oidc_sub, name, role, is_active, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		`INSERT INTO users (id, org_id, email, password_hash, google_sub, oidc_sub, name, role, is_active,
+		                    email_verified_at, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 		owner.ID, owner.OrgID, owner.Email, nullString(owner.PasswordHash), nullString(owner.GoogleSub),
-		nullString(owner.OidcSub), owner.Name, string(owner.Role), owner.IsActive, owner.CreatedAt, owner.UpdatedAt,
+		nullString(owner.OidcSub), owner.Name, string(owner.Role), owner.IsActive, owner.EmailVerifiedAt,
+		owner.CreatedAt, owner.UpdatedAt,
 	); err != nil {
 		if c, ok := isUniqueViolation(err); ok && c == "ux_users_email" {
 			return apperror.Conflict("an account with that email already exists")
@@ -64,7 +66,7 @@ func (r *UserRepository) CreateOrgAndOwner(ctx context.Context, org *auth.Organi
 }
 
 const userColumns = `id, org_id, email, password_hash, google_sub, oidc_sub, name, role, is_active,
-	twofa_enabled, last_login_at, created_at, updated_at`
+	twofa_enabled, email_verified_at, last_login_at, created_at, updated_at`
 
 func scanUser(row pgx.Row) (*auth.User, error) {
 	var u auth.User
@@ -74,7 +76,7 @@ func scanUser(row pgx.Row) (*auth.User, error) {
 	var passwordHash, googleSub, oidcSub sql.NullString
 	if err := row.Scan(
 		&u.ID, &u.OrgID, &u.Email, &passwordHash, &googleSub, &oidcSub, &u.Name, &role, &u.IsActive,
-		&u.TwoFAEnabled, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt,
+		&u.TwoFAEnabled, &u.EmailVerifiedAt, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -173,6 +175,16 @@ func (r *UserRepository) SetPassword(ctx context.Context, userID uuid.UUID, pass
 	}
 	if tag.RowsAffected() == 0 {
 		return apperror.NotFound("user not found")
+	}
+	return nil
+}
+
+// MarkEmailVerified records the first time the user proved they own their email.
+func (r *UserRepository) MarkEmailVerified(ctx context.Context, userID uuid.UUID) error {
+	if _, err := r.pool.Exec(ctx,
+		`UPDATE users SET email_verified_at = COALESCE(email_verified_at, now())
+		  WHERE id = $1 AND deleted_at IS NULL`, userID); err != nil {
+		return apperror.Internal(fmt.Errorf("mark email verified: %w", err))
 	}
 	return nil
 }

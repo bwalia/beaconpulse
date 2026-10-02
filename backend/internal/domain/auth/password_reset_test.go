@@ -8,10 +8,15 @@ import (
 	"beacon/internal/platform/apperror"
 )
 
-type fakeMailer struct{ sent []string } // links
+type fakeMailer struct{ sent, verify []string } // links
 
 func (m *fakeMailer) SendPasswordReset(_ context.Context, _, _, link string) error {
 	m.sent = append(m.sent, link)
+	return nil
+}
+
+func (m *fakeMailer) SendEmailVerification(_ context.Context, _, _, link string) error {
+	m.verify = append(m.verify, link)
 	return nil
 }
 
@@ -85,5 +90,64 @@ func TestPasswordReset_DisabledWithoutMailer(t *testing.T) {
 	err := newTestService().RequestPasswordReset(context.Background(), "jane@example.com", RequestMeta{})
 	if !apperror.IsCode(err, apperror.CodeUnavailable) {
 		t.Fatalf("want unavailable when email is not configured, got %v", err)
+	}
+}
+
+func verifyTokenFrom(t *testing.T, link string) string {
+	t.Helper()
+	u, err := url.Parse(link)
+	if err != nil || u.Path != "/verify-email" {
+		t.Fatalf("bad verify link %q", link)
+	}
+	return u.Query().Get("token")
+}
+
+func TestEmailVerification_SignupLinkVerifies(t *testing.T) {
+	svc, m := resetFixture(t) // registers jane@example.com with a password
+	ctx := context.Background()
+	if len(m.verify) != 1 {
+		t.Fatalf("sign-up should send one confirmation email, got %d", len(m.verify))
+	}
+	jane, _ := svc.users.GetUserByEmail(ctx, "jane@example.com")
+	if jane.EmailVerified() {
+		t.Fatal("a password sign-up starts unverified")
+	}
+	token := verifyTokenFrom(t, m.verify[0])
+	if err := svc.VerifyEmail(ctx, token, RequestMeta{}); err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+	if jane, _ = svc.users.GetUserByID(ctx, jane.ID); !jane.EmailVerified() {
+		t.Fatal("following the link should verify the address")
+	}
+	// Idempotent, and resending to a verified account sends nothing.
+	if err := svc.VerifyEmail(ctx, token, RequestMeta{}); err != nil {
+		t.Fatalf("second verify should succeed too: %v", err)
+	}
+	if already, err := svc.ResendVerification(ctx, jane.ID, RequestMeta{}); err != nil || !already || len(m.verify) != 1 {
+		t.Fatalf("resend to a verified account: already=%v err=%v sent=%d", already, err, len(m.verify))
+	}
+}
+
+func TestEmailVerification_LinkForAnotherAddressRejected(t *testing.T) {
+	svc, _ := resetFixture(t)
+	ctx := context.Background()
+	jane, _ := svc.users.GetUserByEmail(ctx, "jane@example.com")
+	other := *jane
+	other.Email = "attacker@example.com"
+	token, _ := svc.tm.IssueEmailVerifyToken(&other, emailVerifyTTL)
+	if err := svc.VerifyEmail(ctx, token, RequestMeta{}); !apperror.IsCode(err, apperror.CodeValidation) {
+		t.Fatalf("a token for a different address must be rejected, got %v", err)
+	}
+}
+
+func TestEmailVerification_PasswordResetVerifies(t *testing.T) {
+	svc, m := resetFixture(t)
+	ctx := context.Background()
+	_ = svc.RequestPasswordReset(ctx, "jane@example.com", RequestMeta{})
+	if err := svc.ResetPassword(ctx, tokenFrom(t, m.sent[0]), "newpassword", RequestMeta{}); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	if jane, _ := svc.users.GetUserByEmail(ctx, "jane@example.com"); !jane.EmailVerified() {
+		t.Fatal("completing a reset proves inbox access and should verify the address")
 	}
 }

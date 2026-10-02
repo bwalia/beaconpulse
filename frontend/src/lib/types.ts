@@ -8,6 +8,8 @@ export interface User {
   role: string;
   is_active: boolean;
   twofa_enabled: boolean;
+  /** False until the person confirms their address (password sign-ups). */
+  email_verified?: boolean;
   /** Operator account that may edit platform-global settings (pricing, limits,
    *  premium access). Distinct from org role. */
   is_platform_admin?: boolean;

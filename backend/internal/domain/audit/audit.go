@@ -24,6 +24,8 @@ const (
 
 	ActionPasswordResetRequested Action = "password.reset_requested"
 	ActionPasswordReset          Action = "password.reset"
+	ActionEmailVerifySent        Action = "email.verify_sent"
+	ActionEmailVerified          Action = "email.verified"
 
 	ActionProjectCreated Action = "project.created"
 	ActionProjectUpdated Action = "project.updated"
