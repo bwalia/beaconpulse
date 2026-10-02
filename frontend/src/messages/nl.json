@@ -69,7 +69,7 @@
   },
   "marketing": {
     "skipToContent": "Naar inhoud gaan",
-    "badge": "Self-hosted & multi-tenant",
+    "badge": "Monitoring, alerting & statuspagina's",
     "headlineLine1": "Weet dat het down is,",
     "headlineLine2": "voordat je klanten het merken.",
     "heroBlurb": "{brand} controleert je endpoints, certificaten en DNS elke 30 seconden – en waarschuwt meteen de juiste persoon zodra er iets misgaat. Houd je data in eigen hand, draai het overal en geef klanten een statuspagina die ze echt vertrouwen.",
@@ -84,7 +84,7 @@
     "liveSummary": "3 van 4 operationeel – melding 12s geleden verstuurd",
     "featuresEyebrow": "Alles op één plek",
     "featuresTitle": "Vervang de vijf tools die je met plakband bij elkaar houdt",
-    "featuresBlurb": "{brand} is één control plane voor uptime, latency, certificaten en alerting – self-hosted, zodat je data je infrastructuur nooit verlaat.",
+    "featuresBlurb": "{brand} is één control plane voor uptime, latency, certificaten en alerting, zodat problemen de juiste persoon bereiken voordat je klanten iets merken.",
     "feature1Title": "Zes monitortypes",
     "feature1Body": "HTTP-, HTTPS-, TCP-, ICMP-, DNS- en SSL-vervalcontroles – één control plane in plaats van vijf tools.",
     "feature2Title": "Meldingen die een mens bereiken",

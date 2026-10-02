@@ -69,7 +69,7 @@
   },
   "marketing": {
     "skipToContent": "跳至正文",
-    "badge": "自托管 · 多租户",
+    "badge": "监控 · 告警 · 状态页",
     "headlineLine1": "先于用户",
     "headlineLine2": "发现故障。",
     "heroBlurb": "{brand} 每 30 秒检查一次你的端点、证书和 DNS，一旦出问题立即通知对的人。数据归你所有，随处部署，为客户提供一个真正值得信赖的状态页。",
@@ -84,7 +84,7 @@
     "liveSummary": "4 项中 3 项正常 — 12s 前已发出告警",
     "featuresEyebrow": "一站式全能",
     "featuresTitle": "取代你东拼西凑的五款工具",
-    "featuresBlurb": "{brand} 用一个控制平面统管在线率、延迟、证书和告警 — 自托管,数据永不离开你的基础设施。",
+    "featuresBlurb": "{brand} 用一个控制平面统管在线率、延迟、证书和告警，在客户察觉之前把问题送到对的人手里。",
     "feature1Title": "六种监控类型",
     "feature1Body": "HTTP、HTTPS、TCP、ICMP、DNS 和 SSL 到期检查 — 一个控制平面胜过五款工具。",
     "feature2Title": "真正触达人的告警",

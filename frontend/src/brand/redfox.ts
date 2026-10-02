@@ -44,7 +44,7 @@ export const redfox: Brand = {
   shortName: "RedFox",
   tagline: "Know before your users do.",
   description:
-    "Uptime, performance and certificate monitoring with instant alerting and public status pages. Multi-tenant and self-hostable.",
+    "Uptime, performance and certificate monitoring with instant alerting and public status pages.",
   // Cosmetic only — the host shown in the docs' curl examples. The running app always
   // calls its API same-origin regardless.
   apiHost: "redfoxsignals.com",

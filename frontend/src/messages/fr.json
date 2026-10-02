@@ -69,7 +69,7 @@
   },
   "marketing": {
     "skipToContent": "Aller au contenu",
-    "badge": "Auto-hébergé et multi-locataire",
+    "badge": "Surveillance, alertes et pages de statut",
     "headlineLine1": "Sachez que c'est en panne",
     "headlineLine2": "avant eux.",
     "heroBlurb": "{brand} surveille vos endpoints, certificats et DNS toutes les 30 secondes, puis prévient la bonne personne dès que quelque chose casse. Gardez la maîtrise de vos données, exécutez-le où vous voulez et offrez à vos clients une page de statut vraiment digne de confiance.",
@@ -84,7 +84,7 @@
     "liveSummary": "3 sur 4 opérationnels — alerte envoyée il y a 12s",
     "featuresEyebrow": "Tout au même endroit",
     "featuresTitle": "Remplacez les cinq outils que vous bricolez ensemble",
-    "featuresBlurb": "{brand} est un plan de contrôle unique pour la disponibilité, la latence, les certificats et les alertes — auto-hébergé, pour que vos données ne quittent jamais votre infrastructure.",
+    "featuresBlurb": "{brand} est un plan de contrôle unique pour la disponibilité, la latence, les certificats et les alertes, pour que les problèmes atteignent la bonne personne avant que vos clients ne les remarquent.",
     "feature1Title": "Six types de moniteur",
     "feature1Body": "Vérifications HTTP, HTTPS, TCP, ICMP, DNS et expiration SSL — un seul plan de contrôle au lieu de cinq outils.",
     "feature2Title": "Des alertes qui atteignent un humain",
