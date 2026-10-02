@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { brand } from "@/brand";
 import { LegalPage } from "@/components/legal/legal-page";
-import { getSupportEmail, legal } from "@/lib/legal";
+import { getLegal } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -12,17 +12,17 @@ export const metadata: Metadata = {
 };
 
 // Every statement here must stay true of the running product. When a feature starts
-// collecting or sharing something new, update this page (and legal.updated) with it.
+// collecting or sharing something new, update this page (and LEGAL_UPDATED in lib/legal.ts) with it.
 export default async function PrivacyPage() {
-  const supportEmail = await getSupportEmail();
-  const mail = `mailto:${supportEmail}`;
+  const legal = await getLegal();
+  const mail = `mailto:${legal.supportEmail}`;
   return (
     <LegalPage title="Privacy Policy">
       <p>
         This policy explains how {legal.entity} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) handles personal data when you
         use {brand.name} (the &ldquo;Service&rdquo;), including our website, web app and mobile apps. We are the
         controller of the personal data described here. Questions? Email{" "}
-        <a href={mail}>{supportEmail}</a>
+        <a href={mail}>{legal.supportEmail}</a>
         {legal.address ? `, or write to ${legal.address}` : ""}.
       </p>
 
@@ -136,7 +136,7 @@ export default async function PrivacyPage() {
         Under UK and EU data-protection law you can ask to access, correct, export or erase your personal data, and to
         restrict or object to how we use it. You can delete your account yourself at any time from the{" "}
         <Link href="/account">Account</Link> page in the app. For anything else, email{" "}
-        <a href={mail}>{supportEmail}</a> and we will respond within one month. If you are unhappy with how we
+        <a href={mail}>{legal.supportEmail}</a> and we will respond within one month. If you are unhappy with how we
         handle your data, you can complain to the UK Information Commissioner&apos;s Office (
         <a href="https://ico.org.uk/make-a-complaint/" rel="noopener noreferrer">
           ico.org.uk

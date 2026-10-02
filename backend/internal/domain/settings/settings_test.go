@@ -17,3 +17,18 @@ func TestValidSupportEmail(t *testing.T) {
 		}
 	}
 }
+
+func TestValidPublicText(t *testing.T) {
+	for in, want := range map[string]bool{
+		"":                                true,
+		"Acme Ltd":                        true,
+		"1 High St, London, EC1A 1AA, UK": true,
+		"Line one\nLine two":              false, // single line only — it's inline in a sentence
+		"Acme\u0000Ltd":                   false,
+		string(make([]byte, 201)):         false, // NULs and too long
+	} {
+		if got := validPublicText(in, 200); got != want {
+			t.Errorf("validPublicText(%q) = %v, want %v", in, got, want)
+		}
+	}
+}

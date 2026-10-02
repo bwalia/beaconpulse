@@ -63,20 +63,18 @@ export interface Brand {
   googleClientId?: string;
 
   /**
-   * Who operates this brand's service — named in /terms and /privacy. Set these to
-   * your real registered company before launch; see `src/lib/legal.ts` for defaults.
+   * Who operates this brand's service — named in /terms and /privacy. Company name,
+   * address and support email are normally managed live at /platform; these are only
+   * the fallbacks used until an admin sets them. See `src/lib/legal.ts`.
    */
   legal?: {
-    /** The legal entity that runs the service, e.g. "Acme Ltd". Defaults to `name`. */
+    /** Fallback company name, e.g. "Acme Ltd". Defaults to `name`. */
     entity?: string;
-    /** Registered address shown in the policies. Omitted when unset. */
+    /** Fallback registered address. Omitted when unset. */
     address?: string;
     /** Governing law of the Terms. Defaults to "England and Wales". */
     jurisdiction?: string;
-    /**
-     * Fallback support address, used only until a platform admin sets one at /platform
-     * (which is the normal way to manage it). Defaults to support@<site host>.
-     */
+    /** Fallback support address. Defaults to support@<site host>. */
     contactEmail?: string;
   };
 }

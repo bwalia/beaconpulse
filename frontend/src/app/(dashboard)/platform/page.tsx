@@ -24,6 +24,8 @@ export default function PlatformPage() {
   const [plans, setPlans] = useState<PlanSetting[]>([]);
   const [grants, setGrants] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
+  const [legalEntity, setLegalEntity] = useState("");
+  const [legalAddress, setLegalAddress] = useState("");
   const [seededKey, setSeededKey] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -38,6 +40,8 @@ export default function PlatformPage() {
     setPlans(data.plans);
     setGrants(data.premium_grants.join("\n"));
     setSupportEmail(data.support_email ?? "");
+    setLegalEntity(data.legal_entity ?? "");
+    setLegalAddress(data.legal_address ?? "");
     setSeededKey(dataKey);
   }
 
@@ -81,6 +85,8 @@ export default function PlatformPage() {
         })),
         premium_grants,
         support_email: supportEmail.trim(),
+        legal_entity: legalEntity.trim(),
+        legal_address: legalAddress.trim(),
       });
       setSaved(true);
     } catch (e) {
@@ -92,7 +98,7 @@ export default function PlatformPage() {
     <div className="space-y-6">
       <PageHeader
         title="Platform"
-        subtitle="Pricing, plan limits, premium access and support contact — applied live across every tenant."
+        subtitle="Pricing, plan limits, premium access and company details — applied live across every tenant."
         actions={
           <Button onClick={onSave} disabled={update.isPending || isLoading}>
             {update.isPending ? "Saving…" : "Save changes"}
@@ -241,31 +247,44 @@ export default function PlatformPage() {
             </div>
           </Card>
 
-          {/* Public support contact */}
+          {/* Public company & contact details */}
           <Card>
-            <h2 className="text-lg font-semibold">Support email</h2>
+            <h2 className="text-lg font-semibold">Company &amp; contact</h2>
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-              The address customers use to reach you. Shown on the public{" "}
+              Who operates {brand.name} and how customers reach you. Printed on the public{" "}
               <Link href="/terms" target="_blank" className="font-medium text-brand-700 underline dark:text-brand-400">Terms</Link> and{" "}
               <Link href="/privacy" target="_blank" className="font-medium text-brand-700 underline dark:text-brand-400">Privacy</Link>{" "}
-              pages for account, legal and data requests — make sure the mailbox is monitored. Updates on the site within a
-              minute.
+              pages, and updated there within a minute. Leave a field blank to use this brand&apos;s default.
             </p>
-            <div className="mt-4">
-              <Label htmlFor="support-email">Email address</Label>
-              <input
-                id="support-email"
-                type="email"
-                inputMode="email"
-                autoComplete="off"
-                value={supportEmail}
-                onChange={(e) => setSupportEmail(e.target.value)}
-                placeholder="support@example.com"
-                className="w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            <div className="mt-4 grid max-w-2xl gap-4">
+              <TextSetting
+                id="legal-entity"
+                label="Company name"
+                hint="Your registered legal name — the party customers contract with."
+                value={legalEntity}
+                onChange={setLegalEntity}
+                placeholder="Acme Ltd"
+                maxLength={200}
               />
-              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-                Leave blank to use the default for this brand.
-              </span>
+              <TextSetting
+                id="legal-address"
+                label="Registered address"
+                hint="One line, parts separated by commas."
+                value={legalAddress}
+                onChange={setLegalAddress}
+                placeholder="1 High Street, London, EC1A 1AA, United Kingdom"
+                maxLength={500}
+              />
+              <TextSetting
+                id="support-email"
+                label="Support email"
+                hint="For account, legal and data requests — make sure this mailbox is monitored."
+                value={supportEmail}
+                onChange={setSupportEmail}
+                placeholder="support@example.com"
+                type="email"
+                maxLength={254}
+              />
             </div>
           </Card>
 
@@ -307,5 +326,46 @@ function NumberField({
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base tabular-nums text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
       />
     </label>
+  );
+}
+
+function TextSetting({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  maxLength,
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  type?: "text" | "email";
+  maxLength: number;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <input
+        id={id}
+        type={type}
+        inputMode={type === "email" ? "email" : undefined}
+        autoComplete="off"
+        maxLength={maxLength}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-describedby={`${id}-hint`}
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+      />
+      <span id={`${id}-hint`} className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+        {hint}
+      </span>
+    </div>
   );
 }

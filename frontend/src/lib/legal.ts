@@ -1,34 +1,47 @@
 import { brand } from "@/brand";
 import { apiInternal, siteUrl } from "@/lib/site";
 
-// The operator details the Terms and Privacy Policy name, resolved from the brand with
-// safe defaults so every white-label renders complete policies. Set `brand.legal` to
-// the real registered company before launch.
-export const legal = {
+// Bump when either policy's substance changes.
+export const LEGAL_UPDATED = "2 October 2026";
+
+export type LegalDetails = {
+  /** The company that operates the service. */
+  entity: string;
+  /** Registered address, when set. */
+  address?: string;
+  /** Governing law of the Terms. */
+  jurisdiction: string;
+  /** Where account, legal and data requests go. */
+  supportEmail: string;
+};
+
+// Brand defaults, used for anything a platform admin hasn't set at /platform.
+const defaults: LegalDetails = {
   entity: brand.legal?.entity ?? brand.name,
   address: brand.legal?.address,
   jurisdiction: brand.legal?.jurisdiction ?? "England and Wales",
-  // Bump when either policy's substance changes.
-  updated: "2 October 2026",
+  supportEmail: brand.legal?.contactEmail ?? `support@${new URL(siteUrl).hostname.replace(/^www\./, "")}`,
 };
 
-// Used only until a platform admin sets the support email at /platform.
-const fallbackSupportEmail =
-  brand.legal?.contactEmail ?? `support@${new URL(siteUrl).hostname.replace(/^www\./, "")}`;
+type PublicSite = { support_email?: string; legal_entity?: string; legal_address?: string };
 
-// getSupportEmail returns the public support address an admin set at /platform, read
-// live from the API (cached for a minute) so a change shows on the site without a
-// redeploy. Never throws: at build time or if the API is unreachable it falls back to
-// the brand default and corrects itself on the next revalidation.
-export async function getSupportEmail(): Promise<string> {
+// getLegal returns the company & contact details the Terms and Privacy pages print:
+// the values an admin set at /platform, read live from the API (cached for a minute,
+// so a change shows without a redeploy), each falling back to the brand default when
+// blank. Never throws: at build time or if the API is unreachable it returns the
+// defaults and corrects itself on the next revalidation.
+export async function getLegal(): Promise<LegalDetails> {
+  let site: PublicSite = {};
   try {
     const res = await fetch(`${apiInternal}/api/v1/public/site`, { next: { revalidate: 60 } });
-    if (res.ok) {
-      const { support_email } = (await res.json()) as { support_email?: string };
-      if (support_email) return support_email;
-    }
+    if (res.ok) site = (await res.json()) as PublicSite;
   } catch {
-    // fall through to the default
+    // use the defaults
   }
-  return fallbackSupportEmail;
+  return {
+    entity: site.legal_entity || defaults.entity,
+    address: site.legal_address || defaults.address,
+    jurisdiction: defaults.jurisdiction,
+    supportEmail: site.support_email || defaults.supportEmail,
+  };
 }

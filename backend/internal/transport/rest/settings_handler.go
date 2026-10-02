@@ -81,6 +81,8 @@ type settingsResponse struct {
 	Plans                 []planSettingResponse `json:"plans"`
 	PremiumGrants         []string              `json:"premium_grants"`
 	SupportEmail          string                `json:"support_email"`
+	LegalEntity           string                `json:"legal_entity"`
+	LegalAddress          string                `json:"legal_address"`
 	UpdatedAt             *time.Time            `json:"updated_at,omitempty"`
 }
 
@@ -89,6 +91,8 @@ func presentSettings(s settings.Settings) settingsResponse {
 		MonitorHoursPerDollar: s.MonitorHoursPerDollar,
 		PremiumGrants:         s.PremiumGrants,
 		SupportEmail:          s.SupportEmail,
+		LegalEntity:           s.LegalEntity,
+		LegalAddress:          s.LegalAddress,
 	}
 	if resp.PremiumGrants == nil {
 		resp.PremiumGrants = []string{}
@@ -126,9 +130,9 @@ func (h *SettingsHandler) requirePlatformAdmin(r *http.Request) (string, error) 
 	return u.Email, nil
 }
 
-// PublicSite serves the operator-set public site details (today: the support email)
-// to the marketing and legal pages. PUBLIC and unauthenticated — it carries only what
-// those pages print for any visitor. Mounted at /public/site in server.go.
+// PublicSite serves the operator-set company & contact details to the legal pages.
+// PUBLIC and unauthenticated — it carries only what those pages print for any
+// visitor. Mounted at /public/site in server.go.
 func (h *SettingsHandler) PublicSite(w http.ResponseWriter, r *http.Request) {
 	s, err := h.svc.Get(r.Context())
 	if err != nil {
@@ -136,7 +140,11 @@ func (h *SettingsHandler) PublicSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
-	httpx.OK(w, map[string]any{"support_email": s.SupportEmail})
+	httpx.OK(w, map[string]any{
+		"support_email": s.SupportEmail,
+		"legal_entity":  s.LegalEntity,
+		"legal_address": s.LegalAddress,
+	})
 }
 
 func (h *SettingsHandler) get(w http.ResponseWriter, r *http.Request) {
@@ -167,6 +175,8 @@ type updateSettingsRequest struct {
 	Plans                 []planSettingRequest `json:"plans" validate:"required,min=1,dive"`
 	PremiumGrants         []string             `json:"premium_grants" validate:"omitempty,dive,max=254"`
 	SupportEmail          string               `json:"support_email" validate:"max=254"`
+	LegalEntity           string               `json:"legal_entity" validate:"max=200"`
+	LegalAddress          string               `json:"legal_address" validate:"max=500"`
 }
 
 func (h *SettingsHandler) update(w http.ResponseWriter, r *http.Request) {
@@ -188,6 +198,8 @@ func (h *SettingsHandler) update(w http.ResponseWriter, r *http.Request) {
 		MonitorHoursPerDollar: req.MonitorHoursPerDollar,
 		PremiumGrants:         req.PremiumGrants,
 		SupportEmail:          req.SupportEmail,
+		LegalEntity:           req.LegalEntity,
+		LegalAddress:          req.LegalAddress,
 	}
 	for _, p := range req.Plans {
 		in.Plans = append(in.Plans, settings.PlanConfig{
