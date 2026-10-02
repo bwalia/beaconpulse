@@ -130,6 +130,9 @@ func NewRouter(d RouterDeps) http.Handler {
 		// landing page without a redeploy. Same public rate limit as the status page.
 		api.With(middleware.RateLimit(publicLimiter, middleware.ByIP, 5*time.Second)).
 			Get("/public/plans", publicPlans)
+		// PUBLIC: operator-set site details (support email) for the legal pages.
+		api.With(middleware.RateLimit(publicLimiter, middleware.ByIP, 5*time.Second)).
+			Get("/public/site", d.Settings.PublicSite)
 		// PUBLIC, unauthenticated: heartbeat ping ingest. The URL token is the
 		// credential; rate-limited per token inside the handler.
 		// Same payload as /healthz, mounted where a BROWSER can reach it: the gateway

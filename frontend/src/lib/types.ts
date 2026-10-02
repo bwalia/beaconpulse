@@ -171,6 +171,8 @@ export interface PlatformSettings {
   plans: PlanSetting[];
   /** Emails and/or bare domains granted the Pro tier for free. */
   premium_grants: string[];
+  /** Public contact address shown on /terms and /privacy. Empty = brand default. */
+  support_email: string;
   updated_at?: string;
 }
 

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { brand } from "@/brand";
 import { LegalPage } from "@/components/legal/legal-page";
-import { legal } from "@/lib/legal";
+import { getSupportEmail, legal } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -11,8 +11,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-export default function TermsPage() {
-  const mail = `mailto:${legal.contactEmail}`;
+export default async function TermsPage() {
+  const supportEmail = await getSupportEmail();
+  const mail = `mailto:${supportEmail}`;
   return (
     <LegalPage title="Terms of Service">
       <p>
@@ -34,7 +35,7 @@ export default function TermsPage() {
         <li>You must be at least 16 and give accurate information, including a working email address.</li>
         <li>
           Keep your password and API keys secret. You are responsible for activity under your account and its API
-          keys. Tell us promptly at <a href={mail}>{legal.contactEmail}</a> if you suspect unauthorised access.
+          keys. Tell us promptly at <a href={mail}>{supportEmail}</a> if you suspect unauthorised access.
         </li>
         <li>
           You can delete your account at any time from the <Link href="/account">Account</Link> page. Deletion is
@@ -131,7 +132,7 @@ export default function TermsPage() {
 
       <h2>12. Contact</h2>
       <p>
-        Questions about these terms? Email <a href={mail}>{legal.contactEmail}</a>
+        Questions about these terms? Email <a href={mail}>{supportEmail}</a>
         {legal.address ? ` or write to ${legal.entity}, ${legal.address}` : ""}.
       </p>
     </LegalPage>

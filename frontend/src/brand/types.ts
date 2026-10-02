@@ -73,7 +73,10 @@ export interface Brand {
     address?: string;
     /** Governing law of the Terms. Defaults to "England and Wales". */
     jurisdiction?: string;
-    /** Address for privacy, legal and account requests. Defaults to support@<site host>. */
+    /**
+     * Fallback support address, used only until a platform admin sets one at /platform
+     * (which is the normal way to manage it). Defaults to support@<site host>.
+     */
     contactEmail?: string;
   };
 }

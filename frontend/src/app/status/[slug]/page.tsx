@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { StatusView } from "@/components/status/status-view";
+import { apiInternal } from "@/lib/site";
 import type { PublicStatusPage } from "@/lib/types";
 
 // The public status page.
@@ -15,18 +16,8 @@ import type { PublicStatusPage } from "@/lib/types";
 // tokens and refresh logic, none of which belongs on an anonymous page. This
 // fetches the public endpoint directly, server-side.
 
-// Server-side, requests go to the API service inside the cluster; the public
-// gateway URL is only meaningful to a browser.
-//
-// `||`, NOT `??`. NEXT_PUBLIC_API_BASE_URL is deliberately set to the EMPTY
-// STRING in every deployed environment, so that browser calls go same-origin
-// through the gateway. `??` only falls back on null/undefined, so it would hand
-// fetch() an empty base and throw "TypeError: Invalid URL" — which is exactly
-// what happened the first time this ran in Docker. Empty must fall through.
-const API_INTERNAL =
-  process.env.BEACON_INTERNAL_API_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "http://api:8080";
+// Server-side, requests go to the API service inside the cluster (apiInternal); the
+// public gateway URL is only meaningful to a browser.
 
 // Match the endpoint's own Cache-Control (30s). Longer would risk showing a
 // cheerful "operational" during a live outage — the one failure a status page
@@ -35,7 +26,7 @@ export const revalidate = 30;
 
 async function fetchStatus(slug: string): Promise<PublicStatusPage | null> {
   const res = await fetch(
-    `${API_INTERNAL.replace(/\/$/, "")}/api/v1/public/status/${encodeURIComponent(slug)}`,
+    `${apiInternal}/api/v1/public/status/${encodeURIComponent(slug)}`,
     { next: { revalidate: 30 } },
   );
   if (res.status === 404) return null;

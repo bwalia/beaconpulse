@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { brand } from "@/brand";
 import { useAuth } from "@/lib/auth";
@@ -22,6 +23,7 @@ export default function PlatformPage() {
   const [rate, setRate] = useState(5);
   const [plans, setPlans] = useState<PlanSetting[]>([]);
   const [grants, setGrants] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
   const [seededKey, setSeededKey] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export default function PlatformPage() {
     setRate(data.monitor_hours_per_dollar);
     setPlans(data.plans);
     setGrants(data.premium_grants.join("\n"));
+    setSupportEmail(data.support_email ?? "");
     setSeededKey(dataKey);
   }
 
@@ -77,6 +80,7 @@ export default function PlatformPage() {
           features: (p.features ?? []).map((f) => f.trim()).filter(Boolean),
         })),
         premium_grants,
+        support_email: supportEmail.trim(),
       });
       setSaved(true);
     } catch (e) {
@@ -88,7 +92,7 @@ export default function PlatformPage() {
     <div className="space-y-6">
       <PageHeader
         title="Platform"
-        subtitle="Pricing, plan limits and premium access — applied live across every tenant."
+        subtitle="Pricing, plan limits, premium access and support contact — applied live across every tenant."
         actions={
           <Button onClick={onSave} disabled={update.isPending || isLoading}>
             {update.isPending ? "Saving…" : "Save changes"}
@@ -234,6 +238,34 @@ export default function PlatformPage() {
                 placeholder={"you@example.com\nworkstation.co.uk"}
                 className="font-mono text-sm"
               />
+            </div>
+          </Card>
+
+          {/* Public support contact */}
+          <Card>
+            <h2 className="text-lg font-semibold">Support email</h2>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              The address customers use to reach you. Shown on the public{" "}
+              <Link href="/terms" target="_blank" className="font-medium text-brand-700 underline dark:text-brand-400">Terms</Link> and{" "}
+              <Link href="/privacy" target="_blank" className="font-medium text-brand-700 underline dark:text-brand-400">Privacy</Link>{" "}
+              pages for account, legal and data requests — make sure the mailbox is monitored. Updates on the site within a
+              minute.
+            </p>
+            <div className="mt-4">
+              <Label htmlFor="support-email">Email address</Label>
+              <input
+                id="support-email"
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                value={supportEmail}
+                onChange={(e) => setSupportEmail(e.target.value)}
+                placeholder="support@example.com"
+                className="w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              />
+              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                Leave blank to use the default for this brand.
+              </span>
             </div>
           </Card>
 

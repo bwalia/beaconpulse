@@ -414,6 +414,7 @@ export interface UpdatePlatformSettingsInput {
     features: string[];
   }>;
   premium_grants: string[];
+  support_email: string;
 }
 
 export function useUpdatePlatformSettings() {

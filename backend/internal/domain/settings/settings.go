@@ -10,6 +10,8 @@ package settings
 
 import (
 	"context"
+	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,7 +42,10 @@ type Settings struct {
 	Plans                 []PlanConfig
 	// PremiumGrants are emails and/or domains that get Pro free (bypassing billing).
 	PremiumGrants []string
-	UpdatedAt     time.Time
+	// SupportEmail is the public contact address shown on the Terms and Privacy pages.
+	// Empty = not set (the web app falls back to its brand default).
+	SupportEmail string
+	UpdatedAt    time.Time
 }
 
 // editableTiers are the tiers exposed in the admin page, in display order. PayAsYouGo
@@ -179,7 +184,19 @@ func toPlanConfig(s Settings) plan.Config {
 
 func normalize(s Settings) Settings {
 	s.PremiumGrants = emailmatch.Normalize(s.PremiumGrants)
+	s.SupportEmail = strings.ToLower(strings.TrimSpace(s.SupportEmail))
 	return s
+}
+
+// validSupportEmail accepts a bare address (no display name, no mailto:) or empty. It is
+// rendered into public pages and mailto: links, so anything else is refused.
+func validSupportEmail(e string) bool {
+	e = strings.TrimSpace(e)
+	if e == "" {
+		return true
+	}
+	a, err := mail.ParseAddress(e)
+	return err == nil && a.Name == "" && a.Address == e && len(e) <= 254
 }
 
 // validate bounds every editable value. Ceilings are generous but finite: they exist
@@ -189,6 +206,10 @@ func validate(s Settings) error {
 	if s.MonitorHoursPerDollar < 1 || s.MonitorHoursPerDollar > 1_000_000 {
 		return apperror.Validation("monitor hours per dollar must be between 1 and 1,000,000",
 			apperror.FieldError{Field: "monitor_hours_per_dollar", Message: "out of range"})
+	}
+	if !validSupportEmail(s.SupportEmail) {
+		return apperror.Validation("support email must be a plain email address, like support@example.com",
+			apperror.FieldError{Field: "support_email", Message: "not a valid email address"})
 	}
 	for _, p := range s.Plans {
 		if !p.Plan.Subscribable() {

@@ -48,9 +48,9 @@ func (r *SettingsRepository) Load(ctx context.Context) (settings.Settings, bool,
 		plansRaw []byte
 	)
 	err := r.pool.QueryRow(ctx,
-		`SELECT monitor_hours_per_dollar, plans, premium_grants, updated_at
+		`SELECT monitor_hours_per_dollar, plans, premium_grants, support_email, updated_at
 		   FROM platform_settings WHERE id = 1`).
-		Scan(&s.MonitorHoursPerDollar, &plansRaw, &s.PremiumGrants, &s.UpdatedAt)
+		Scan(&s.MonitorHoursPerDollar, &plansRaw, &s.PremiumGrants, &s.SupportEmail, &s.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return settings.Settings{}, false, nil
@@ -105,15 +105,16 @@ func (r *SettingsRepository) Save(ctx context.Context, s settings.Settings, upda
 		by = &updatedBy
 	}
 	_, err = r.pool.Exec(ctx,
-		`INSERT INTO platform_settings (id, monitor_hours_per_dollar, plans, premium_grants, updated_at, updated_by)
-		 VALUES (1, $1, $2, $3, now(), $4)
+		`INSERT INTO platform_settings (id, monitor_hours_per_dollar, plans, premium_grants, support_email, updated_at, updated_by)
+		 VALUES (1, $1, $2, $3, $4, now(), $5)
 		 ON CONFLICT (id) DO UPDATE SET
 		     monitor_hours_per_dollar = EXCLUDED.monitor_hours_per_dollar,
 		     plans                    = EXCLUDED.plans,
 		     premium_grants           = EXCLUDED.premium_grants,
+		     support_email            = EXCLUDED.support_email,
 		     updated_at               = now(),
 		     updated_by               = EXCLUDED.updated_by`,
-		s.MonitorHoursPerDollar, plansRaw, grants, by)
+		s.MonitorHoursPerDollar, plansRaw, grants, s.SupportEmail, by)
 	if err != nil {
 		return apperror.Internal(fmt.Errorf("save platform settings: %w", err))
 	}
