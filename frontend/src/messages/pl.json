@@ -69,7 +69,7 @@
   },
   "marketing": {
     "skipToContent": "Przejdź do treści",
-    "badge": "Self-hosted i wielodostępny",
+    "badge": "Monitoring, alerty i strony statusu",
     "headlineLine1": "Wiedz, że nie działa",
     "headlineLine2": "zanim oni to zauważą.",
     "heroBlurb": "{brand} sprawdza Twoje endpointy, certyfikaty i DNS co 30 sekund — i powiadamia właściwą osobę w chwili, gdy coś przestaje działać. Zachowaj kontrolę nad danymi, uruchom go gdziekolwiek i daj klientom stronę statusu, której naprawdę ufają.",
@@ -84,7 +84,7 @@
     "liveSummary": "3 z 4 działają — alert wysłany 12s temu",
     "featuresEyebrow": "Wszystko w jednym miejscu",
     "featuresTitle": "Zastąp pięć narzędzi, które sklejasz taśmą",
-    "featuresBlurb": "{brand} to jeden panel kontrolny do uptime'u, opóźnień, certyfikatów i alertów — self-hosted, więc dane nigdy nie opuszczają Twojej infrastruktury.",
+    "featuresBlurb": "{brand} to jeden panel kontrolny do uptime'u, opóźnień, certyfikatów i alertów — problemy trafiają do właściwej osoby, zanim zauważą je Twoi klienci.",
     "feature1Title": "Sześć typów monitorów",
     "feature1Body": "Sprawdzanie HTTP, HTTPS, TCP, ICMP, DNS i wygasania SSL — jeden panel kontrolny zamiast pięciu narzędzi.",
     "feature2Title": "Alerty, które docierają do człowieka",

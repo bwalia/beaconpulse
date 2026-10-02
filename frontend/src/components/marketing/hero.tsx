@@ -145,16 +145,16 @@ export function Hero() {
             </span>
           </motion.div>
 
-          <motion.h1
-            variants={reveal}
-            className="mt-7 text-balance text-6xl font-semibold leading-[1.03] tracking-tight text-slate-900 sm:text-7xl xl:text-[5.25rem] dark:text-white"
-          >
+          {/* Deliberately NOT animated: the headline is the page's Largest Contentful
+              Paint. Revealing it from opacity 0 after hydration held LCP back ~2s on
+              the live site; static, it paints with the first byte. */}
+          <h1 className="mt-7 text-balance text-6xl font-semibold leading-[1.03] tracking-tight text-slate-900 sm:text-7xl xl:text-[5.25rem] dark:text-white">
             {t("headlineLine1")}
             <br />
             <span className="bg-gradient-to-r from-brand-600 to-emerald-600 bg-clip-text text-transparent dark:from-brand-400 dark:to-emerald-400">
               {t("headlineLine2")}
             </span>
-          </motion.h1>
+          </h1>
 
           <motion.p
             variants={reveal}
