@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"time"
 
@@ -57,7 +58,25 @@ type Service struct {
 	google GoogleVerifier
 	// apple verifies Apple identity tokens. Nil disables "Sign in with Apple".
 	apple AppleVerifier
+	// mailer sends password-reset links to appBaseURL/reset-password. Nil disables
+	// forgot-password.
+	mailer     Mailer
+	appBaseURL string
+	// async runs the reset email off the request path. A test swaps in an inline
+	// runner; production always uses a goroutine (see RequestPasswordReset).
+	async func(func())
 	now   func() time.Time
+}
+
+// passwordResetTTL bounds how long an emailed reset link works.
+const passwordResetTTL = time.Hour
+
+// WithPasswordReset enables forgot-password: links are mailed by m and point at
+// appBaseURL (the public web origin, e.g. https://sysops247.com).
+func (s *Service) WithPasswordReset(m Mailer, appBaseURL string) *Service {
+	s.mailer = m
+	s.appBaseURL = strings.TrimRight(appBaseURL, "/")
+	return s
 }
 
 // WithEmailPolicy vets the address a signup is made with. See emailpolicy.go for why
@@ -93,8 +112,92 @@ func NewService(
 		tm:       tm,
 		hasher:   hasher,
 		auditlog: auditlog,
+		async:    func(f func()) { go f() },
 		now:      time.Now,
 	}
+}
+
+// RequestPasswordReset mails a reset link if email belongs to an active account.
+//
+// It returns nil whether or not the account exists, and sends the email off the
+// request path, so neither the response nor its timing reveals which addresses are
+// registered. The only error is deployment-wide: email isn't configured at all.
+func (s *Service) RequestPasswordReset(ctx context.Context, email string, meta RequestMeta) error {
+	if s.mailer == nil {
+		return apperror.New(apperror.CodeUnavailable,
+			"password reset by email is not available on this deployment — contact support")
+	}
+	user, err := s.users.GetUserByEmail(ctx, normalizeEmail(email))
+	if err != nil {
+		if apperror.IsCode(err, apperror.CodeNotFound) {
+			return nil
+		}
+		return err
+	}
+	if !user.IsActive {
+		return nil
+	}
+	token, err := s.tm.IssuePasswordResetToken(user, passwordResetTTL)
+	if err != nil {
+		return apperror.Internal(err)
+	}
+	link := s.appBaseURL + "/reset-password?token=" + url.QueryEscape(token)
+
+	bg := context.WithoutCancel(ctx)
+	s.async(func() {
+		ctx, cancel := context.WithTimeout(bg, 30*time.Second)
+		defer cancel()
+		md := map[string]any(nil)
+		if err := s.mailer.SendPasswordReset(ctx, user.Email, user.Name, link); err != nil {
+			md = map[string]any{"send_error": err.Error()}
+		}
+		s.audit(ctx, user, audit.ActionPasswordResetRequested, "user", user.ID.String(), meta, md)
+	})
+	return nil
+}
+
+// ResetPassword sets a new password from an emailed reset token, then revokes every
+// refresh token for the account — whoever knew the old password is signed out
+// everywhere. Every way a token can be wrong gets the same answer.
+func (s *Service) ResetPassword(ctx context.Context, token, newPassword string, meta RequestMeta) error {
+	if len(newPassword) < 8 {
+		return apperror.Validation("password must be at least 8 characters",
+			apperror.FieldError{Field: "password", Message: "must be at least 8 characters"})
+	}
+	invalid := apperror.Validation("this reset link is invalid or has expired — request a new one")
+
+	claims, err := s.tm.ParsePasswordResetToken(token)
+	if err != nil {
+		return invalid
+	}
+	userID, err := uuid.Parse(claims.Subject)
+	if err != nil {
+		return invalid
+	}
+	user, err := s.users.GetUserByID(ctx, userID)
+	if err != nil {
+		if apperror.IsCode(err, apperror.CodeNotFound) {
+			return invalid
+		}
+		return err
+	}
+	// Already used (the password changed since issue), or the account was disabled.
+	if !user.IsActive || claims.PasswordFP != PasswordFingerprint(user.PasswordHash) {
+		return invalid
+	}
+
+	hash, err := s.hasher.Hash(newPassword)
+	if err != nil {
+		return apperror.Internal(err)
+	}
+	if err := s.users.SetPassword(ctx, user.ID, hash); err != nil {
+		return err
+	}
+	if err := s.tokens.RevokeAllForUser(ctx, user.ID); err != nil {
+		return err
+	}
+	s.audit(ctx, user, audit.ActionPasswordReset, "user", user.ID.String(), meta, nil)
+	return nil
 }
 
 // Register creates a new organization with an owner user and returns tokens so

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { C, Code, Endpoint, Fields, H2, H3, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/docs/authentication" },
   title: "Authentication",
   description: "Create an API key and make your first authenticated request.",
 };

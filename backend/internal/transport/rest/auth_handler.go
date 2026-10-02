@@ -107,9 +107,60 @@ func (h *AuthHandler) Routes() chi.Router {
 	// Sign in with Apple, like Google, doubles as signup — same tighter bucket.
 	r.With(middleware.RateLimit(signupLimiter, middleware.ByIP, time.Minute)).
 		Post("/apple", h.apple)
+	// Forgot-password sends email, so it is a mail-bombing and sender-reputation
+	// surface: the tight signup bucket. Reset costs a bcrypt, like login.
+	r.With(middleware.RateLimit(signupLimiter, middleware.ByIP, time.Minute)).
+		Post("/forgot-password", h.forgotPassword)
+	r.With(middleware.RateLimit(loginLimiter, middleware.ByIP, 30*time.Second)).
+		Post("/reset-password", h.resetPassword)
 	r.Post("/refresh", h.refresh)
 	r.Post("/logout", h.logout)
 	return r
+}
+
+type forgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email,max=254"`
+}
+
+type resetPasswordRequest struct {
+	Token    string `json:"token" validate:"required,max=2048"`
+	Password string `json:"password" validate:"required,min=8,max=128"`
+}
+
+// forgotPassword answers the same 200 whether or not the address has an account —
+// the response is never an oracle for who is registered.
+func (h *AuthHandler) forgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req forgotPasswordRequest
+	if err := httpx.DecodeJSON(w, r, &req, maxBodyBytes); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	if err := h.validator.Struct(req); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	if err := h.svc.RequestPasswordReset(r.Context(), req.Email, requestMeta(r)); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	httpx.OK(w, map[string]any{"status": "ok"})
+}
+
+func (h *AuthHandler) resetPassword(w http.ResponseWriter, r *http.Request) {
+	var req resetPasswordRequest
+	if err := httpx.DecodeJSON(w, r, &req, maxBodyBytes); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	if err := h.validator.Struct(req); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	if err := h.svc.ResetPassword(r.Context(), req.Token, req.Password, requestMeta(r)); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	httpx.OK(w, map[string]any{"status": "ok"})
 }
 
 // ---- DTOs ----

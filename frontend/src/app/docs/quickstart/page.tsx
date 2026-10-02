@@ -5,6 +5,7 @@ import Link from "next/link";
 import { C, Code, H2, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/docs/quickstart" },
   title: "Quickstart",
   description: "Sign up and get your first domain monitored in about five minutes.",
 };

@@ -20,6 +20,9 @@ type Claims struct {
 	OrgID string `json:"org"`
 	Role  Role   `json:"role"`
 	Type  string `json:"typ"`
+	// PasswordFP is set only on password-reset tokens: a fingerprint of the user's
+	// password hash at issue time. See IssuePasswordResetToken.
+	PasswordFP string `json:"pfp,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -30,6 +33,8 @@ const (
 	// full-page navigations to the raw Prometheus/Alertmanager UIs and derive the
 	// tenant's org_id for label enforcement.
 	proxyTokenType = "proxy"
+	// passwordResetTokenType marks the short-lived token mailed in a reset link.
+	passwordResetTokenType = "pwreset"
 )
 
 // TokenManager issues short-lived JWT access tokens and generates opaque
@@ -118,6 +123,45 @@ func (m *TokenManager) IssueProxyToken(u *User) (string, error) {
 // ParseProxyToken validates a gateway proxy-session token.
 func (m *TokenManager) ParseProxyToken(raw string) (*Claims, error) {
 	return m.parseTyped(raw, proxyTokenType)
+}
+
+// IssuePasswordResetToken signs a token that lets its holder set a new password for
+// u within ttl. It carries a fingerprint of u's CURRENT password hash, which makes it
+// single-use with no server-side state: the moment the password changes the
+// fingerprint stops matching, so the used link — and any other outstanding one — dies.
+func (m *TokenManager) IssuePasswordResetToken(u *User, ttl time.Duration) (string, error) {
+	now := m.now()
+	claims := Claims{
+		Type:       passwordResetTokenType,
+		PasswordFP: PasswordFingerprint(u.PasswordHash),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   u.ID.String(),
+			ID:        uuid.NewString(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+			Issuer:    "beacon",
+		},
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(m.accessSecret)
+	if err != nil {
+		return "", fmt.Errorf("sign password reset token: %w", err)
+	}
+	return signed, nil
+}
+
+// ParsePasswordResetToken validates a reset token's signature, expiry and type. The
+// caller still has to compare PasswordFP against the user's current hash.
+func (m *TokenManager) ParsePasswordResetToken(raw string) (*Claims, error) {
+	return m.parseTyped(raw, passwordResetTokenType)
+}
+
+// PasswordFingerprint is a short, non-reversible digest of a password hash, used to
+// bind a reset token to the password it replaces. An empty hash (a Google/Apple-only
+// account) fingerprints fine too, so such a user can set a first password by email.
+func PasswordFingerprint(hash string) string {
+	sum := sha256.Sum256([]byte(hash))
+	return hex.EncodeToString(sum[:8])
 }
 
 func (m *TokenManager) parseTyped(raw, wantType string) (*Claims, error) {

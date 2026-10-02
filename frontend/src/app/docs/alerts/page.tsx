@@ -5,6 +5,7 @@ import Link from "next/link";
 import { C, Code, Fields, H2, H3, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/docs/alerts" },
   title: "Alerts & maintenance",
   description: "Where alerts go, how quickly they fire, and how to stay quiet during planned work.",
 };

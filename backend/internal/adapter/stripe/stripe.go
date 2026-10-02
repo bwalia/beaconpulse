@@ -330,6 +330,20 @@ func (c *Client) BillingPortalURL(ctx context.Context, customerID string) (strin
 	return sess.URL, nil
 }
 
+// DeleteCustomer deletes the Stripe customer, which immediately cancels its active
+// subscriptions and removes its saved payment methods. Invoices stay in Stripe.
+func (c *Client) DeleteCustomer(ctx context.Context, customerID string) error {
+	params := &stripe.CustomerParams{}
+	params.Context = ctx
+	if _, err := customer.Del(customerID, params); err != nil {
+		if customerInvalid(err) {
+			return nil // already gone — nothing left to bill
+		}
+		return fmt.Errorf("stripe delete customer: %w", err)
+	}
+	return nil
+}
+
 func (c *Client) priceFor(p plan.Plan) (string, error) {
 	switch p {
 	case plan.Starter:

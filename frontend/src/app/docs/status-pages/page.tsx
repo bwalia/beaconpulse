@@ -5,6 +5,7 @@ import Link from "next/link";
 import { C, Code, H2, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/docs/status-pages" },
   title: "Status pages",
   description: "A public page your customers can check instead of emailing you.",
 };

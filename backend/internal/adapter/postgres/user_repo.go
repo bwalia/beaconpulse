@@ -164,6 +164,49 @@ func (r *UserRepository) TouchLastLogin(ctx context.Context, userID uuid.UUID) e
 	return nil
 }
 
+// SetPassword replaces a user's password hash.
+func (r *UserRepository) SetPassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE users SET password_hash = $2 WHERE id = $1 AND deleted_at IS NULL`, userID, passwordHash)
+	if err != nil {
+		return apperror.Internal(fmt.Errorf("set password: %w", err))
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NotFound("user not found")
+	}
+	return nil
+}
+
+// DeleteOrganization permanently erases an organization and everything it owns.
+// Every tenant table cascades from organizations (users, monitors, channels and their
+// encrypted secrets, billing, API keys, device tokens, …). The audit trail would only
+// be orphaned (SET NULL) with emails and IPs still in it, so it is deleted explicitly
+// first — this is an erasure, not a deactivation.
+func (r *UserRepository) DeleteOrganization(ctx context.Context, orgID uuid.UUID) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return apperror.Internal(fmt.Errorf("begin delete org: %w", err))
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM audit_logs WHERE org_id = $1
+		    OR user_id IN (SELECT id FROM users WHERE org_id = $1)`, orgID); err != nil {
+		return apperror.Internal(fmt.Errorf("delete org audit trail: %w", err))
+	}
+	tag, err := tx.Exec(ctx, `DELETE FROM organizations WHERE id = $1`, orgID)
+	if err != nil {
+		return apperror.Internal(fmt.Errorf("delete org: %w", err))
+	}
+	if tag.RowsAffected() == 0 {
+		return apperror.NotFound("organization not found")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return apperror.Internal(fmt.Errorf("commit delete org: %w", err))
+	}
+	return nil
+}
+
 // SlugExists reports whether a non-deleted organization already uses slug.
 func (r *UserRepository) SlugExists(ctx context.Context, slug string) (bool, error) {
 	var exists bool

@@ -6,6 +6,7 @@ import { ApiConsole } from "@/components/docs/api-console";
 import { H2, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/docs/console" },
   title: "API console",
   description: `Call the live ${brand.name} API from your browser — paste a key and send a request.`,
 };

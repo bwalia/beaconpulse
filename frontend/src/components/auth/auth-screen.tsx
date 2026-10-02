@@ -164,6 +164,14 @@ function LoginForm() {
       <Field label={t("password")} error={errors.password?.message}>
         <PasswordInput register={register("password")} autoComplete="current-password" placeholder="Your password" />
       </Field>
+      <div className="-mt-2 text-right">
+        <Link
+          href="/forgot-password"
+          className="rounded text-sm font-medium text-brand-700 underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 dark:text-brand-400"
+        >
+          Forgot password?
+        </Link>
+      </div>
       <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting}>
         {isSubmitting ? "…" : t("signInButton")}
       </Button>
@@ -212,6 +220,17 @@ function RegisterForm() {
       <Button type="submit" size="lg" className="w-full text-lg" disabled={isSubmitting}>
         {isSubmitting ? "…" : t("createAccountButton")}
       </Button>
+      <p className="text-center text-sm text-slate-600 dark:text-slate-400">
+        By creating an account you agree to our{" "}
+        <Link href="/terms" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="font-medium text-brand-700 underline underline-offset-2 dark:text-brand-400">
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </form>
   );
 }

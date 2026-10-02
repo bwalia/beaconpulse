@@ -5,6 +5,7 @@ import Link from "next/link";
 import { C, Code, Fields, H2, H3, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/docs/monitors" },
   title: "Monitor types",
   description: `Every kind of check ${brand.name} can run, and when to reach for each.`,
 };

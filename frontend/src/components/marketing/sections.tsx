@@ -550,6 +550,18 @@ function Footer() {
           >
             {t("signIn")}
           </Link>
+          <Link
+            href="/terms"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+          >
+            Terms
+          </Link>
+          <Link
+            href="/privacy"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+          >
+            Privacy
+          </Link>
         </nav>
       </div>
     </footer>

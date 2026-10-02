@@ -119,10 +119,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 flex-col">
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/75 dark:border-slate-800 dark:bg-slate-900/90 dark:supports-[backdrop-filter]:bg-slate-900/75">
-          <div className="min-w-0 truncate text-sm text-slate-600 dark:text-slate-300">
+          <Link
+            href="/account"
+            title="Account settings"
+            className="min-w-0 truncate rounded text-sm text-slate-600 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-slate-300 dark:hover:text-white"
+          >
             <span className="font-medium text-slate-900 dark:text-slate-100">{user.name}</span> ·{" "}
             <span className="capitalize">{user.role}</span>
-          </div>
+          </Link>
           <div className="flex shrink-0 items-center gap-3">
             <LanguageSwitcher />
             <ThemeToggle />

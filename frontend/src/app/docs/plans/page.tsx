@@ -5,6 +5,7 @@ import Link from "next/link";
 import { C, Code, Fields, H2, Note } from "@/components/docs/parts";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/docs/plans" },
   title: "Plans & billing",
   description: "What each plan includes, and how pay-as-you-go credit works.",
 };

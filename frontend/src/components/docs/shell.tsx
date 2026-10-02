@@ -168,6 +168,12 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
           <Link href="/register" className="hover:text-slate-900 dark:hover:text-white">
             Create an account
           </Link>
+          <Link href="/terms" className="hover:text-slate-900 dark:hover:text-white">
+            Terms
+          </Link>
+          <Link href="/privacy" className="hover:text-slate-900 dark:hover:text-white">
+            Privacy
+          </Link>
         </div>
       </footer>
     </div>

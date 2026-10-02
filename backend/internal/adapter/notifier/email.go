@@ -52,7 +52,12 @@ func (e *EmailNotifier) Send(ctx context.Context, ch notification.Decrypted, msg
 	if err != nil {
 		return err
 	}
+	return e.deliver(ctx, cfg, ch.Secret, buildMIME(e.brand, cfg, msg))
+}
 
+// deliver runs one SMTP exchange for an already-rendered MIME message. It is the
+// only code in the product that speaks SMTP — alerts and account email both use it.
+func (e *EmailNotifier) deliver(ctx context.Context, cfg emailConfig, password, mime string) error {
 	ctx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
 
@@ -83,7 +88,7 @@ func (e *EmailNotifier) Send(ctx context.Context, ch notification.Decrypted, msg
 	}
 
 	if cfg.username != "" {
-		auth := smtp.PlainAuth("", cfg.username, ch.Secret, cfg.host)
+		auth := smtp.PlainAuth("", cfg.username, password, cfg.host)
 		if err := client.Auth(auth); err != nil {
 			return fmt.Errorf("email: authentication failed: %w", err)
 		}
@@ -102,7 +107,7 @@ func (e *EmailNotifier) Send(ctx context.Context, ch notification.Decrypted, msg
 	if err != nil {
 		return fmt.Errorf("email: DATA: %w", err)
 	}
-	if _, err := w.Write([]byte(buildMIME(e.brand, cfg, msg))); err != nil {
+	if _, err := w.Write([]byte(mime)); err != nil {
 		return fmt.Errorf("email: write body: %w", err)
 	}
 	if err := w.Close(); err != nil {

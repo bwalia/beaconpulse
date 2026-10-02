@@ -49,6 +49,8 @@ type RouterDeps struct {
 	Sync     *SyncHandler
 	// Device registers a mobile device's push token. Session-only, like API keys.
 	Device *DeviceHandler
+	// Account deletes the caller's account. Session-only.
+	Account *AccountHandler
 }
 
 // NewRouter builds the fully-wired HTTP handler: middleware chain, operational
@@ -179,6 +181,8 @@ func NewRouter(d RouterDeps) http.Handler {
 		// Mobile push-token registration. Session-only (a device belongs to a
 		// signed-in person, not to a machine key).
 		api.Mount("/devices", d.Device.Routes())
+		// Permanent account deletion (GDPR erasure / App Store requirement).
+		api.Mount("/account", d.Account.Routes())
 		// Alertmanager webhook: no JWT (Alertmanager can't present one); guarded
 		// by a shared secret inside the handler.
 		api.Post("/alerts/webhook", d.Alert.Webhook)
