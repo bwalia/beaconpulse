@@ -23,6 +23,9 @@ type Claims struct {
 	// PasswordFP is set only on password-reset tokens: a fingerprint of the user's
 	// password hash at issue time. See IssuePasswordResetToken.
 	PasswordFP string `json:"pfp,omitempty"`
+	// Email is set only on email-verification tokens: the address being confirmed,
+	// so a link can never verify a different address than the one it was sent to.
+	Email string `json:"eml,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -35,6 +38,8 @@ const (
 	proxyTokenType = "proxy"
 	// passwordResetTokenType marks the short-lived token mailed in a reset link.
 	passwordResetTokenType = "pwreset"
+	// emailVerifyTokenType marks the token mailed in an email-confirmation link.
+	emailVerifyTokenType = "verify"
 )
 
 // TokenManager issues short-lived JWT access tokens and generates opaque
@@ -154,6 +159,35 @@ func (m *TokenManager) IssuePasswordResetToken(u *User, ttl time.Duration) (stri
 // caller still has to compare PasswordFP against the user's current hash.
 func (m *TokenManager) ParsePasswordResetToken(raw string) (*Claims, error) {
 	return m.parseTyped(raw, passwordResetTokenType)
+}
+
+// IssueEmailVerifyToken signs a token confirming that whoever holds it can read the
+// mail sent to u.Email. Verifying is idempotent, so it needs no single-use binding.
+func (m *TokenManager) IssueEmailVerifyToken(u *User, ttl time.Duration) (string, error) {
+	now := m.now()
+	claims := Claims{
+		Type:  emailVerifyTokenType,
+		Email: u.Email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   u.ID.String(),
+			ID:        uuid.NewString(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+			Issuer:    "beacon",
+		},
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(m.accessSecret)
+	if err != nil {
+		return "", fmt.Errorf("sign email verify token: %w", err)
+	}
+	return signed, nil
+}
+
+// ParseEmailVerifyToken validates an email-verification token's signature, expiry
+// and type. The caller still checks Email against the account.
+func (m *TokenManager) ParseEmailVerifyToken(raw string) (*Claims, error) {
+	return m.parseTyped(raw, emailVerifyTokenType)
 }
 
 // PasswordFingerprint is a short, non-reversible digest of a password hash, used to

@@ -69,13 +69,20 @@ type User struct {
 	Role         Role
 	IsActive     bool
 	TwoFAEnabled bool
-	LastLoginAt  *time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// EmailVerifiedAt is when the person proved they own Email (clicked the emailed
+	// link, signed in with a provider that verified it, or completed a password
+	// reset). Nil = not yet.
+	EmailVerifiedAt *time.Time
+	LastLoginAt     *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // HasPassword reports whether the account can authenticate with a password.
 func (u *User) HasPassword() bool { return u.PasswordHash != "" }
+
+// EmailVerified reports whether the account's email address has been confirmed.
+func (u *User) EmailVerified() bool { return u.EmailVerifiedAt != nil }
 
 // RefreshToken is a persisted, hashed refresh credential. The plaintext value is
 // only ever held in memory and returned to the client once.

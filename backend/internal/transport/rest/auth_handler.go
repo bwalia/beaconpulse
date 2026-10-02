@@ -113,6 +113,8 @@ func (h *AuthHandler) Routes() chi.Router {
 		Post("/forgot-password", h.forgotPassword)
 	r.With(middleware.RateLimit(loginLimiter, middleware.ByIP, 30*time.Second)).
 		Post("/reset-password", h.resetPassword)
+	r.With(middleware.RateLimit(loginLimiter, middleware.ByIP, 30*time.Second)).
+		Post("/verify-email", h.verifyEmail)
 	r.Post("/refresh", h.refresh)
 	r.Post("/logout", h.logout)
 	return r
@@ -144,6 +146,44 @@ func (h *AuthHandler) forgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.OK(w, map[string]any{"status": "ok"})
+}
+
+type verifyEmailRequest struct {
+	Token string `json:"token" validate:"required,max=2048"`
+}
+
+// verifyEmail confirms an address from an emailed link. Public: the token is the
+// credential, so it works from any browser the link is opened in.
+func (h *AuthHandler) verifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req verifyEmailRequest
+	if err := httpx.DecodeJSON(w, r, &req, maxBodyBytes); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	if err := h.validator.Struct(req); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	if err := h.svc.VerifyEmail(r.Context(), req.Token, requestMeta(r)); err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	httpx.OK(w, map[string]any{"status": "verified"})
+}
+
+// ResendVerification mails the signed-in user a fresh confirmation link. Mounted
+// at POST /me/verify-email/resend (session-only, rate-limited) in server.go.
+func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	already, err := h.svc.ResendVerification(r.Context(), mustPrincipal(r).UserID, requestMeta(r))
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	if already {
+		httpx.OK(w, map[string]any{"status": "already_verified"})
+		return
+	}
+	httpx.OK(w, map[string]any{"status": "sent"})
 }
 
 func (h *AuthHandler) resetPassword(w http.ResponseWriter, r *http.Request) {
@@ -207,6 +247,9 @@ type userResponse struct {
 	Role         string `json:"role"`
 	IsActive     bool   `json:"is_active"`
 	TwoFAEnabled bool   `json:"twofa_enabled"`
+	// EmailVerified is false until the person confirms their address; the web app
+	// shows a "confirm your email" banner while it is.
+	EmailVerified bool `json:"email_verified"`
 	// IsPlatformAdmin is true for operator accounts that may edit platform-global
 	// settings (pricing, limits, premium access). Org role is separate from this.
 	IsPlatformAdmin bool       `json:"is_platform_admin"`
@@ -223,6 +266,7 @@ func (h *AuthHandler) presentUser(u *auth.User) userResponse {
 		Role:            string(u.Role),
 		IsActive:        u.IsActive,
 		TwoFAEnabled:    u.TwoFAEnabled,
+		EmailVerified:   u.EmailVerified(),
 		IsPlatformAdmin: emailmatch.Match(h.platformAdmins, u.Email),
 		LastLoginAt:     u.LastLoginAt,
 		CreatedAt:       u.CreatedAt,

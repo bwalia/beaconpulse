@@ -88,6 +88,14 @@ func (f *fakeUserRepo) SetPassword(_ context.Context, id uuid.UUID, hash string)
 	return nil
 }
 
+func (f *fakeUserRepo) MarkEmailVerified(_ context.Context, id uuid.UUID) error {
+	if u, ok := f.usersByID[id]; ok && u.EmailVerifiedAt == nil {
+		now := time.Now()
+		u.EmailVerifiedAt = &now
+	}
+	return nil
+}
+
 type fakeRefreshRepo struct {
 	byHash map[string]*RefreshToken
 	byID   map[uuid.UUID]*RefreshToken
