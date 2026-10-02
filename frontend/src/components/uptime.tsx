@@ -118,8 +118,12 @@ export function UptimeStrip({
           style={{ background: slotFill(slot.state), opacity: slot.state === "none" ? 0.35 : 1 }}
           title={
             slot.t
-              ? `${fullStamp(slot.t)} · ${slot.state === "up" ? "operational" : "down"}`
-              : "no data for this window"
+              ? `${fullStamp(slot.t)}\n${
+                  slot.state === "up"
+                    ? "✓ Operational — this check passed"
+                    : "✗ Down — this check failed"
+                }`
+              : "No data collected for this window"
           }
         />
       ))}

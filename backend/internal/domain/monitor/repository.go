@@ -17,6 +17,25 @@ type StatusUpdate struct {
 	CheckedAt time.Time
 }
 
+// GitHubRun is one recorded github_actions workflow run — the history behind a
+// push monitor, which otherwise keeps only its latest status. Status is our
+// classification; Conclusion is GitHub's raw word. The rest is context for the
+// per-run tooltip and the link back to the run on github.com.
+type GitHubRun struct {
+	MonitorID  uuid.UUID
+	Status     Status
+	Conclusion string
+	Workflow   string
+	RunNumber  string
+	RunAttempt string
+	Branch     string
+	SHA        string
+	Actor      string
+	EventName  string
+	RunURL     string
+	CreatedAt  time.Time
+}
+
 // ListFilter narrows and paginates a monitor listing within an organization.
 type ListFilter struct {
 	ProjectID *uuid.UUID
@@ -55,6 +74,14 @@ type Repository interface {
 	// and last_checked_at). Paused monitors are left untouched. Returns the
 	// number of rows updated.
 	ApplyStatusUpdates(ctx context.Context, updates []StatusUpdate) (int64, error)
+
+	// RecordGitHubRun appends one github_actions run to the history log. Shared
+	// with the githubactions ingest context, which satisfies this same repository.
+	RecordGitHubRun(ctx context.Context, run GitHubRun) error
+
+	// ListGitHubRuns returns a monitor's recent runs, newest first (org-scoped: a
+	// monitor in another org yields no rows). limit caps the result.
+	ListGitHubRuns(ctx context.Context, orgID, monitorID uuid.UUID, limit int) ([]GitHubRun, error)
 }
 
 // OrgPlanReader resolves an organization's subscription plan. The service maps

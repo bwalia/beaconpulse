@@ -129,6 +129,24 @@ export interface MonitorMetrics {
   response_ms: MetricPoint[];
 }
 
+// GitHubRun is one recorded github_actions workflow run — the push monitor's
+// history, where a passing run no longer overwrites a failing one. `status` is our
+// up/down/unknown classification; `conclusion` is GitHub's raw word (success,
+// failure, cancelled, timed_out, …).
+export interface GitHubRun {
+  status: MonitorStatus;
+  conclusion: string;
+  workflow?: string;
+  run_number?: string;
+  run_attempt?: string;
+  branch?: string;
+  sha?: string;
+  actor?: string;
+  event_name?: string;
+  run_url?: string;
+  created_at: string;
+}
+
 export interface Usage {
   plan: string;
   monitors_used: number;

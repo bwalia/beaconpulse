@@ -41,6 +41,7 @@ func (h *MonitorHandler) Routes() chi.Router {
 	r.Get("/usage", h.usage)
 	r.Get("/{id}", h.get)
 	r.Get("/{id}/metrics", h.metrics)
+	r.Get("/{id}/runs", h.runs)
 	r.With(h.auth.RequireWriter).Post("/", h.create)
 	r.With(h.auth.RequireWriter).Patch("/{id}", h.update)
 	r.With(h.auth.RequireWriter).Delete("/{id}", h.delete)
@@ -402,6 +403,47 @@ func (h *MonitorHandler) metrics(w http.ResponseWriter, r *http.Request) {
 		Up:                toMetricPoints(m.Up),
 		ResponseMs:        toMetricPoints(m.ResponseMs),
 	})
+}
+
+type githubRunResponse struct {
+	Status     string    `json:"status"`
+	Conclusion string    `json:"conclusion"`
+	Workflow   string    `json:"workflow,omitempty"`
+	RunNumber  string    `json:"run_number,omitempty"`
+	RunAttempt string    `json:"run_attempt,omitempty"`
+	Branch     string    `json:"branch,omitempty"`
+	SHA        string    `json:"sha,omitempty"`
+	Actor      string    `json:"actor,omitempty"`
+	EventName  string    `json:"event_name,omitempty"`
+	RunURL     string    `json:"run_url,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// runs returns a github_actions monitor's recent run history, newest first. Empty
+// (never null) for a monitor with no reported runs yet, so the UI renders an empty
+// state rather than an error. Works for any monitor the caller's org owns; a
+// non-github monitor simply has no runs.
+func (h *MonitorHandler) runs(w http.ResponseWriter, r *http.Request) {
+	id, err := parseIDParam(r, "id")
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	list, err := h.svc.GitHubRuns(r.Context(), monitorActor(r), id, 50)
+	if err != nil {
+		httpx.Error(w, r, err)
+		return
+	}
+	out := make([]githubRunResponse, 0, len(list))
+	for _, run := range list {
+		out = append(out, githubRunResponse{
+			Status: string(run.Status), Conclusion: run.Conclusion, Workflow: run.Workflow,
+			RunNumber: run.RunNumber, RunAttempt: run.RunAttempt, Branch: run.Branch,
+			SHA: run.SHA, Actor: run.Actor, EventName: run.EventName, RunURL: run.RunURL,
+			CreatedAt: run.CreatedAt,
+		})
+	}
+	httpx.OK(w, map[string]any{"runs": out})
 }
 
 func toMetricPoints(pts []insight.Point) []metricPoint {

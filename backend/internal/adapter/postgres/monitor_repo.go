@@ -358,6 +358,57 @@ func (r *MonitorRepository) GitHubByTokenHash(ctx context.Context, hash string) 
 	return m, nil
 }
 
+// RecordGitHubRun appends one github_actions run to the history log. Append-only:
+// the row is never updated, so a later green run no longer erases an earlier red one.
+func (r *MonitorRepository) RecordGitHubRun(ctx context.Context, run monitor.GitHubRun) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO github_runs
+		   (monitor_id, status, conclusion, workflow, run_number, run_attempt,
+		    branch, sha, actor, event_name, run_url, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		run.MonitorID, string(run.Status), run.Conclusion, run.Workflow, run.RunNumber,
+		run.RunAttempt, run.Branch, run.SHA, run.Actor, run.EventName, run.RunURL, run.CreatedAt)
+	if err != nil {
+		return apperror.Internal(fmt.Errorf("record github run: %w", err))
+	}
+	return nil
+}
+
+// ListGitHubRuns returns a monitor's recent runs, newest first. The join on monitors
+// enforces org scope (a monitor in another org, or a soft-deleted one, yields no rows).
+func (r *MonitorRepository) ListGitHubRuns(ctx context.Context, orgID, monitorID uuid.UUID, limit int) ([]monitor.GitHubRun, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT gr.status, gr.conclusion, gr.workflow, gr.run_number, gr.run_attempt,
+		        gr.branch, gr.sha, gr.actor, gr.event_name, gr.run_url, gr.created_at
+		   FROM github_runs gr
+		   JOIN monitors m ON m.id = gr.monitor_id
+		  WHERE gr.monitor_id = $1 AND m.org_id = $2 AND m.deleted_at IS NULL
+		  ORDER BY gr.created_at DESC
+		  LIMIT $3`,
+		monitorID, orgID, limit)
+	if err != nil {
+		return nil, apperror.Internal(fmt.Errorf("list github runs: %w", err))
+	}
+	defer rows.Close()
+
+	out := make([]monitor.GitHubRun, 0, limit)
+	for rows.Next() {
+		run := monitor.GitHubRun{MonitorID: monitorID}
+		var status string
+		if err := rows.Scan(&status, &run.Conclusion, &run.Workflow, &run.RunNumber,
+			&run.RunAttempt, &run.Branch, &run.SHA, &run.Actor, &run.EventName,
+			&run.RunURL, &run.CreatedAt); err != nil {
+			return nil, apperror.Internal(fmt.Errorf("scan github run: %w", err))
+		}
+		run.Status = monitor.Status(status)
+		out = append(out, run)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, apperror.Internal(fmt.Errorf("iterate github runs: %w", err))
+	}
+	return out, nil
+}
+
 // nullIfEmpty maps an empty string to a SQL NULL. github_token_hash carries a
 // partial UNIQUE index, so the many monitors without a token must store NULL (many
 // allowed) rather than a shared empty string (which would collide on the second row).

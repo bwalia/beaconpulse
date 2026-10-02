@@ -17,6 +17,7 @@ type fakeRepo struct {
 	m          *monitor.Monitor
 	lastStatus monitor.Status
 	applied    int
+	recorded   []monitor.GitHubRun
 }
 
 func (f *fakeRepo) GitHubByTokenHash(_ context.Context, hash string) (*monitor.Monitor, error) {
@@ -32,6 +33,11 @@ func (f *fakeRepo) ApplyStatusUpdates(_ context.Context, updates []monitor.Statu
 		f.applied++
 	}
 	return int64(len(updates)), nil
+}
+
+func (f *fakeRepo) RecordGitHubRun(_ context.Context, run monitor.GitHubRun) error {
+	f.recorded = append(f.recorded, run)
+	return nil
 }
 
 func newFixture(m *monitor.Monitor) (*Service, *fakeRepo, string) {
@@ -142,6 +148,23 @@ func TestIngest_CancelledIsIgnored(t *testing.T) {
 	}
 	if repo.applied != 0 {
 		t.Fatalf("cancelled must not change status, but %d update(s) applied", repo.applied)
+	}
+	// Even an outcome we don't act on belongs in the history, so the dashboard shows
+	// every run — not just the ones that flipped the status.
+	if len(repo.recorded) != 1 || repo.recorded[0].Conclusion != "cancelled" {
+		t.Fatalf("want the cancelled run recorded in history, got %+v", repo.recorded)
+	}
+}
+
+func TestIngest_WorkflowFilterMismatchNotRecorded(t *testing.T) {
+	m := baseMonitor()
+	m.Settings.GitHubWorkflow = "Deploy"
+	svc, repo, token := newFixture(m)
+	if _, err := svc.Ingest(context.Background(), token, Event{Status: "failure", Workflow: "CI"}); err != nil {
+		t.Fatalf("ingest: %v", err)
+	}
+	if len(repo.recorded) != 0 {
+		t.Fatalf("a run for a different workflow is not this monitor's history, got %+v", repo.recorded)
 	}
 }
 
