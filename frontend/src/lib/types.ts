@@ -47,7 +47,9 @@ export interface MonitorSettings {
   body_not_keyword?: string;
   follow_redirects?: boolean;
   skip_tls_verify?: boolean;
+  /** Values are always "********" from the API; send back unchanged to keep them. */
   headers?: Record<string, string>;
+  body?: string;
   ssl_expiry_warning_days?: number;
   response_time_warning_ms?: number;
   alert_sensitivity?: string;

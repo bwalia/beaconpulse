@@ -66,7 +66,10 @@ const schema = z.object({
   grace_seconds: z.coerce.number().int().min(0).max(86400).optional(),
   // Advanced (all optional)
   valid_status_codes: z.string().optional(),
+  method: z.string().optional(),
+  body: z.string().max(8192, "Keep the request body under 8 KB").optional(),
   body_keyword: z.string().optional(),
+  body_not_keyword: z.string().optional(),
   follow_redirects: z.boolean().optional(),
   skip_tls_verify: z.boolean().optional(),
   response_time_warning_ms: z.coerce.number().int().min(0).optional(),
@@ -87,7 +90,10 @@ type Values = z.infer<typeof schema>;
 // both the create and edit forms.
 type AdvancedFields = {
   valid_status_codes?: string;
+  method?: string;
+  body?: string;
   body_keyword?: string;
+  body_not_keyword?: string;
   follow_redirects?: boolean;
   skip_tls_verify?: boolean;
   response_time_warning_ms?: number;
@@ -110,7 +116,10 @@ const SENSITIVITY_OPTIONS = [
 // omitting anything the user left blank.
 function buildSettings(v: AdvancedFields): Record<string, unknown> {
   const s: Record<string, unknown> = {};
+  if (v.method && v.method !== "GET") s.method = v.method;
+  if (v.body?.trim()) s.body = v.body;
   if (v.body_keyword) s.body_keyword = v.body_keyword;
+  if (v.body_not_keyword) s.body_not_keyword = v.body_not_keyword;
   if (v.follow_redirects) s.follow_redirects = true;
   if (v.skip_tls_verify) s.skip_tls_verify = true;
   if (v.response_time_warning_ms) s.response_time_warning_ms = v.response_time_warning_ms;
@@ -139,6 +148,75 @@ function buildSettings(v: AdvancedFields): Record<string, unknown> {
     if (Object.keys(h).length) s.headers = h;
   }
   return s;
+}
+
+const HTTP_METHODS = ["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE"];
+
+// withHeader sets one "Name: value" line in the headers textarea, replacing any
+// existing line for the same (case-insensitive) name.
+function withHeader(text: string | undefined, name: string, value: string): string {
+  const keep = (text ?? "")
+    .split("\n")
+    .filter((l) => l.trim() && l.slice(0, l.indexOf(":")).trim().toLowerCase() !== name.toLowerCase());
+  return [...keep, `${name}: ${value}`].join("\n");
+}
+
+// base64 of UTF-8 text — btoa alone throws on anything outside Latin-1.
+const base64 = (s: string) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+
+// AuthHeaderHelper builds the auth header for a private page or API, so nobody has
+// to remember "Bearer " or base64-encode user:password by hand. It only writes a
+// line into the headers field; the headers field stays the single source of truth.
+function AuthHeaderHelper({ onAdd }: { onAdd: (name: string, value: string) => void }) {
+  const [kind, setKind] = useState<"bearer" | "basic" | "apikey">("bearer");
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const add = () => {
+    if (kind === "bearer") onAdd("Authorization", `Bearer ${a.trim()}`);
+    else if (kind === "basic") onAdd("Authorization", `Basic ${base64(`${a}:${b}`)}`);
+    else onAdd(a.trim() || "X-API-Key", b.trim());
+    setA("");
+    setB("");
+  };
+  const ready = kind === "basic" ? a !== "" : kind === "bearer" ? a.trim() !== "" : b.trim() !== "";
+  return (
+    <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-slate-300 p-2 dark:border-slate-700">
+      <Select aria-label="Authentication type" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} className="!w-auto">
+        <option value="bearer">Bearer token</option>
+        <option value="basic">Basic auth</option>
+        <option value="apikey">API key header</option>
+      </Select>
+      {kind === "bearer" && (
+        <Input aria-label="Token" type="password" autoComplete="off" placeholder="Token" value={a} onChange={(e) => setA(e.target.value)} className="min-w-40 flex-1" />
+      )}
+      {kind === "basic" && (
+        <>
+          <Input aria-label="Username" autoComplete="off" placeholder="Username" value={a} onChange={(e) => setA(e.target.value)} className="min-w-28 flex-1" />
+          <Input aria-label="Password" type="password" autoComplete="new-password" placeholder="Password" value={b} onChange={(e) => setB(e.target.value)} className="min-w-28 flex-1" />
+        </>
+      )}
+      {kind === "apikey" && (
+        <>
+          <Input aria-label="Header name" autoComplete="off" placeholder="X-API-Key" value={a} onChange={(e) => setA(e.target.value)} className="min-w-28 flex-1" />
+          <Input aria-label="Key" type="password" autoComplete="off" placeholder="Key" value={b} onChange={(e) => setB(e.target.value)} className="min-w-28 flex-1" />
+        </>
+      )}
+      <Button type="button" size="sm" variant="secondary" onClick={add} disabled={!ready}>
+        Add header
+      </Button>
+    </div>
+  );
+}
+
+// RedirectHint sits under "Follow redirects" — the trap behind a monitor that's
+// green while the page it names is broken (checkout → /cart, private → /login).
+function RedirectHint() {
+  return (
+    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+      Off: a redirect (e.g. checkout → /cart, private page → /login) is judged by itself and usually counts
+      as up. Turn on to check the page you end up on.
+    </p>
+  );
 }
 
 const targetHints: Record<string, string> = {
@@ -934,7 +1012,10 @@ const editSchema = z.object({
   target: z.string().min(1, "Target is required"),
   interval_seconds: z.coerce.number().int().min(10).max(86400),
   valid_status_codes: z.string().optional(),
+  method: z.string().optional(),
+  body: z.string().max(8192, "Keep the request body under 8 KB").optional(),
   body_keyword: z.string().optional(),
+  body_not_keyword: z.string().optional(),
   follow_redirects: z.boolean().optional(),
   skip_tls_verify: z.boolean().optional(),
   response_time_warning_ms: z.coerce.number().int().min(0).optional(),
@@ -961,6 +1042,8 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
   const {
     register,
     handleSubmit,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<EditValues>({
     resolver: zodResolver(editSchema),
@@ -969,7 +1052,10 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
       target: monitor.target,
       interval_seconds: monitor.interval_seconds,
       valid_status_codes: (s.valid_status_codes ?? []).join(", "),
+      method: s.method ?? "GET",
+      body: s.body ?? "",
       body_keyword: s.body_keyword ?? "",
+      body_not_keyword: s.body_not_keyword ?? "",
       follow_redirects: s.follow_redirects ?? false,
       skip_tls_verify: s.skip_tls_verify ?? false,
       response_time_warning_ms: s.response_time_warning_ms,
@@ -1062,11 +1148,21 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
 
           {isHTTP && (
             <>
+              <Field label="Method" error={errors.method?.message}>
+                <Select {...register("method")}>
+                  {HTTP_METHODS.map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </Select>
+              </Field>
               <Field label="Expected status codes" error={errors.valid_status_codes?.message}>
                 <Input placeholder="200, 204, 301" {...register("valid_status_codes")} />
               </Field>
               <Field label="Response body must contain" error={errors.body_keyword?.message}>
                 <Input {...register("body_keyword")} />
+              </Field>
+              <Field label="Response body must NOT contain" error={errors.body_not_keyword?.message}>
+                <Input placeholder="e.g. Out of stock" {...register("body_not_keyword")} />
               </Field>
               <Field label="Slow-response alert (ms, blank = off)" error={errors.response_time_warning_ms?.message}>
                 <Input type="number" {...register("response_time_warning_ms")} />
@@ -1074,16 +1170,34 @@ function EditMonitorModal({ monitor, onClose }: { monitor: Monitor; onClose: () 
               <Field label="SSL expiry warning (days)" error={errors.ssl_expiry_warning_days?.message}>
                 <Input type="number" {...register("ssl_expiry_warning_days")} />
               </Field>
-              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                <input type="checkbox" className="h-4 w-4" {...register("follow_redirects")} /> Follow redirects
-              </label>
+              <div className="sm:col-span-2">
+                <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <input type="checkbox" className="h-4 w-4" {...register("follow_redirects")} /> Follow redirects
+                </label>
+                <RedirectHint />
+              </div>
               <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                 <input type="checkbox" className="h-4 w-4" {...register("skip_tls_verify")} /> Skip TLS verification
               </label>
               <div className="sm:col-span-2">
-                <Field label="Custom headers (one per line, Name: value)" error={errors.headers?.message}>
-                  <Textarea rows={3} {...register("headers")} />
+                <Field label="Request body (optional, for POST/PUT/PATCH)" error={errors.body?.message}>
+                  <Textarea rows={3} className="font-mono text-sm" placeholder={'{"ping": true}'} {...register("body")} />
                 </Field>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Visible to your team — put credentials in headers, which are hidden once saved.
+                </p>
+              </div>
+              <div className="sm:col-span-2">
+                <Field label="Custom headers (one per line, Name: value)" error={errors.headers?.message}>
+                  <Textarea rows={3} className="font-mono text-sm" {...register("headers")} />
+                </Field>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Saved values are encrypted and shown as ********. Leave a line as it is to keep its value, replace
+                  the value to change it, or delete the line to remove the header.
+                </p>
+                <AuthHeaderHelper
+                  onAdd={(name, value) => setValue("headers", withHeader(getValues("headers"), name, value), { shouldDirty: true })}
+                />
               </div>
             </>
           )}
@@ -1413,11 +1527,21 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
 
         {showAdvanced && isHTTP && (
           <>
+            <Field label="Method" error={errors.method?.message}>
+              <Select {...register("method")}>
+                {HTTP_METHODS.map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+              </Select>
+            </Field>
             <Field label="Expected status codes" error={errors.valid_status_codes?.message}>
               <Input placeholder="200, 204, 301 (blank = 2xx/3xx)" {...register("valid_status_codes")} />
             </Field>
             <Field label="Response body must contain" error={errors.body_keyword?.message}>
-              <Input placeholder='e.g. "status":"ok"' {...register("body_keyword")} />
+              <Input placeholder='e.g. "status":"ok" or Place order' {...register("body_keyword")} />
+            </Field>
+            <Field label="Response body must NOT contain" error={errors.body_not_keyword?.message}>
+              <Input placeholder="e.g. Out of stock" {...register("body_not_keyword")} />
             </Field>
             <Field label="Slow-response alert (ms, blank = off)" error={errors.response_time_warning_ms?.message}>
               <Input type="number" placeholder="2000" {...register("response_time_warning_ms")} />
@@ -1425,16 +1549,38 @@ function CreateMonitorForm({ onDone }: { onDone: () => void }) {
             <Field label="SSL expiry warning (days)" error={errors.ssl_expiry_warning_days?.message}>
               <Input type="number" placeholder="30" {...register("ssl_expiry_warning_days")} />
             </Field>
-            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <input type="checkbox" className="h-4 w-4" {...register("follow_redirects")} /> Follow redirects
-            </label>
+            <div className="sm:col-span-2">
+              <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input type="checkbox" className="h-4 w-4" {...register("follow_redirects")} /> Follow redirects
+              </label>
+              <RedirectHint />
+            </div>
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
               <input type="checkbox" className="h-4 w-4" {...register("skip_tls_verify")} /> Skip TLS verification
             </label>
             <div className="sm:col-span-2">
-              <Field label="Custom headers (one per line, Name: value) — use for auth" error={errors.headers?.message}>
-                <Textarea rows={3} placeholder={"Authorization: Bearer xxx\nX-API-Key: abc123"} {...register("headers")} />
+              <Field label="Request body (optional, for POST/PUT/PATCH)" error={errors.body?.message}>
+                <Textarea rows={3} className="font-mono text-sm" placeholder={'{"ping": true}'} {...register("body")} />
               </Field>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Visible to your team — put credentials in headers, which are hidden once saved.
+              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <Field label="Custom headers (one per line, Name: value) — use for auth" error={errors.headers?.message}>
+                <Textarea
+                  rows={3}
+                  className="font-mono text-sm"
+                  placeholder={"Authorization: Bearer xxx\nX-API-Key: abc123"}
+                  {...register("headers")}
+                />
+              </Field>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                For a private page or API. Values are encrypted and never shown again after saving.
+              </p>
+              <AuthHeaderHelper
+                onAdd={(name, value) => setValue("headers", withHeader(getValues("headers"), name, value), { shouldDirty: true })}
+              />
             </div>
           </>
         )}
