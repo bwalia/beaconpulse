@@ -20,3 +20,12 @@ ALTER TABLE device_tokens
 ALTER TABLE notification_channels DROP CONSTRAINT IF EXISTS notification_channels_type_check;
 ALTER TABLE notification_channels ADD CONSTRAINT notification_channels_type_check
     CHECK (type IN ('telegram', 'slack', 'discord', 'email', 'webhook', 'teams', 'apns', 'webpush'));
+
+-- Secrets the platform generates for itself — today the VAPID key, created on
+-- first start when BEACON_WEBPUSH_PRIVATE_KEY isn't set, so browser push needs
+-- no setup. Values are encrypted by the app with BEACON_ENCRYPTION_KEY.
+CREATE TABLE platform_secrets (
+    name       TEXT PRIMARY KEY,
+    value      TEXT        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

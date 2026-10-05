@@ -210,22 +210,18 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		log.Info("apple push (APNs) enabled",
 			slog.String("topic", cfg.Push.APNsTopic), slog.Bool("production", cfg.Push.APNsProduction))
 	}
-	// Browser push (VAPID): same graceful degradation — no key, no browser push,
-	// and the UI hides the option. One key per deployment; browsers subscribe with
-	// its public half, served at GET /api/v1/devices/webpush.
+	// Browser push (VAPID). The key comes from BEACON_WEBPUSH_PRIVATE_KEY, or is
+	// generated on first start and kept (encrypted) in the database, so browser
+	// push works on every deployment with no setup and the key stays stable.
+	// Browsers subscribe with its public half, served at GET /api/v1/devices/webpush.
+	// Any problem here turns browser push off rather than stopping the API.
 	var webPushKey string
-	if cfg.Push.WebPushEnabled() {
-		subject := cfg.Push.WebPushSubject
-		if subject == "" {
-			subject = cfg.Notify.DashboardURL
-		}
-		wp, err := webpush.New(cfg.Push.WebPushPrivateKey, subject, tenantHTTP)
-		if err != nil {
-			return nil, fmt.Errorf("browser push: %w", err)
-		}
+	if wp, err := newWebPush(cfg, pool, cipher, tenantHTTP); err != nil {
+		log.Warn("browser push disabled", slog.String("error", err.Error()))
+	} else {
 		notifierRegistry[notification.TypeWebPush] = notifier.NewWebPushNotifier(wp, deviceRepo)
 		webPushKey = wp.PublicKey()
-		log.Info("browser push (VAPID) enabled", slog.String("subject", subject))
+		log.Info("browser push (VAPID) enabled")
 	}
 	projectLookup := postgres.NewProjectLookupAdapter(projectRepo)
 	notifySvc := notification.NewService(notificationRepo, cipher, notifierRegistry, auditRec, cfg.Notify.DashboardURL)
@@ -534,4 +530,23 @@ func runMigrate(ctx context.Context, pool *pgxpool.Pool, args []string) error {
 	default:
 		return fmt.Errorf("unknown migrate subcommand %q (want up|status)", sub)
 	}
+}
+
+// newWebPush builds the browser push client from the configured VAPID key, or
+// from one generated once and stored in platform_secrets.
+func newWebPush(cfg config.Config, pool *pgxpool.Pool, cipher *crypto.Cipher, httpClient webpush.Doer) (*webpush.Client, error) {
+	key := cfg.Push.WebPushPrivateKey
+	if key == "" {
+		var err error
+		key, err = postgres.NewPlatformSecretRepository(pool, cipher).
+			GetOrCreate(context.Background(), "webpush_vapid_private_key", webpush.GenerateKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+	subject := cfg.Push.WebPushSubject
+	if subject == "" {
+		subject = cfg.Notify.DashboardURL // must be https: (or set a mailto: subject)
+	}
+	return webpush.New(key, subject, httpClient)
 }

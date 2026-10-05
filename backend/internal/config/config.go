@@ -310,7 +310,8 @@ type Push struct {
 
 	// WebPushPrivateKey is the VAPID private key for browser push: a raw P-256
 	// scalar, base64url (32 bytes). The public key browsers subscribe with is
-	// derived from it. Empty disables browser push.
+	// derived from it. Optional: when empty the API generates one on first start
+	// and keeps it, encrypted, in the database (platform_secrets).
 	WebPushPrivateKey string
 	// WebPushSubject is the VAPID contact (a mailto: or https: URL) push services
 	// use to reach the sender. Defaults to the dashboard URL.
@@ -321,9 +322,6 @@ type Push struct {
 func (p Push) Enabled() bool {
 	return p.APNsKeyP8 != "" && p.APNsKeyID != "" && p.APNsTeamID != "" && p.APNsTopic != ""
 }
-
-// WebPushEnabled reports whether browser (VAPID) push is configured.
-func (p Push) WebPushEnabled() bool { return p.WebPushPrivateKey != "" }
 
 // Crypto holds symmetric-encryption configuration used to protect secrets at
 // rest (e.g. notification credentials).

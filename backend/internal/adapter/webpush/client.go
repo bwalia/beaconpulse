@@ -124,6 +124,15 @@ func New(privateKey, subject string, httpClient Doer) (*Client, error) {
 	}, nil
 }
 
+// GenerateKey returns a new VAPID private key, in the form New accepts.
+func GenerateKey() (string, error) {
+	k, err := ecdh.P256().GenerateKey(rand.Reader)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(k.Bytes()), nil
+}
+
 // PublicKey is the VAPID public key browsers pass to PushManager.subscribe().
 func (c *Client) PublicKey() string { return c.public }
 
