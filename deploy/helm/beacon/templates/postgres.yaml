@@ -64,10 +64,24 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            {{- if .Values.backup.enabled }}
+            # Read-only view of the nightly dumps, so a restore can run in place. It
+            # also makes Postgres the backup volume's first consumer: local-path binds
+            # on first use, and the CronJob alone would leave it Pending until 02:30,
+            # failing `helm --wait`.
+            - name: backups
+              mountPath: /backups
+              readOnly: true
+            {{- end }}
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: beacon-postgres-data
+        {{- if .Values.backup.enabled }}
+        - name: backups
+          persistentVolumeClaim:
+            claimName: beacon-postgres-backups
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service
