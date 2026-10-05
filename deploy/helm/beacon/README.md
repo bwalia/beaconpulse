@@ -203,9 +203,9 @@ kubectl -n <ns> create job --from=cronjob/beacon-postgres-backup beacon-postgres
 NS=sysops-prod
 PG=$(kubectl -n $NS get pod -l app=beacon-postgres -o name)
 kubectl -n $NS scale deploy/beacon-api deploy/beacon-worker --replicas=0
-# From the local volume: copy a dump out of a backup job pod, or download it from the bucket.
-kubectl -n $NS cp ./beacon-YYYYMMDDTHHMMSSZ.dump ${PG#pod/}:/tmp/restore.dump
-kubectl -n $NS exec ${PG#pod/} -- pg_restore -U beacon -d beacon --clean --if-exists --no-owner /tmp/restore.dump
+# Local dumps are mounted read-only at /backups in the Postgres pod; /backups/LATEST names the newest.
+# For an off-site copy, download it and `kubectl -n $NS cp` it to ${PG#pod/}:/tmp/ instead.
+kubectl -n $NS exec ${PG#pod/} -- sh -c 'pg_restore -U beacon -d beacon --clean --if-exists --no-owner "$(cat /backups/LATEST)"'
 kubectl -n $NS scale deploy/beacon-api deploy/beacon-worker --replicas=2
 ```
 
