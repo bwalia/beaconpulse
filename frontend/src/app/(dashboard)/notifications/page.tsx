@@ -21,8 +21,10 @@ import { Button, Card, EmptyState, Field, Input, PageHeader, Skeleton } from "@/
 import { useConfirm } from "@/components/confirm";
 import type { NotificationChannel } from "@/lib/types";
 import { BellIcon, LockIcon, PlusIcon, SearchIcon, XIcon } from "@/components/icons";
+import { DeviceAlertsCard } from "@/components/device-alerts";
 import {
   CHANNEL_TYPES,
+  PUSH_CHANNELS,
   channelTypeDef,
   toChannelPayload,
   type ChannelTypeDef,
@@ -87,6 +89,8 @@ export default function NotificationsPage() {
       )}
 
       {showForm && <CreateChannelForm onDone={() => setShowForm(false)} setNotice={setNotice} />}
+
+      <DeviceAlertsCard />
 
       {(total > 0 || filtering) && !isLoading && (
         <SearchInput
@@ -166,6 +170,7 @@ function ChannelRow({
   const confirm = useConfirm();
 
   const def = channelTypeDef(channel.type);
+  const push = PUSH_CHANNELS[channel.type];
 
   return (
     <Card
@@ -178,7 +183,7 @@ function ChannelRow({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-slate-900 dark:text-white">{channel.name}</span>
             <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-900/30 dark:text-brand-300">
-              {def?.label ?? channel.type}
+              {def?.label ?? push?.label ?? channel.type}
             </span>
             {!channel.enabled && (
               <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-400">
@@ -187,7 +192,7 @@ function ChannelRow({
             )}
           </div>
           <p className="mt-1 inline-flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
-            <span className="truncate font-mono">{def?.summary(channel) ?? channel.type}</span>
+            <span className={`truncate ${push ? "" : "font-mono"}`}>{def?.summary(channel) ?? push?.summary ?? channel.type}</span>
             {channel.has_secret && (
               <span className="inline-flex shrink-0 items-center gap-1">
                 · secret <LockIcon className="h-3 w-3" />

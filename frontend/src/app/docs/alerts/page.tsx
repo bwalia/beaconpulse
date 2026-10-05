@@ -30,6 +30,7 @@ export default function Alerts() {
           { name: "Slack", type: "channel", desc: "An incoming webhook URL." },
           { name: "Email", type: "channel", desc: "Your own SMTP server — the credentials stay encrypted at rest." },
           { name: "Webhook", type: "channel", desc: "A POST to your endpoint. For PagerDuty, Opsgenie, or your own tooling." },
+          { name: "Browser push", type: "channel", desc: <>Notifications on your computer or phone, even with the app closed. Turn them on per device under <C>Notifications → Alerts on this device</C>; on iPhone and iPad, add the app to your Home Screen first.</> },
         ]}
       />
       <Note>
