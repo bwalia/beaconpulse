@@ -30,6 +30,7 @@ import (
 	"beacon/internal/domain/plan"
 	"beacon/internal/domain/settings"
 	"beacon/internal/platform/cache"
+	"beacon/internal/platform/crypto"
 	"beacon/internal/platform/database"
 	"beacon/internal/platform/logger"
 	"beacon/internal/worker"
@@ -82,7 +83,12 @@ func run() error {
 	defer func() { _ = rdb.Close() }()
 
 	// Control-plane syncer: reads monitors, regenerates config, reloads services.
-	monitorRepo := postgres.NewMonitorRepository(pool)
+	// The cipher opens monitors' encrypted header values for the prober config.
+	cipher, err := crypto.NewCipher(cfg.Crypto.EncryptionKey)
+	if err != nil {
+		return err
+	}
+	monitorRepo := postgres.NewMonitorRepository(pool, cipher)
 	refreshRepo := postgres.NewRefreshTokenRepository(pool)
 	billingRepo := postgres.NewBillingRepository(pool)
 

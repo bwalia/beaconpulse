@@ -222,6 +222,9 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Mon
 		return nil, err
 	}
 
+	if err := keepMaskedHeaders(in.Settings.Headers, nil); err != nil {
+		return nil, err
+	}
 	target, settings, err := normalizeAndValidate(in.Type, in.Target, in.Settings)
 	if err != nil {
 		return nil, err
@@ -382,6 +385,9 @@ func (s *Service) Update(ctx context.Context, actor Actor, id uuid.UUID, in Upda
 		settings := m.Settings
 		if in.Settings != nil {
 			settings = *in.Settings
+			if err := keepMaskedHeaders(settings.Headers, m.Settings.Headers); err != nil {
+				return nil, err
+			}
 		}
 		nt, ns, err := normalizeAndValidate(m.Type, target, settings)
 		if err != nil {

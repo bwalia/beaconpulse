@@ -27,6 +27,7 @@ type httpProbe struct {
 	FailIfBodyNotMatchesRegexp []string          `yaml:"fail_if_body_not_matches_regexp,omitempty"`
 	FailIfBodyMatchesRegexp    []string          `yaml:"fail_if_body_matches_regexp,omitempty"`
 	Headers                    map[string]string `yaml:"headers,omitempty"`
+	Body                       string            `yaml:"body,omitempty"`
 	TLSConfig                  *tlsConfig        `yaml:"tls_config,omitempty"`
 	PreferredIPProtocol        string            `yaml:"preferred_ip_protocol,omitempty"`
 }

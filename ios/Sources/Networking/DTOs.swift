@@ -44,7 +44,10 @@ struct MonitorSettings: Codable, Equatable {
     var bodyKeyword: String? = nil
     var bodyNotKeyword: String? = nil
     var followRedirects: Bool? = nil
+    /// Values come back as "********" (the server never returns them); sent back
+    /// unchanged, the server keeps the saved value.
     var headers: [String: String]? = nil
+    var body: String? = nil
     var skipTlsVerify: Bool? = nil
     var sslExpiryWarningDays: Int? = nil
     var responseTimeWarningMs: Int? = nil
@@ -52,6 +55,8 @@ struct MonitorSettings: Codable, Equatable {
     var dnsQueryName: String? = nil
     var dnsQueryType: String? = nil
     var dnsExpectedIps: [String]? = nil
+    var githubWorkflow: String? = nil
+    var githubNotifyOnSuccess: Bool? = nil
 
     static let empty = MonitorSettings()
 }
