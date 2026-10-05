@@ -102,6 +102,13 @@ configured.
   release entitlement); `false` only for an Xcode debug build on a device
 - `BEACON_APPLE_CLIENT_ID` — the bundle id(s), comma-separated per brand
 - `BEACON_GOOGLE_CLIENT_ID` — existing web client id(s), comma-separated
+- `BEACON_WEBPUSH_PRIVATE_KEY` — optional VAPID key for browser (PWA) push (raw P-256
+  private key, base64url). Leave unset: the API generates one on first start and keeps
+  it encrypted in `platform_secrets`, so browser push needs no setup. Set it only to
+  pin a key yourself (changing it breaks existing browser subscriptions until each
+  owner reopens Notifications). The public half is served at `GET /api/v1/devices/webpush`.
+- `BEACON_WEBPUSH_SUBJECT` — optional VAPID contact (`mailto:` or `https:`); defaults
+  to `BEACON_DASHBOARD_URL`, which must then be https or browser push stays off
 
 ## Build, run, test
 

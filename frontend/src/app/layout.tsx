@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fira_Code, Fira_Sans } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
@@ -61,8 +61,16 @@ export const metadata: Metadata = {
   robots: noindex
     ? { index: false, follow: false }
     : { index: true, follow: true, googleBot: { index: true, follow: true } },
-  icons: { icon: "/icon.svg" },
+  // Explicit icons override Next's file conventions, so the generated iOS home-screen
+  // icon (app/apple-icon.tsx) is listed here too.
+  icons: { icon: "/icon.svg", apple: { url: "/apple-icon", sizes: "180x180", type: "image/png" } },
+  // Installed on iOS ("Add to Home Screen") it opens full-screen as the brand's app.
+  // The manifest itself comes from app/manifest.ts.
+  appleWebApp: { capable: true, title: brand.shortName, statusBarStyle: "default" },
 };
+
+// Tints the browser chrome / installed app's title bar with the brand accent.
+export const viewport: Viewport = { themeColor: brand.primary[600] };
 
 // Runs before first paint, so the page never flashes light before hydration swaps
 // it to dark. Dependency-free and wrapped in try/catch because localStorage throws

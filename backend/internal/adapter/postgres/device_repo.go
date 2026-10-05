@@ -20,8 +20,9 @@ func NewDeviceRepository(pool *pgxpool.Pool) *DeviceRepository {
 }
 
 var (
-	_ device.Repository = (*DeviceRepository)(nil)
-	_ device.TokenStore = (*DeviceRepository)(nil)
+	_ device.Repository           = (*DeviceRepository)(nil)
+	_ device.TokenStore           = (*DeviceRepository)(nil)
+	_ device.WebSubscriptionStore = (*DeviceRepository)(nil)
 )
 
 // Upsert registers a token or refreshes it in place. Conflicts key on the unique
@@ -29,14 +30,17 @@ var (
 // org and last_seen updated to the latest registration.
 func (r *DeviceRepository) Upsert(ctx context.Context, d *device.Device) error {
 	_, err := r.pool.Exec(ctx,
-		`INSERT INTO device_tokens (id, org_id, user_id, platform, token, last_seen_at, created_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7)
+		`INSERT INTO device_tokens (id, org_id, user_id, platform, token, web_p256dh, web_auth, last_seen_at, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		 ON CONFLICT (token) DO UPDATE SET
 		     org_id       = EXCLUDED.org_id,
 		     user_id      = EXCLUDED.user_id,
 		     platform     = EXCLUDED.platform,
+		     web_p256dh   = EXCLUDED.web_p256dh,
+		     web_auth     = EXCLUDED.web_auth,
 		     last_seen_at = EXCLUDED.last_seen_at`,
-		d.ID, d.OrgID, d.UserID, string(d.Platform), d.Token, d.LastSeenAt, d.CreatedAt)
+		d.ID, d.OrgID, d.UserID, string(d.Platform), d.Token,
+		nullIfEmpty(d.P256dh), nullIfEmpty(d.Auth), d.LastSeenAt, d.CreatedAt)
 	if err != nil {
 		return apperror.Internal(fmt.Errorf("upsert device token: %w", err))
 	}
@@ -54,9 +58,9 @@ func (r *DeviceRepository) DeleteByToken(ctx context.Context, orgID uuid.UUID, t
 	return nil
 }
 
-// TokensByOrg returns every registered token for an org, for alert fan-out.
+// TokensByOrg returns an org's iOS tokens, for APNs fan-out.
 func (r *DeviceRepository) TokensByOrg(ctx context.Context, orgID uuid.UUID) ([]string, error) {
-	rows, err := r.pool.Query(ctx, `SELECT token FROM device_tokens WHERE org_id = $1`, orgID)
+	rows, err := r.pool.Query(ctx, `SELECT token FROM device_tokens WHERE org_id = $1 AND platform = 'ios'`, orgID)
 	if err != nil {
 		return nil, apperror.Internal(fmt.Errorf("list device tokens: %w", err))
 	}
@@ -80,4 +84,24 @@ func (r *DeviceRepository) Delete(ctx context.Context, token string) error {
 		return apperror.Internal(fmt.Errorf("prune device token: %w", err))
 	}
 	return nil
+}
+
+// WebSubscriptionsByOrg returns an org's browser push subscriptions, for fan-out.
+func (r *DeviceRepository) WebSubscriptionsByOrg(ctx context.Context, orgID uuid.UUID) ([]device.WebSubscription, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT token, COALESCE(web_p256dh, ''), COALESCE(web_auth, '')
+		   FROM device_tokens WHERE org_id = $1 AND platform = 'web'`, orgID)
+	if err != nil {
+		return nil, apperror.Internal(fmt.Errorf("list web push subscriptions: %w", err))
+	}
+	defer rows.Close()
+	var out []device.WebSubscription
+	for rows.Next() {
+		var s device.WebSubscription
+		if err := rows.Scan(&s.Endpoint, &s.P256dh, &s.Auth); err != nil {
+			return nil, apperror.Internal(fmt.Errorf("scan web push subscription: %w", err))
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }

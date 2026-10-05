@@ -113,6 +113,12 @@ export const CHANNEL_TYPES: ChannelTypeDef[] = [
   },
 ];
 
+/** Push channels: created automatically when a device enables notifications, never by hand. */
+export const PUSH_CHANNELS: Record<string, { label: string; summary: string }> = {
+  apns: { label: "Apple Push", summary: "Every iPhone and iPad signed in to the app" },
+  webpush: { label: "Browser push", summary: "Every browser that turned on notifications" },
+};
+
 export function channelTypeDef(value: string): ChannelTypeDef | undefined {
   return CHANNEL_TYPES.find((t) => t.value === value);
 }

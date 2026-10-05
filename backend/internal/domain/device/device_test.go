@@ -20,12 +20,18 @@ func (f *fakeRepo) DeleteByToken(_ context.Context, _ uuid.UUID, token string) e
 }
 
 type fakeActivator struct {
-	called bool
-	err    error
+	called    bool
+	webCalled bool
+	err       error
 }
 
 func (f *fakeActivator) EnsureAPNsChannel(_ context.Context, _ uuid.UUID) error {
 	f.called = true
+	return f.err
+}
+
+func (f *fakeActivator) EnsureWebPushChannel(_ context.Context, _ uuid.UUID) error {
+	f.webCalled = true
 	return f.err
 }
 
@@ -95,5 +101,43 @@ func TestUnregisterRejectsEmptyToken(t *testing.T) {
 	svc := NewService(&fakeRepo{}, nil)
 	if err := svc.Unregister(context.Background(), actor(), "  "); err == nil {
 		t.Fatal("expected a validation error for an empty token")
+	}
+}
+
+// TestRegisterWebSubscription: a browser subscription stores its keys and turns on
+// the browser-push channel (not Apple Push). The endpoint must be a real push
+// service — the server POSTs to it, so an arbitrary URL would be an SSRF.
+func TestRegisterWebSubscription(t *testing.T) {
+	const p256dh = "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4"
+	const auth = "BTBZMqHH6r4Tts7J_aSIgg"
+	repo := &fakeRepo{}
+	act := &fakeActivator{}
+	svc := NewService(repo, act)
+
+	in := RegisterInput{Token: "https://fcm.googleapis.com/fcm/send/abc", Platform: PlatformWeb, P256dh: p256dh, Auth: auth}
+	if _, err := svc.Register(context.Background(), actor(), in); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if repo.upserted.P256dh != p256dh || repo.upserted.Auth != auth {
+		t.Errorf("keys not stored: %+v", repo.upserted)
+	}
+	if !act.webCalled || act.called {
+		t.Errorf("web registration should enable browser push only (web=%v apns=%v)", act.webCalled, act.called)
+	}
+
+	for _, endpoint := range []string{
+		"https://169.254.169.254/latest/meta-data/",
+		"http://fcm.googleapis.com/fcm/send/abc",
+		"https://fcm.googleapis.com.evil.example/x",
+		"https://fcm.googleapis.com:8443/x",
+	} {
+		in.Token = endpoint
+		if _, err := svc.Register(context.Background(), actor(), in); err == nil {
+			t.Errorf("endpoint %q was accepted", endpoint)
+		}
+	}
+	in.Token, in.Auth = "https://web.push.apple.com/abc", "short"
+	if _, err := svc.Register(context.Background(), actor(), in); err == nil {
+		t.Error("a malformed auth secret was accepted")
 	}
 }

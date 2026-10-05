@@ -92,7 +92,7 @@ export interface Monitor {
   updated_at: string;
 }
 
-export type ChannelType = "telegram" | "slack" | "discord" | "email" | "webhook" | "teams";
+export type ChannelType = "telegram" | "slack" | "discord" | "email" | "webhook" | "teams" | "apns" | "webpush";
 
 export interface NotificationChannel {
   id: string;

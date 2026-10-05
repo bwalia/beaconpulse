@@ -6,6 +6,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { api, tokenStore } from "./api";
+import { disablePush } from "./pwa";
 import type { AuthResponse, User } from "./types";
 
 interface AuthState {
@@ -88,6 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    // Like the iOS app: signing out stops alerts reaching this browser. Before the
+    // token is revoked, since removing the subscription is an authenticated call.
+    await disablePush();
     const refresh = tokenStore.refresh;
     if (refresh) {
       await api.post("/api/v1/auth/logout", { refresh_token: refresh }, false).catch(() => {});
