@@ -128,7 +128,13 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	refreshRepo := postgres.NewRefreshTokenRepository(pool)
 	auditRepo := postgres.NewAuditRepository(pool)
 	projectRepo := postgres.NewProjectRepository(pool)
-	monitorRepo := postgres.NewMonitorRepository(pool)
+	monitorRepo := postgres.NewMonitorRepository(pool, cipher)
+	// Header values saved before they were encrypted at rest get sealed here.
+	if n, err := monitorRepo.SealLegacyHeaders(context.Background()); err != nil {
+		log.Warn("seal legacy monitor headers", "err", err)
+	} else if n > 0 {
+		log.Info("sealed legacy monitor headers", "monitors", n)
+	}
 	orgPlanRepo := postgres.NewOrgPlanRepository(pool)
 	notificationRepo := postgres.NewNotificationRepository(pool)
 	maintenanceRepo := postgres.NewMaintenanceRepository(pool)

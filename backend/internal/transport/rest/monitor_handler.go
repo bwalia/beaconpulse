@@ -60,6 +60,7 @@ type monitorSettingsDTO struct {
 	BodyNotKeyword        string            `json:"body_not_keyword,omitempty" validate:"omitempty,max=500"`
 	FollowRedirects       bool              `json:"follow_redirects,omitempty"`
 	Headers               map[string]string `json:"headers,omitempty"`
+	Body                  string            `json:"body,omitempty"`
 	SkipTLSVerify         bool              `json:"skip_tls_verify,omitempty"`
 	SSLExpiryWarningDays  int               `json:"ssl_expiry_warning_days,omitempty" validate:"omitempty,gte=1,lte=825"`
 	ResponseTimeWarningMS int               `json:"response_time_warning_ms,omitempty" validate:"omitempty,gte=1"`
@@ -79,6 +80,7 @@ func (d monitorSettingsDTO) toDomain() monitor.Settings {
 		BodyNotKeyword:        d.BodyNotKeyword,
 		FollowRedirects:       d.FollowRedirects,
 		Headers:               d.Headers,
+		Body:                  d.Body,
 		SkipTLSVerify:         d.SkipTLSVerify,
 		SSLExpiryWarningDays:  d.SSLExpiryWarningDays,
 		ResponseTimeWarningMS: d.ResponseTimeWarningMS,
@@ -161,7 +163,7 @@ func presentMonitor(m *monitor.Monitor) monitorResponse {
 		Public:          m.Public,
 		IntervalSeconds: m.IntervalSeconds,
 		TimeoutSeconds:  m.TimeoutSeconds,
-		Settings:        m.Settings,
+		Settings:        m.Settings.Redacted(),
 		LastStatus:      string(m.LastStatus),
 		LastCheckedAt:   m.LastCheckedAt,
 		GraceSeconds:    m.GraceSeconds,

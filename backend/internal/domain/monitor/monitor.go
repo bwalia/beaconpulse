@@ -87,13 +87,19 @@ func ValidSensitivity(s string) bool {
 // Persisted as JSONB so new fields do not require migrations.
 type Settings struct {
 	// ---- HTTP / HTTPS / SSL ----
-	Method           string            `json:"method,omitempty"`
-	ValidStatusCodes []int             `json:"valid_status_codes,omitempty"`
-	BodyKeyword      string            `json:"body_keyword,omitempty"`
-	BodyNotKeyword   string            `json:"body_not_keyword,omitempty"`
-	FollowRedirects  bool              `json:"follow_redirects,omitempty"`
-	Headers          map[string]string `json:"headers,omitempty"`
-	SkipTLSVerify    bool              `json:"skip_tls_verify,omitempty"`
+	Method           string `json:"method,omitempty"`
+	ValidStatusCodes []int  `json:"valid_status_codes,omitempty"`
+	BodyKeyword      string `json:"body_keyword,omitempty"`
+	BodyNotKeyword   string `json:"body_not_keyword,omitempty"`
+	FollowRedirects  bool   `json:"follow_redirects,omitempty"`
+	// Headers often carry credentials (Authorization, API keys, cookies). Values
+	// are encrypted at rest by the repository and never leave the API: responses
+	// carry HeaderMask instead (see Redacted).
+	Headers       map[string]string `json:"headers,omitempty"`
+	SkipTLSVerify bool              `json:"skip_tls_verify,omitempty"`
+	// Body is sent with the request (e.g. a JSON payload for a POST health check).
+	// Not treated as a secret — credentials belong in Headers.
+	Body string `json:"body,omitempty"`
 	// SSLExpiryWarningDays sets the alert threshold for certificate expiry.
 	SSLExpiryWarningDays int `json:"ssl_expiry_warning_days,omitempty"`
 	// ResponseTimeWarningMS, when > 0, generates a slow-response alert rule.
@@ -118,6 +124,25 @@ type Settings struct {
 	// just when recovering from a failure. Off by default (no-news-is-good-news);
 	// on for cases like a backup where a positive "it ran" is the point.
 	GitHubNotifyOnSuccess bool `json:"github_notify_on_success,omitempty"`
+}
+
+// HeaderMask replaces every header value the API returns. Sent back unchanged on
+// update, it means "keep the saved value", so clients that round-trip settings
+// never overwrite a secret with the mask.
+const HeaderMask = "********"
+
+// Redacted returns a copy of s safe to hand to clients: header names are kept so
+// the UI can show what is sent, every value is HeaderMask.
+func (s Settings) Redacted() Settings {
+	if len(s.Headers) == 0 {
+		return s
+	}
+	masked := make(map[string]string, len(s.Headers))
+	for name := range s.Headers {
+		masked[name] = HeaderMask
+	}
+	s.Headers = masked
+	return s
 }
 
 // Monitor is a single monitored resource.

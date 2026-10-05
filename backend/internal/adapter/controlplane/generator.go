@@ -107,6 +107,7 @@ func buildModule(cfg GeneratorConfig, m *monitor.Monitor) (blackboxModule, strin
 		if len(m.Settings.Headers) > 0 {
 			http.Headers = m.Settings.Headers
 		}
+		http.Body = m.Settings.Body
 		if m.Settings.BodyKeyword != "" {
 			http.FailIfBodyNotMatchesRegexp = []string{regexp.QuoteMeta(m.Settings.BodyKeyword)}
 		}

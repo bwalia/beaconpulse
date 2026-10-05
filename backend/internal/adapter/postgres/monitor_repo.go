@@ -13,16 +13,115 @@ import (
 	"beacon/internal/domain/monitor"
 	"beacon/internal/domain/plan"
 	"beacon/internal/platform/apperror"
+	"beacon/internal/platform/crypto"
 )
 
 // MonitorRepository implements monitor.Repository.
+//
+// Header values (settings.headers) are encrypted at rest with cipher: sealed on
+// every write, opened on every read, so the domain and the prober config only
+// ever see plaintext and the database only ever holds ciphertext.
 type MonitorRepository struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	cipher *crypto.Cipher
 }
 
 // NewMonitorRepository builds a MonitorRepository.
-func NewMonitorRepository(pool *pgxpool.Pool) *MonitorRepository {
-	return &MonitorRepository{pool: pool}
+func NewMonitorRepository(pool *pgxpool.Pool, cipher *crypto.Cipher) *MonitorRepository {
+	return &MonitorRepository{pool: pool, cipher: cipher}
+}
+
+// sealedPrefix marks an encrypted header value. A value without it is legacy
+// plaintext from before encryption, read as-is until SealLegacyHeaders runs.
+const sealedPrefix = "enc:"
+
+// sealedConfig marshals settings for storage with every header value encrypted.
+func (r *MonitorRepository) sealedConfig(s monitor.Settings) ([]byte, error) {
+	if len(s.Headers) > 0 {
+		sealed := make(map[string]string, len(s.Headers))
+		for name, v := range s.Headers {
+			ct, err := r.cipher.EncryptString(v)
+			if err != nil {
+				return nil, err
+			}
+			sealed[name] = sealedPrefix + ct
+		}
+		s.Headers = sealed
+	}
+	return json.Marshal(s)
+}
+
+// openHeaders decrypts sealed header values in place.
+func (r *MonitorRepository) openHeaders(h map[string]string) {
+	for name, v := range h {
+		ct, ok := strings.CutPrefix(v, sealedPrefix)
+		if !ok {
+			continue
+		}
+		pt, err := r.cipher.DecryptString(ct)
+		if err != nil {
+			// Unreadable (e.g. the key changed): send the header empty so only this
+			// monitor's check fails, rather than failing every read — including the
+			// one that builds the probe config for all tenants.
+			pt = ""
+		}
+		h[name] = pt
+	}
+}
+
+// SealLegacyHeaders encrypts header values stored before encryption at rest.
+// Idempotent and safe to run on every start (and from several replicas): a row
+// is rewritten only if it still holds plaintext and hasn't changed since read.
+func (r *MonitorRepository) SealLegacyHeaders(ctx context.Context) (int, error) {
+	rows, err := r.pool.Query(ctx, `SELECT id, config FROM monitors WHERE config ? 'headers'`)
+	if err != nil {
+		return 0, fmt.Errorf("list monitors with headers: %w", err)
+	}
+	type row struct {
+		id  uuid.UUID
+		raw []byte
+	}
+	var legacy []row
+	for rows.Next() {
+		var rw row
+		if err := rows.Scan(&rw.id, &rw.raw); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("scan monitor config: %w", err)
+		}
+		legacy = append(legacy, rw)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	sealed := 0
+	for _, rw := range legacy {
+		var s monitor.Settings
+		if err := json.Unmarshal(rw.raw, &s); err != nil {
+			return sealed, fmt.Errorf("unmarshal monitor %s settings: %w", rw.id, err)
+		}
+		plain := false
+		for _, v := range s.Headers {
+			if !strings.HasPrefix(v, sealedPrefix) {
+				plain = true
+			}
+		}
+		if !plain {
+			continue
+		}
+		r.openHeaders(s.Headers)
+		cfg, err := r.sealedConfig(s)
+		if err != nil {
+			return sealed, err
+		}
+		tag, err := r.pool.Exec(ctx, `UPDATE monitors SET config=$2 WHERE id=$1 AND config=$3::jsonb`, rw.id, cfg, rw.raw)
+		if err != nil {
+			return sealed, fmt.Errorf("seal monitor %s headers: %w", rw.id, err)
+		}
+		sealed += int(tag.RowsAffected())
+	}
+	return sealed, nil
 }
 
 var _ monitor.Repository = (*MonitorRepository)(nil)
@@ -33,7 +132,7 @@ const monitorColumns = `id, org_id, project_id, name, type, target, enabled, pub
 	ping_token, last_ping_at, grace_seconds,
 	COALESCE(github_token_hash, ''), COALESCE(github_token_prefix, '')`
 
-func scanMonitor(row pgx.Row) (*monitor.Monitor, error) {
+func (r *MonitorRepository) scan(row pgx.Row) (*monitor.Monitor, error) {
 	var (
 		m         monitor.Monitor
 		typ       string
@@ -55,13 +154,14 @@ func scanMonitor(row pgx.Row) (*monitor.Monitor, error) {
 		if err := json.Unmarshal(configRaw, &m.Settings); err != nil {
 			return nil, fmt.Errorf("unmarshal monitor settings: %w", err)
 		}
+		r.openHeaders(m.Settings.Headers)
 	}
 	return &m, nil
 }
 
 // Create inserts a monitor.
 func (r *MonitorRepository) Create(ctx context.Context, m *monitor.Monitor) error {
-	cfg, err := json.Marshal(m.Settings)
+	cfg, err := r.sealedConfig(m.Settings)
 	if err != nil {
 		return apperror.Internal(fmt.Errorf("marshal settings: %w", err))
 	}
@@ -88,7 +188,7 @@ func (r *MonitorRepository) Create(ctx context.Context, m *monitor.Monitor) erro
 func (r *MonitorRepository) GetByID(ctx context.Context, orgID, id uuid.UUID) (*monitor.Monitor, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT `+monitorColumns+` FROM monitors WHERE id=$1 AND org_id=$2 AND deleted_at IS NULL`, id, orgID)
-	m, err := scanMonitor(row)
+	m, err := r.scan(row)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, apperror.NotFound("monitor not found")
@@ -168,7 +268,7 @@ func (r *MonitorRepository) List(ctx context.Context, orgID uuid.UUID, f monitor
 
 	var out []monitor.Monitor
 	for rows.Next() {
-		m, err := scanMonitor(rows)
+		m, err := r.scan(rows)
 		if err != nil {
 			return nil, 0, apperror.Internal(fmt.Errorf("scan monitor: %w", err))
 		}
@@ -179,7 +279,7 @@ func (r *MonitorRepository) List(ctx context.Context, orgID uuid.UUID, f monitor
 
 // Update persists mutable fields including settings.
 func (r *MonitorRepository) Update(ctx context.Context, m *monitor.Monitor) error {
-	cfg, err := json.Marshal(m.Settings)
+	cfg, err := r.sealedConfig(m.Settings)
 	if err != nil {
 		return apperror.Internal(fmt.Errorf("marshal settings: %w", err))
 	}
@@ -267,7 +367,7 @@ func (r *MonitorRepository) ListAllEnabled(ctx context.Context) ([]monitor.Monit
 
 	var out []monitor.Monitor
 	for rows.Next() {
-		m, err := scanMonitor(rows)
+		m, err := r.scan(rows)
 		if err != nil {
 			return nil, apperror.Internal(fmt.Errorf("scan monitor: %w", err))
 		}
@@ -348,7 +448,7 @@ func (r *MonitorRepository) ApplyStatusUpdates(ctx context.Context, updates []mo
 func (r *MonitorRepository) GitHubByTokenHash(ctx context.Context, hash string) (*monitor.Monitor, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT `+monitorColumns+` FROM monitors WHERE github_token_hash=$1 AND deleted_at IS NULL`, hash)
-	m, err := scanMonitor(row)
+	m, err := r.scan(row)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, nil

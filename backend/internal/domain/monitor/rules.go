@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"beacon/internal/platform/apperror"
@@ -13,6 +14,57 @@ import (
 var validDNSTypes = map[string]bool{
 	"A": true, "AAAA": true, "CNAME": true, "MX": true,
 	"TXT": true, "NS": true, "SOA": true, "CAA": true,
+}
+
+// Request limits. Every monitor's request lands in one shared prober config, so
+// a single monitor must not be able to bloat it.
+const (
+	maxHeaders     = 20
+	maxHeaderValue = 8 << 10
+	maxBody        = 8 << 10
+)
+
+// headerName is an RFC 9110 field-name token.
+var headerName = regexp.MustCompile("^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
+
+func validateRequest(s Settings) error {
+	if len(s.Headers) > maxHeaders {
+		return apperror.Validation("too many headers",
+			apperror.FieldError{Field: "settings.headers", Message: fmt.Sprintf("at most %d headers", maxHeaders)})
+	}
+	for name, v := range s.Headers {
+		if !headerName.MatchString(name) {
+			return apperror.Validation("invalid header name",
+				apperror.FieldError{Field: "settings.headers", Message: fmt.Sprintf("%q is not a valid header name", name)})
+		}
+		if len(v) > maxHeaderValue || strings.ContainsAny(v, "\r\n") {
+			return apperror.Validation("invalid header value",
+				apperror.FieldError{Field: "settings.headers", Message: fmt.Sprintf("the value of %s must be one line, under 8 KB", name)})
+		}
+	}
+	if len(s.Body) > maxBody {
+		return apperror.Validation("request body too large",
+			apperror.FieldError{Field: "settings.body", Message: "must be under 8 KB"})
+	}
+	return nil
+}
+
+// keepMaskedHeaders swaps each HeaderMask value for the value already saved
+// under that name. A mask with nothing saved behind it is an error, not an empty
+// header — the caller has to type the value.
+func keepMaskedHeaders(next, saved map[string]string) error {
+	for name, v := range next {
+		if v != HeaderMask {
+			continue
+		}
+		old, ok := saved[name]
+		if !ok {
+			return apperror.Validation("header value missing",
+				apperror.FieldError{Field: "settings.headers", Message: fmt.Sprintf("enter a value for %s", name)})
+		}
+		next[name] = old
+	}
+	return nil
 }
 
 // validHTTPMethods for HTTP probes.
@@ -115,6 +167,9 @@ func validateHTTP(t Type, target string, s Settings) (string, Settings, error) {
 	if !validHTTPMethods[s.Method] {
 		return "", s, apperror.Validation("invalid HTTP method",
 			apperror.FieldError{Field: "settings.method", Message: "must be a valid HTTP method"})
+	}
+	if err := validateRequest(s); err != nil {
+		return "", s, err
 	}
 	if len(s.ValidStatusCodes) == 0 {
 		s.ValidStatusCodes = []int{200, 201, 202, 203, 204, 206, 300, 301, 302, 303, 304, 307, 308}
