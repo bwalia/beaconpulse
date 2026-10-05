@@ -237,12 +237,27 @@ export interface Invoice {
   pdf_url?: string;
 }
 
+/** One status-strip slot. `v` is the share of the window's checks that passed;
+ *  the rest explain the verdict on hover, set only for types that produce them. */
+export interface CheckWindow extends MetricPoint {
+  n?: number;
+  ms?: number;
+  /** Lowest/highest HTTP status seen; 0 (or absent, for http types) = no response. */
+  code_min?: number;
+  code_max?: number;
+  kw_failed?: boolean;
+  /** Unix seconds of the earliest certificate expiry seen. */
+  ssl_expiry?: number;
+  /** Heartbeat pings received in the window. */
+  pings?: number;
+}
+
 export interface MonitorUptime {
   monitor_id: string;
   monitor_name: string;
   target: string;
   avg_response_ms: number;
-  points: MetricPoint[];
+  points: CheckWindow[];
 }
 
 export interface Overview {

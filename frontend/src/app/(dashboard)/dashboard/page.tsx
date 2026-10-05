@@ -32,12 +32,14 @@ import {
 } from "@/lib/viz";
 import type { MetricPoint, Monitor, MonitorUptime } from "@/lib/types";
 import {
+  RunHistoryStrip,
   SLOT_COUNT,
   StatusPill,
   StripLegend,
   TONE_COLOR,
   UptimeStrip,
   statusOf,
+  uptimePercent,
   type Tone,
 } from "@/components/uptime";
 import {
@@ -219,7 +221,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="grid gap-2.5">
                     {g.monitors.map((m) => (
-                      <MonitorRow key={m.id} monitor={m} hist={histById.get(m.id)} winShort={winShort} />
+                      <MonitorRow key={m.id} monitor={m} hist={histById.get(m.id)} winShort={winShort} hours={hours} />
                     ))}
                   </div>
                 </div>
@@ -630,16 +632,17 @@ function MonitorRow({
   monitor,
   hist,
   winShort,
+  hours,
 }: {
   monitor: Monitor;
   hist?: MonitorUptime;
   winShort: string;
+  hours: number;
 }) {
   const status = statusOf(monitor);
   const diagnose = useDiagnoseControl(monitor.id);
   const pts = hist?.points ?? [];
-  const passed = pts.filter((p) => p.v === 1).length;
-  const uptimePct = pts.length ? round1((passed / pts.length) * 100) : null;
+  const uptimePct = uptimePercent(pts);
   const respMs = hist?.avg_response_ms ?? 0;
   const isDown = status === "down";
 
@@ -677,11 +680,18 @@ function MonitorRow({
       </div>
 
       <div className="mt-3">
-        <UptimeStrip points={pts} uptimePct={uptimePct} winShort={winShort} />
-        <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-          <span>{winShort} ago</span>
-          <span>now</span>
-        </div>
+        {/* github_actions runs aren't probe windows; show its run history instead. */}
+        {monitor.type === "github_actions" ? (
+          <RunHistoryStrip monitorId={monitor.id} />
+        ) : (
+          <>
+            <UptimeStrip points={pts} uptimePct={uptimePct} winShort={winShort} hours={hours} monitor={monitor} />
+            <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span>{winShort} ago</span>
+              <span>now</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Offered right where the outage is being read, so nobody has to find the

@@ -51,7 +51,24 @@ type MonitorUptime struct {
 	MonitorName   string
 	Target        string
 	AvgResponseMs float64
-	Points        []Point // v: 1 = up, 0 = down, absent = no data
+	Points        []Window // absent window = no data
+}
+
+// Window is one slot of a status strip: every check that ran in the window
+// ending at T, reduced to what a hover needs to explain the verdict. Only the
+// fields the monitor's type produces are set.
+type Window struct {
+	T time.Time
+	// V is the share of checks that passed (0..1). Heartbeats: 0 if a ping was
+	// missed at any point in the window, else 1.
+	V             float64
+	Checks        int
+	AvgMs         float64
+	CodeMin       int // lowest/highest HTTP status seen; 0 = no response
+	CodeMax       int
+	KeywordFailed bool  // a body keyword check failed at least once
+	SSLExpiry     int64 // unix time of the earliest certificate expiry seen
+	Pings         int   // heartbeat pings received
 }
 
 // Overview is the org-wide dashboard read model.
@@ -158,7 +175,7 @@ func (s *Service) MonitorMetrics(ctx context.Context, orgID, monitorID uuid.UUID
 	start := end.Add(-window)
 	step := window / 60 // ~60 points across the window
 	m.ResponseMs = firstSeries(s.rng(ctx, fmt.Sprintf(`probe_duration_seconds{monitor_id="%s"} * 1000`, id), start, end, step))
-	m.Up = firstSeries(s.rng(ctx, fmt.Sprintf(`probe_success{monitor_id="%s"}`, id), start, end, step))
+	m.Up = firstSeries(s.rng(ctx, fmt.Sprintf(`avg_over_time(probe_success{monitor_id="%s"}[%s])`, id, promSeconds(step)), start, end, step))
 	return m, nil
 }
 
@@ -182,7 +199,11 @@ func (s *Service) Overview(ctx context.Context, orgID uuid.UUID, window time.Dur
 	end := s.now().UTC()
 	start := end.Add(-window)
 	step := window / time.Duration(buckets)
-	o.UptimeSeries = firstSeries(s.rng(ctx, fmt.Sprintf(`avg(probe_success{org_id="%s"}) * 100`, org), start, end, step))
+	// Every range query below aggregates over [step], so each point covers the
+	// whole window ending at it. A bare probe_success would sample one check per
+	// window and paint an outage between samples green.
+	slot := promSeconds(step)
+	o.UptimeSeries = firstSeries(s.rng(ctx, fmt.Sprintf(`avg(avg_over_time(probe_success{org_id="%s"}[%s])) * 100`, org, slot), start, end, step))
 	o.ResponseSeries = firstSeries(s.rng(ctx, fmt.Sprintf(`avg(probe_duration_seconds{org_id="%s"}) * 1000`, org), start, end, step))
 
 	// Per-monitor average response time over the window, keyed by monitor id.
@@ -191,15 +212,67 @@ func (s *Service) Overview(ctx context.Context, orgID uuid.UUID, window time.Dur
 		respByID[sample.Labels["monitor_id"]] = round2(sample.Value)
 	}
 
-	for _, series := range s.rng(ctx, fmt.Sprintf(`probe_success{org_id="%s"}`, org), start, end, step) {
+	// byWindow runs a per-monitor range query and indexes it monitor -> window.
+	// ponytail: sequential queries (~9 per overview); run them concurrently if
+	// overview latency ever shows up.
+	byWindow := func(expr string) map[string]map[int64]float64 {
+		out := map[string]map[int64]float64{}
+		for _, series := range s.rng(ctx, fmt.Sprintf(expr, org, slot), start, end, step) {
+			id := series.Labels["monitor_id"]
+			if out[id] == nil {
+				out[id] = map[int64]float64{}
+			}
+			for _, p := range series.Points {
+				out[id][p.T.Unix()] = p.V
+			}
+		}
+		return out
+	}
+	checks := byWindow(`sum by (monitor_id) (count_over_time(probe_success{org_id="%s"}[%s]))`)
+	avgMs := byWindow(`avg by (monitor_id) (avg_over_time(probe_duration_seconds{org_id="%s"}[%s])) * 1000`)
+	codeMin := byWindow(`min by (monitor_id) (min_over_time(probe_http_status_code{org_id="%s"}[%s]))`)
+	codeMax := byWindow(`max by (monitor_id) (max_over_time(probe_http_status_code{org_id="%s"}[%s]))`)
+	keyword := byWindow(`max by (monitor_id) (max_over_time(probe_failed_due_to_regex{org_id="%s"}[%s]))`)
+	sslExpiry := byWindow(`min by (monitor_id) (min_over_time(probe_ssl_earliest_cert_expiry{org_id="%s"}[%s]))`)
+
+	for _, series := range s.rng(ctx, fmt.Sprintf(`avg_over_time(probe_success{org_id="%s"}[%s])`, org, slot), start, end, step) {
 		id := series.Labels["monitor_id"]
+		ws := make([]Window, len(series.Points))
+		for i, p := range series.Points {
+			k := p.T.Unix()
+			ws[i] = Window{
+				T: p.T, V: p.V,
+				Checks:        int(checks[id][k]),
+				AvgMs:         round2(avgMs[id][k]),
+				CodeMin:       int(codeMin[id][k]),
+				CodeMax:       int(codeMax[id][k]),
+				KeywordFailed: keyword[id][k] > 0,
+				SSLExpiry:     int64(sslExpiry[id][k]),
+			}
+		}
 		o.Monitors = append(o.Monitors, MonitorUptime{
 			MonitorID:     id,
 			MonitorName:   series.Labels["monitor_name"],
 			Target:        series.Labels["instance"],
 			AvgResponseMs: respByID[id],
-			Points:        series.Points,
+			Points:        ws,
 		})
+	}
+
+	// Heartbeats aren't probed: a window is a miss if the HeartbeatMissed rule
+	// fired in it, and pings counts how often the last-ping gauge moved.
+	missed := byWindow(`max by (monitor_id) (max_over_time(ALERTS{org_id="%s",alertname="HeartbeatMissed",alertstate="firing"}[%s]))`)
+	for _, series := range s.rng(ctx, fmt.Sprintf(`sum by (monitor_id) (changes(beacon_heartbeat_last_ping_timestamp_seconds{org_id="%s"}[%s]))`, org, slot), start, end, step) {
+		id := series.Labels["monitor_id"]
+		ws := make([]Window, len(series.Points))
+		for i, p := range series.Points {
+			v := 1.0
+			if missed[id][p.T.Unix()] > 0 {
+				v = 0
+			}
+			ws[i] = Window{T: p.T, V: v, Pings: int(p.V)}
+		}
+		o.Monitors = append(o.Monitors, MonitorUptime{MonitorID: id, Points: ws})
 	}
 	return o, nil
 }
@@ -248,4 +321,10 @@ func durationToPromRange(d time.Duration) string {
 		return fmt.Sprintf("%dh", int(d.Hours()))
 	}
 	return fmt.Sprintf("%dm", int(d.Minutes()))
+}
+
+// promSeconds renders a duration as an exact PromQL range in seconds — window
+// slots are often not whole minutes (1h / 48 = 75s).
+func promSeconds(d time.Duration) string {
+	return fmt.Sprintf("%ds", int(d.Seconds()))
 }
