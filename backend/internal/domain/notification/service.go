@@ -102,7 +102,17 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Cha
 // one the org has deliberately switched off, so a user who muted push stays muted.
 // Idempotent and safe to call on every device registration.
 func (s *Service) EnsureAPNsChannel(ctx context.Context, orgID uuid.UUID) error {
-	existing, err := s.repo.FindByType(ctx, orgID, TypeAPNs)
+	return s.ensurePushChannel(ctx, orgID, TypeAPNs, "Apple Push")
+}
+
+// EnsureWebPushChannel is EnsureAPNsChannel for browser push: the first browser
+// that subscribes turns the org's channel on; a channel the org paused stays paused.
+func (s *Service) EnsureWebPushChannel(ctx context.Context, orgID uuid.UUID) error {
+	return s.ensurePushChannel(ctx, orgID, TypeWebPush, "Browser push")
+}
+
+func (s *Service) ensurePushChannel(ctx context.Context, orgID uuid.UUID, t ChannelType, name string) error {
+	existing, err := s.repo.FindByType(ctx, orgID, t)
 	if err != nil {
 		return err
 	}
@@ -113,8 +123,8 @@ func (s *Service) EnsureAPNsChannel(ctx context.Context, orgID uuid.UUID) error 
 	ch := &Channel{
 		ID:        uuid.New(),
 		OrgID:     orgID,
-		Name:      "Apple Push",
-		Type:      TypeAPNs,
+		Name:      name,
+		Type:      t,
 		Enabled:   true,
 		Config:    map[string]string{},
 		CreatedAt: now,

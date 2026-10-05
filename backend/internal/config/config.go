@@ -307,12 +307,23 @@ type Push struct {
 	// APNsProduction selects the APNs host: true → api.push.apple.com,
 	// false → the sandbox (which a development build's device tokens are valid for).
 	APNsProduction bool
+
+	// WebPushPrivateKey is the VAPID private key for browser push: a raw P-256
+	// scalar, base64url (32 bytes). The public key browsers subscribe with is
+	// derived from it. Empty disables browser push.
+	WebPushPrivateKey string
+	// WebPushSubject is the VAPID contact (a mailto: or https: URL) push services
+	// use to reach the sender. Defaults to the dashboard URL.
+	WebPushSubject string
 }
 
 // Enabled reports whether APNs push is configured.
 func (p Push) Enabled() bool {
 	return p.APNsKeyP8 != "" && p.APNsKeyID != "" && p.APNsTeamID != "" && p.APNsTopic != ""
 }
+
+// WebPushEnabled reports whether browser (VAPID) push is configured.
+func (p Push) WebPushEnabled() bool { return p.WebPushPrivateKey != "" }
 
 // Crypto holds symmetric-encryption configuration used to protect secrets at
 // rest (e.g. notification credentials).
@@ -442,11 +453,13 @@ func Load() (Config, error) {
 			ClientIDs: getCSV("BEACON_APPLE_CLIENT_ID", nil),
 		},
 		Push: Push{
-			APNsKeyP8:      getStr("BEACON_APNS_KEY_P8", ""),
-			APNsKeyID:      getStr("BEACON_APNS_KEY_ID", ""),
-			APNsTeamID:     getStr("BEACON_APNS_TEAM_ID", ""),
-			APNsTopic:      getStr("BEACON_APNS_TOPIC", ""),
-			APNsProduction: getBool("BEACON_APNS_PRODUCTION", false, add),
+			APNsKeyP8:         getStr("BEACON_APNS_KEY_P8", ""),
+			APNsKeyID:         getStr("BEACON_APNS_KEY_ID", ""),
+			APNsTeamID:        getStr("BEACON_APNS_TEAM_ID", ""),
+			APNsTopic:         getStr("BEACON_APNS_TOPIC", ""),
+			APNsProduction:    getBool("BEACON_APNS_PRODUCTION", false, add),
+			WebPushPrivateKey: getStr("BEACON_WEBPUSH_PRIVATE_KEY", ""),
+			WebPushSubject:    getStr("BEACON_WEBPUSH_SUBJECT", ""),
 		},
 		OIDC: OIDC{
 			Provider:     getStr("BEACON_OIDC_PROVIDER", "OpsAPI"),

@@ -102,6 +102,13 @@ configured.
   release entitlement); `false` only for an Xcode debug build on a device
 - `BEACON_APPLE_CLIENT_ID` — the bundle id(s), comma-separated per brand
 - `BEACON_GOOGLE_CLIENT_ID` — existing web client id(s), comma-separated
+- `BEACON_WEBPUSH_PRIVATE_KEY` — VAPID key for browser (PWA) push: a raw P-256
+  private key, base64url. The public key is derived from it and served to browsers at
+  `GET /api/v1/devices/webpush`. Generate one per environment and keep it stable — a
+  new key breaks existing browser subscriptions until each owner reopens Notifications:
+  `openssl ecparam -name prime256v1 -genkey -noout | openssl ec -outform DER 2>/dev/null | tail -c +8 | head -c 32 | base64 | tr '+/' '-_' | tr -d '='`
+- `BEACON_WEBPUSH_SUBJECT` — optional VAPID contact (`mailto:` or `https:`); defaults
+  to the dashboard URL
 
 ## Build, run, test
 

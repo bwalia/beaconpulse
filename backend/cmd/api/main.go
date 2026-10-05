@@ -28,6 +28,7 @@ import (
 	"beacon/internal/adapter/promapi"
 	"beacon/internal/adapter/queue"
 	stripeadapter "beacon/internal/adapter/stripe"
+	"beacon/internal/adapter/webpush"
 	"beacon/internal/config"
 	"beacon/internal/domain/account"
 	"beacon/internal/domain/apikey"
@@ -208,6 +209,23 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		notifierRegistry[notification.TypeAPNs] = notifier.NewAPNsNotifier(apnsClient, deviceRepo)
 		log.Info("apple push (APNs) enabled",
 			slog.String("topic", cfg.Push.APNsTopic), slog.Bool("production", cfg.Push.APNsProduction))
+	}
+	// Browser push (VAPID): same graceful degradation — no key, no browser push,
+	// and the UI hides the option. One key per deployment; browsers subscribe with
+	// its public half, served at GET /api/v1/devices/webpush.
+	var webPushKey string
+	if cfg.Push.WebPushEnabled() {
+		subject := cfg.Push.WebPushSubject
+		if subject == "" {
+			subject = cfg.Notify.DashboardURL
+		}
+		wp, err := webpush.New(cfg.Push.WebPushPrivateKey, subject, tenantHTTP)
+		if err != nil {
+			return nil, fmt.Errorf("browser push: %w", err)
+		}
+		notifierRegistry[notification.TypeWebPush] = notifier.NewWebPushNotifier(wp, deviceRepo)
+		webPushKey = wp.PublicKey()
+		log.Info("browser push (VAPID) enabled", slog.String("subject", subject))
 	}
 	projectLookup := postgres.NewProjectLookupAdapter(projectRepo)
 	notifySvc := notification.NewService(notificationRepo, cipher, notifierRegistry, auditRec, cfg.Notify.DashboardURL)
@@ -403,7 +421,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Diagnose:           diagnoseHandler,
 		APIKey:             rest.NewAPIKeyHandler(apiKeySvc, validator, authn),
 		Sync:               rest.NewSyncHandler(syncSvc, validator, authn, rest.SyncLimiter()),
-		Device:             rest.NewDeviceHandler(deviceSvc, validator, authn),
+		Device:             rest.NewDeviceHandler(deviceSvc, validator, authn).WithWebPushKey(webPushKey),
 		Account:            rest.NewAccountHandler(accountSvc, authn),
 	}), nil
 }

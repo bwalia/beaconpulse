@@ -28,6 +28,10 @@ const (
 	// per-channel secret: the signing key is platform config and the destinations
 	// are the org's registered device tokens, looked up at send time.
 	TypeAPNs ChannelType = "apns"
+	// TypeWebPush delivers browser (PWA) notifications. Like APNs it holds no
+	// secret: the VAPID key is platform config and the destinations are the org's
+	// registered browser subscriptions.
+	TypeWebPush ChannelType = "webpush"
 )
 
 // SupportedTypes are the channel types with a working Notifier today. Others are
@@ -43,6 +47,7 @@ var SupportedTypes = map[ChannelType]bool{
 	TypeEmail:    true,
 	TypeWebhook:  true,
 	TypeAPNs:     true,
+	TypeWebPush:  true,
 }
 
 // Channel is a configured delivery destination for an organization.
