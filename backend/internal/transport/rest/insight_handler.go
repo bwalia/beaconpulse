@@ -44,7 +44,21 @@ type monitorUptimeResponse struct {
 	MonitorName   string        `json:"monitor_name"`
 	Target        string        `json:"target"`
 	AvgResponseMs float64       `json:"avg_response_ms"`
-	Points        []metricPoint `json:"points"`
+	Points        []windowPoint `json:"points"`
+}
+
+// windowPoint is one status-strip slot; the optional fields explain its verdict
+// on hover and are set only for the monitor types that produce them.
+type windowPoint struct {
+	T             time.Time `json:"t"`
+	V             float64   `json:"v"`
+	Checks        int       `json:"n,omitempty"`
+	AvgMs         float64   `json:"ms,omitempty"`
+	CodeMin       int       `json:"code_min,omitempty"`
+	CodeMax       int       `json:"code_max,omitempty"`
+	KeywordFailed bool      `json:"kw_failed,omitempty"`
+	SSLExpiry     int64     `json:"ssl_expiry,omitempty"`
+	Pings         int       `json:"pings,omitempty"`
 }
 
 type overviewResponse struct {
@@ -77,7 +91,7 @@ func (h *InsightHandler) Overview(w http.ResponseWriter, r *http.Request) {
 			MonitorName:   m.MonitorName,
 			Target:        m.Target,
 			AvgResponseMs: m.AvgResponseMs,
-			Points:        toMetricPoints(m.Points),
+			Points:        toWindowPoints(m.Points),
 		})
 	}
 	httpx.OK(w, overviewResponse{
@@ -187,4 +201,16 @@ func (h *InsightHandler) ActiveAlerts(w http.ResponseWriter, r *http.Request) {
 		end = total
 	}
 	httpx.OK(w, newListResponse(all[start:end], total, limit, offset))
+}
+
+func toWindowPoints(ws []insight.Window) []windowPoint {
+	out := make([]windowPoint, len(ws))
+	for i, w := range ws {
+		out[i] = windowPoint{
+			T: w.T, V: w.V, Checks: w.Checks, AvgMs: w.AvgMs,
+			CodeMin: w.CodeMin, CodeMax: w.CodeMax, KeywordFailed: w.KeywordFailed,
+			SSLExpiry: w.SSLExpiry, Pings: w.Pings,
+		}
+	}
+	return out
 }

@@ -11,7 +11,6 @@ import {
   useCreateMonitor,
   useDeleteMonitor,
   useMonitorMetrics,
-  useMonitorRuns,
   useMonitors,
   useMonitorsPage,
   useOverview,
@@ -36,11 +35,20 @@ import {
 import { ActivityIcon, CheckCircleIcon, ClockIcon, GlobeIcon, PlusIcon, SearchIcon, WrenchIcon, XIcon } from "@/components/icons";
 import { useConfirm } from "@/components/confirm";
 import { isFailing, useDiagnoseControl } from "@/components/diagnose-panel";
-import { STATUS_LABEL, StatusPill, StripLegend, TONE_COLOR, UptimeStrip, statusOf } from "@/components/uptime";
+import {
+  RunHistoryStrip,
+  STATUS_LABEL,
+  StatusPill,
+  StripLegend,
+  TONE_COLOR,
+  UptimeStrip,
+  statusOf,
+  uptimePercent,
+} from "@/components/uptime";
 import { Pagination, SearchInput } from "@/components/table-controls";
 import { useRevealVariants, useStaggerVariants } from "@/lib/motion";
-import { fullStamp, timeAgo, VIZ } from "@/lib/viz";
-import type { GitHubRun, MetricPoint, Monitor, MonitorUptime } from "@/lib/types";
+import { timeAgo } from "@/lib/viz";
+import type { MetricPoint, Monitor, MonitorUptime } from "@/lib/types";
 
 const PAGE_SIZE = 20;
 
@@ -564,88 +572,6 @@ function visitUrl(m: Monitor): string | null {
   return null;
 }
 
-const RUN_HATCH = `repeating-linear-gradient(45deg, ${VIZ.critical} 0 2px, rgba(255,255,255,0.5) 2px 4px)`;
-
-// runFill colours a run box by our classification: green pass, hatched-red fail
-// (texture, not hue alone — good↔critical sits in the CVD floor band), amber for an
-// outcome we don't score (cancelled, skipped).
-function runFill(status: string): string {
-  if (status === "up") return VIZ.good;
-  if (status === "down") return RUN_HATCH;
-  return VIZ.warning;
-}
-
-// runTooltip is the full story of one run, shown on hover — "what, and how we marked
-// it", exactly the detail the dashboard otherwise hides behind a single pass/fail word.
-function runTooltip(run: GitHubRun): string {
-  const lines: string[] = [];
-  const outcome = run.conclusion ? run.conclusion.replace(/_/g, " ") : run.status;
-  lines.push(run.run_number ? `#${run.run_number} · ${outcome}` : outcome);
-  if (run.workflow) lines.push(run.workflow);
-  const ctx = [run.branch, run.event_name].filter(Boolean).join(" · ");
-  if (ctx) lines.push(ctx);
-  if (run.actor) lines.push(`by ${run.actor}`);
-  if (run.sha) lines.push(run.sha.slice(0, 7));
-  lines.push(fullStamp(run.created_at));
-  if (run.run_url) lines.push("— click to open on GitHub");
-  return lines.join("\n");
-}
-
-// RunHistoryStrip draws a github_actions monitor's run history: one right-anchored
-// box per reported run, newest on the right, each hover-revealing the full outcome
-// and linking back to the run. This is what the plain "Passing/Failing" headline
-// hides — a red run stays red here even after the next one passes, so the trend is
-// visible and the owner can act on it.
-function RunHistoryStrip({ monitorId }: { monitorId: string }) {
-  const { data, isLoading } = useMonitorRuns(monitorId);
-  const runs = data?.runs ?? [];
-
-  if (isLoading && !data) {
-    return <div className="mt-2 h-6 animate-pulse rounded bg-slate-100 motion-reduce:animate-none dark:bg-slate-800" />;
-  }
-  if (runs.length === 0) {
-    return (
-      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-        No runs recorded yet — they&apos;ll appear here as workflows report in.
-      </p>
-    );
-  }
-
-  const passed = runs.filter((r) => r.status === "up").length;
-  const failed = runs.filter((r) => r.status === "down").length;
-  // API returns newest-first; show oldest→newest so "now" sits on the right.
-  const chronological = [...runs].reverse();
-
-  return (
-    <div className="mt-2">
-      <div
-        className="flex h-6 justify-end gap-[2px]"
-        role="img"
-        aria-label={`Last ${runs.length} runs: ${passed} passed, ${failed} failed. Newest on the right.`}
-      >
-        {chronological.map((run, i) => {
-          const common = {
-            className: "h-full w-2 shrink-0 rounded-[2px] transition-opacity hover:opacity-70 motion-reduce:transition-none",
-            style: { background: runFill(run.status) },
-            title: runTooltip(run),
-          };
-          return run.run_url ? (
-            <a key={i} href={run.run_url} target="_blank" rel="noopener noreferrer" aria-label={`Run ${run.run_number || i + 1} — open on GitHub`} {...common} />
-          ) : (
-            <div key={i} {...common} />
-          );
-        })}
-      </div>
-      <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-        <span>
-          {passed} passed · {failed} failed
-        </span>
-        <span>latest →</span>
-      </div>
-    </div>
-  );
-}
-
 // MonitorCard is one monitor as a rich card: identity, headline uptime/response,
 // the 24h uptime strip that is the product's whole point, and the management
 // actions. `hist` is that monitor's slice of the org overview, joined by id.
@@ -681,8 +607,7 @@ function MonitorCard({
   const lastEventAt = monitor.type === "heartbeat" ? monitor.last_ping_at : monitor.last_checked_at;
 
   const pts = hist?.points ?? [];
-  const passed = pts.filter((p) => p.v === 1).length;
-  const uptimePct = pts.length ? Math.round((passed / pts.length) * 1000) / 10 : null;
+  const uptimePct = uptimePercent(pts);
   const respMs = hist?.avg_response_ms ?? 0;
 
   return (
@@ -751,13 +676,18 @@ function MonitorCard({
               {lastEventAt ? `last ${runWord} ${timeAgo(lastEventAt)}` : `no ${runWord} yet`}
             </span>
           </div>
-          {/* github_actions keeps a full run history; the headline bar above is only
-              the latest word. Heartbeats report pings, not scored runs, so no strip. */}
+          {/* The headline bar above is only the latest word; the strip below is the
+              history — one box per run, or per window of heartbeat pings. */}
           {monitor.type === "github_actions" && <RunHistoryStrip monitorId={monitor.id} />}
+          {monitor.type === "heartbeat" && (
+            <div className="mt-2">
+              <UptimeStrip points={pts} uptimePct={uptimePct} winShort="24h" hours={24} monitor={monitor} />
+            </div>
+          )}
         </div>
       ) : (
         <div className="mt-3">
-          <UptimeStrip points={pts} uptimePct={uptimePct} winShort="24h" />
+          <UptimeStrip points={pts} uptimePct={uptimePct} winShort="24h" hours={24} monitor={monitor} />
           <div className="mt-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>24h ago</span>
             <span>now</span>

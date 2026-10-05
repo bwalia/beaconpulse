@@ -91,3 +91,48 @@ func TestMonitorMetricsQueriesWhenOwned(t *testing.T) {
 		}
 	}
 }
+
+// rangeQuerier answers range queries by the metric function they start with.
+type rangeQuerier struct{ byPrefix map[string][]RangeSeries }
+
+func (r *rangeQuerier) Query(context.Context, string) ([]Sample, error) { return nil, nil }
+func (r *rangeQuerier) QueryRange(_ context.Context, expr string, _, _ time.Time, _ time.Duration) ([]RangeSeries, error) {
+	for prefix, s := range r.byPrefix {
+		if strings.HasPrefix(expr, prefix) {
+			return s, nil
+		}
+	}
+	return nil, nil
+}
+
+// TestOverviewWindowsCarryCheckDetails: each strip slot aggregates every check in
+// its window (so a mid-window outage can't hide), joined with the details a hover
+// explains, and heartbeats get slots from their ping gauge and missed alerts.
+func TestOverviewWindowsCarryCheckDetails(t *testing.T) {
+	t0 := time.Unix(1_700_000_000, 0).UTC()
+	one := func(id string, v float64) []RangeSeries {
+		return []RangeSeries{{Labels: map[string]string{"monitor_id": id}, Points: []Point{{T: t0, V: v}}}}
+	}
+	q := &rangeQuerier{byPrefix: map[string][]RangeSeries{
+		"avg_over_time(probe_success":     one("web", 0.95),
+		"sum by (monitor_id) (count_over": one("web", 60),
+		"max by (monitor_id) (max_over_time(probe_http_status_code": one("web", 503),
+		"max by (monitor_id) (max_over_time(probe_failed_due":       one("web", 1),
+		"sum by (monitor_id) (changes(":                             one("hb", 4),
+		"max by (monitor_id) (max_over_time(ALERTS":                 one("hb", 1),
+	}}
+	o, err := NewService(q, &fakeLookup{}).Overview(context.Background(), uuid.New(), 24*time.Hour, 48)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]Window{}
+	for _, m := range o.Monitors {
+		got[m.MonitorID] = m.Points[0]
+	}
+	if w := got["web"]; w.V != 0.95 || w.Checks != 60 || w.CodeMax != 503 || !w.KeywordFailed {
+		t.Errorf("web window = %+v", w)
+	}
+	if w := got["hb"]; w.V != 0 || w.Pings != 4 {
+		t.Errorf("heartbeat window = %+v, want missed with 4 pings", w)
+	}
+}
