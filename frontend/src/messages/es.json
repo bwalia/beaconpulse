@@ -69,7 +69,7 @@
   },
   "marketing": {
     "skipToContent": "Saltar al contenido",
-    "badge": "Autoalojado y multiinquilino",
+    "badge": "Monitorización, alertas y páginas de estado",
     "headlineLine1": "Entérate de la caída",
     "headlineLine2": "antes que ellos.",
     "heroBlurb": "{brand} vigila tus endpoints, certificados y DNS cada 30 segundos y avisa a la persona indicada en cuanto algo falla. Controla tus datos, ejecútalo donde quieras y ofrece a tus clientes una página de estado en la que confíen de verdad.",
@@ -84,7 +84,7 @@
     "liveSummary": "3 de 4 operativos — alerta enviada hace 12s",
     "featuresEyebrow": "Todo en un solo lugar",
     "featuresTitle": "Reemplaza las cinco herramientas que has apañado con parches",
-    "featuresBlurb": "{brand} es un solo plano de control para disponibilidad, latencia, certificados y alertas — autoalojado, para que los datos nunca salgan de tu infraestructura.",
+    "featuresBlurb": "{brand} es un solo plano de control para disponibilidad, latencia, certificados y alertas, para que los problemas lleguen a la persona adecuada antes de que tus clientes los noten.",
     "feature1Title": "Seis tipos de monitor",
     "feature1Body": "Comprobaciones de HTTP, HTTPS, TCP, ICMP, DNS y caducidad de SSL — un solo plano de control en lugar de cinco herramientas.",
     "feature2Title": "Alertas que llegan a una persona",

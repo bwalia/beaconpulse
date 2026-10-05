@@ -42,7 +42,7 @@ export const sysops: Brand = {
   shortName: "SysOps",
   tagline: "Always on. Always watching.",
   description:
-    "Round-the-clock infrastructure and service monitoring with alerting and public status pages. Self-hosted and multi-tenant.",
+    "Round-the-clock infrastructure and service monitoring with alerting and public status pages.",
   // Cosmetic only — the host shown in the docs' curl examples. Set this to your real
   // domain; the running app always calls its API same-origin regardless.
   apiHost: "sysops247.io",

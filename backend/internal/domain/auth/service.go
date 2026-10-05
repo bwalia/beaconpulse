@@ -196,7 +196,84 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string, 
 	if err := s.tokens.RevokeAllForUser(ctx, user.ID); err != nil {
 		return err
 	}
+	// Following the emailed link proved they read this inbox.
+	_ = s.users.MarkEmailVerified(ctx, user.ID)
 	s.audit(ctx, user, audit.ActionPasswordReset, "user", user.ID.String(), meta, nil)
+	return nil
+}
+
+// emailVerifyTTL bounds how long an emailed confirmation link works.
+const emailVerifyTTL = 72 * time.Hour
+
+// sendVerification mails a confirmation link off the request path. A no-op when
+// email isn't configured or the address is already confirmed.
+func (s *Service) sendVerification(ctx context.Context, user *User, meta RequestMeta) {
+	if s.mailer == nil || user.EmailVerified() {
+		return
+	}
+	token, err := s.tm.IssueEmailVerifyToken(user, emailVerifyTTL)
+	if err != nil {
+		return
+	}
+	link := s.appBaseURL + "/verify-email?token=" + url.QueryEscape(token)
+	bg := context.WithoutCancel(ctx)
+	s.async(func() {
+		ctx, cancel := context.WithTimeout(bg, 30*time.Second)
+		defer cancel()
+		if err := s.mailer.SendEmailVerification(ctx, user.Email, user.Name, link); err != nil {
+			s.audit(ctx, user, audit.ActionEmailVerifySent, "user", user.ID.String(), meta, map[string]any{"send_error": err.Error()})
+			return
+		}
+		s.audit(ctx, user, audit.ActionEmailVerifySent, "user", user.ID.String(), meta, nil)
+	})
+}
+
+// ResendVerification mails a fresh confirmation link to the signed-in user.
+// alreadyVerified is true (and nothing is sent) when the address is confirmed.
+func (s *Service) ResendVerification(ctx context.Context, userID uuid.UUID, meta RequestMeta) (alreadyVerified bool, err error) {
+	if s.mailer == nil {
+		return false, apperror.New(apperror.CodeUnavailable, "email isn't configured on this deployment — contact support")
+	}
+	user, err := s.users.GetUserByID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if user.EmailVerified() {
+		return true, nil
+	}
+	s.sendVerification(ctx, user, meta)
+	return false, nil
+}
+
+// VerifyEmail confirms an address from an emailed link. Idempotent: an already
+// confirmed account just succeeds again.
+func (s *Service) VerifyEmail(ctx context.Context, token string, meta RequestMeta) error {
+	invalid := apperror.Validation("this confirmation link is invalid or has expired — sign in and request a new one")
+	claims, err := s.tm.ParseEmailVerifyToken(token)
+	if err != nil {
+		return invalid
+	}
+	userID, err := uuid.Parse(claims.Subject)
+	if err != nil {
+		return invalid
+	}
+	user, err := s.users.GetUserByID(ctx, userID)
+	if err != nil {
+		if apperror.IsCode(err, apperror.CodeNotFound) {
+			return invalid
+		}
+		return err
+	}
+	if !strings.EqualFold(claims.Email, user.Email) {
+		return invalid
+	}
+	if user.EmailVerified() {
+		return nil
+	}
+	if err := s.users.MarkEmailVerified(ctx, user.ID); err != nil {
+		return err
+	}
+	s.audit(ctx, user, audit.ActionEmailVerified, "user", user.ID.String(), meta, nil)
 	return nil
 }
 
@@ -259,6 +336,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, meta RequestMe
 		"org_id": org.ID.String(),
 		"email":  owner.Email,
 	})
+	s.sendVerification(ctx, owner, meta)
 	return result, nil
 }
 
@@ -345,6 +423,10 @@ func (s *Service) LoginWithGoogle(ctx context.Context, idToken string, meta Requ
 		}
 		user.GoogleSub = id.Subject
 	}
+	// Google verified this address (checked above), so the account's email is proven.
+	if !user.EmailVerified() {
+		_ = s.users.MarkEmailVerified(ctx, user.ID)
+	}
 
 	result, err := s.issueTokens(ctx, user, meta)
 	if err != nil {
@@ -379,8 +461,10 @@ func (s *Service) registerGoogleUser(ctx context.Context, id *GoogleIdentity, em
 		Name:      name,
 		Role:      RoleOwner,
 		IsActive:  true,
-		CreatedAt: now,
-		UpdatedAt: now,
+		// Google verified the address before we got here.
+		EmailVerifiedAt: &now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	if err := s.users.CreateOrgAndOwner(ctx, org, owner); err != nil {
 		return nil, err // conflict apperror on a racing duplicate email
@@ -441,6 +525,10 @@ func (s *Service) LoginWithOIDC(ctx context.Context, subject, email, name string
 	if !user.IsActive {
 		return nil, apperror.Forbidden("this account has been deactivated")
 	}
+	// The provider verified this address (checked above).
+	if !user.EmailVerified() {
+		_ = s.users.MarkEmailVerified(ctx, user.ID)
+	}
 
 	result, err := s.issueTokens(ctx, user, meta)
 	if err != nil {
@@ -472,12 +560,14 @@ func (s *Service) registerOIDCUser(ctx context.Context, subject, email, name, pr
 		Email: email,
 		// The provider subject is this account's credential — no password, no
 		// Google. Satisfies ck_users_auth_method and links the identity.
-		OidcSub:   subject,
-		Name:      name,
-		Role:      RoleOwner,
-		IsActive:  true,
-		CreatedAt: now,
-		UpdatedAt: now,
+		OidcSub:  subject,
+		Name:     name,
+		Role:     RoleOwner,
+		IsActive: true,
+		// The provider verified the address before we got here.
+		EmailVerifiedAt: &now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	if err := s.users.CreateOrgAndOwner(ctx, org, owner); err != nil {
 		return nil, err // conflict apperror on a racing duplicate email

@@ -38,7 +38,7 @@ export const beacon: Brand = {
   shortName: "Beacon",
   tagline: "Know before your customers do.",
   description:
-    "Uptime, latency, SSL and DNS monitoring with alerting and public status pages. Self-hosted and multi-tenant.",
+    "Uptime, latency, SSL and DNS monitoring with alerting and public status pages.",
   apiHost: "beaconpulse.net",
 
   // The production apex — the canonical origin for SEO. See url in types.ts.

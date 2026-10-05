@@ -69,7 +69,7 @@
   },
   "marketing": {
     "skipToContent": "İçeriğe geç",
-    "badge": "Kendi sunucunuzda ve çok kiracılı",
+    "badge": "İzleme, uyarılar ve durum sayfaları",
     "headlineLine1": "Çöktüğünü bilin",
     "headlineLine2": "onlar fark etmeden.",
     "heroBlurb": "{brand} uç noktalarınızı, sertifikalarınızı ve DNS'i her 30 saniyede bir izler — bir şey bozulduğu anda doğru kişiye haber verir. Verilerinize siz sahip olun, her yerde çalıştırın ve müşterilerinize gerçekten güvendikleri bir durum sayfası sunun.",
@@ -84,7 +84,7 @@
     "liveSummary": "4'ten 3'ü çalışıyor — uyarı 12s önce gönderildi",
     "featuresEyebrow": "Her şey tek yerde",
     "featuresTitle": "Zar zor bir arada tuttuğunuz beş aracın yerini alın",
-    "featuresBlurb": "{brand}, çalışma süresi, gecikme, sertifikalar ve uyarılar için tek bir kontrol düzlemidir — kendi sunucunuzda çalışır, böylece veriler altyapınızdan hiç çıkmaz.",
+    "featuresBlurb": "{brand}, çalışma süresi, gecikme, sertifikalar ve uyarılar için tek bir kontrol düzlemidir; sorunlar müşterileriniz fark etmeden doğru kişiye ulaşır.",
     "feature1Title": "Altı izleme türü",
     "feature1Body": "HTTP, HTTPS, TCP, ICMP, DNS ve SSL süre dolumu kontrolleri — beş araç yerine tek bir kontrol düzlemi.",
     "feature2Title": "Bir insana ulaşan uyarılar",

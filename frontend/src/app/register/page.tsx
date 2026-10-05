@@ -8,7 +8,7 @@ import { AuthScreen } from "@/components/auth/auth-screen";
 // carry its own metadata.
 export const metadata: Metadata = {
   title: `Start monitoring free — ${brand.name}`,
-  description: `Create your ${brand.name} account. Self-hosted, multi-tenant infrastructure monitoring. No credit card.`,
+  description: `Create your ${brand.name} account. Website, API and certificate monitoring with alerts and status pages. No credit card.`,
 };
 
 export default function RegisterPage() {

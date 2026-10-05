@@ -233,16 +233,21 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	// partial config (host or from, not both) is a likely mistake: warn loudly and
 	// leave it off rather than half-enable it.
 	var fallbackNotifier notification.FallbackNotifier
+	// Platform-health alerts (scope=platform) email the platform operators over the
+	// same relay. Declared as the interface so "not configured" is a real nil.
+	var operatorAlerts rest.OperatorAlerter
 	switch de := cfg.Notify.DefaultEmail; {
 	case de.Enabled():
-		fallbackNotifier = notifier.NewDefaultEmailNotifier(notifier.DefaultEmailConfig{
+		relay := notifier.DefaultEmailConfig{
 			Host:     de.Host,
 			Port:     de.Port,
 			From:     de.From,
 			Username: de.Username,
 			Password: de.Password,
 			Security: de.Security,
-		}, userRepo, cfg.Notify.BrandName)
+		}
+		operatorAlerts = notifier.NewOperatorNotifier(relay, cfg.PlatformAdminEmails, cfg.Notify.BrandName)
+		fallbackNotifier = notifier.NewDefaultEmailNotifier(relay, userRepo, cfg.Notify.BrandName)
 		log.Info("default email fallback enabled",
 			slog.String("smtp_host", de.Host), slog.String("from", de.From))
 	case de.Host != "" || de.From != "":
@@ -387,7 +392,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 		Monitor:            rest.NewMonitorHandler(monitorSvc, insightSvc, maintenanceSvc, validator, authn),
 		Notification:       rest.NewNotificationHandler(notifySvc, validator, authn),
 		Maintenance:        rest.NewMaintenanceHandler(maintenanceSvc, validator, authn),
-		Alert:              rest.NewAlertHandler(dispatcher, cfg.Notify.WebhookToken),
+		Alert:              rest.NewAlertHandler(dispatcher, cfg.Notify.WebhookToken, operatorAlerts),
 		Insight:            rest.NewInsightHandler(insightSvc, maintenanceSvc),
 		Billing:            rest.NewBillingHandler(billingSvc, stripeWebhook, userRepo, validator, authn, cfg.AI.DiagnoseCostSeconds),
 		StatusPage:         rest.NewStatusPageHandler(statusPageSvc),

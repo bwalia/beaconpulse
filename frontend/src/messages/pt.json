@@ -69,7 +69,7 @@
   },
   "marketing": {
     "skipToContent": "Pular para o conteúdo",
-    "badge": "Auto-hospedado e multi-inquilino",
+    "badge": "Monitoramento, alertas e páginas de status",
     "headlineLine1": "Saiba que caiu",
     "headlineLine2": "antes deles.",
     "heroBlurb": "O {brand} monitora seus endpoints, certificados e DNS a cada 30 segundos e avisa a pessoa certa no momento em que algo quebra. Tenha o controle dos seus dados, execute onde quiser e ofereça aos clientes uma página de status em que eles realmente confiam.",
@@ -84,7 +84,7 @@
     "liveSummary": "3 de 4 operacionais — alerta enviado há 12s",
     "featuresEyebrow": "Tudo em um só lugar",
     "featuresTitle": "Substitua as cinco ferramentas que você emenda com fita adesiva",
-    "featuresBlurb": "O {brand} é um único plano de controle para disponibilidade, latência, certificados e alertas — auto-hospedado, para que os dados nunca saiam da sua infraestrutura.",
+    "featuresBlurb": "O {brand} é um único plano de controle para disponibilidade, latência, certificados e alertas, para que os problemas cheguem à pessoa certa antes que seus clientes percebam.",
     "feature1Title": "Seis tipos de monitor",
     "feature1Body": "Verificações de HTTP, HTTPS, TCP, ICMP, DNS e expiração de SSL — um só plano de controle no lugar de cinco ferramentas.",
     "feature2Title": "Alertas que chegam a uma pessoa",

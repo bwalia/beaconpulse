@@ -335,7 +335,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
 
         <p className="relative flex items-center gap-2 text-base text-slate-400">
           <LockIcon className="h-5 w-5" />
-          Self-hosted. Your data never leaves your infrastructure.
+          Encrypted in transit. Your data is never sold.
         </p>
       </aside>
 

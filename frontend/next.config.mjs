@@ -8,6 +8,26 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Don't advertise the framework in every response.
+  poweredByHeader: false,
+  // Baseline security headers. HSTS is set at the TLS edge (wslproxy). Framing is
+  // denied everywhere except public status pages, which customers may embed.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+        ],
+      },
+      {
+        source: "/:path((?!status/).*)",
+        headers: [{ key: "X-Frame-Options", value: "DENY" }],
+      },
+    ];
+  },
   // Standalone output produces a minimal self-contained server for the Docker image.
   output: "standalone",
   // The React Compiler memoizes components and values automatically, which is why

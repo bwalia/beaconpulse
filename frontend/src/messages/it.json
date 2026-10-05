@@ -69,7 +69,7 @@
   },
   "marketing": {
     "skipToContent": "Vai al contenuto",
-    "badge": "Self-hosted e multi-tenant",
+    "badge": "Monitoraggio, avvisi e pagine di stato",
     "headlineLine1": "Scopri che è giù",
     "headlineLine2": "prima dei tuoi clienti.",
     "heroBlurb": "{brand} controlla i tuoi endpoint, certificati e DNS ogni 30 secondi e avvisa la persona giusta nell'istante in cui qualcosa si rompe. I dati restano tuoi, lo esegui ovunque e offri ai clienti una pagina di stato di cui fidarsi davvero.",
@@ -84,7 +84,7 @@
     "liveSummary": "3 di 4 operativi – avviso inviato 12s fa",
     "featuresEyebrow": "Tutto in un unico posto",
     "featuresTitle": "Sostituisci i cinque strumenti che tieni insieme alla bell'e meglio",
-    "featuresBlurb": "{brand} è un unico piano di controllo per uptime, latenza, certificati e avvisi: self-hosted, così i dati non lasciano mai la tua infrastruttura.",
+    "featuresBlurb": "{brand} è un unico piano di controllo per uptime, latenza, certificati e avvisi, così i problemi raggiungono la persona giusta prima che i tuoi clienti se ne accorgano.",
     "feature1Title": "Sei tipi di monitor",
     "feature1Body": "Controlli HTTP, HTTPS, TCP, ICMP, DNS e scadenza SSL: un unico piano di controllo invece di cinque strumenti.",
     "feature2Title": "Avvisi che raggiungono una persona",
