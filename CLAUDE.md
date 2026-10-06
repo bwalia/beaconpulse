@@ -110,6 +110,15 @@ configured.
 - `BEACON_WEBPUSH_SUBJECT` — optional VAPID contact (`mailto:` or `https:`); defaults
   to `BEACON_DASHBOARD_URL`, which must then be https or browser push stays off
 
+## Deploys
+
+Merges to `main` deploy beacon int (`deploy-k3s.yml`) and cut the next `v*` tag
+(`auto-tag.yml`). Every other ring of both brands is promoted from Ring Promoter
+(https://rp.workstation.co.uk, apps `beacon` and `sysops`, registered in
+bwalia/ring-promoter `deploy/k8s/configmap.yaml`), which dispatches `deploy-k3s.yml`
+with `BRAND`, `TARGET_ENV` and `IMAGE_TAG=<tag>`. The workflow resolves the tag to
+its commit and only builds images the target registry lacks.
+
 ## Build, run, test
 
 Backend:
