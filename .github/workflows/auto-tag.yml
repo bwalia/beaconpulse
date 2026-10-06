@@ -1,0 +1,43 @@
+name: Auto Tag
+
+# Cut the next patch tag (vMAJOR.MINOR.PATCH+1) on every push to main. These tags
+# are the versions Ring Promoter (rp.workstation.co.uk) seeds and promotes through
+# int -> test -> acc -> prod for both brands; deploy-k3s.yml resolves the tag to its
+# commit, so every ring runs the same commit. Same pattern as bwalia/fishers.
+#
+# A tag pushed with GITHUB_TOKEN triggers no other workflow, so this deploys nothing.
+# Add `[skip tag]` to a commit message to skip tagging that push.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: auto-tag
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    if: ${{ !contains(github.event.head_commit.message, '[skip tag]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Tag this commit with the next patch version
+        run: |
+          set -euo pipefail
+          latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1 | sed 's/^v//')"
+          latest="${latest:-1.0.0}"
+          major="${latest%%.*}"; rest="${latest#*.}"; minor="${rest%%.*}"; patch="${rest##*.}"
+          next="v${major}.${minor}.$((patch + 1))"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$next" -m "Release $next (${GITHUB_SHA::7})"
+          git push origin "$next"
+          echo "Tagged ${GITHUB_SHA::7} as $next"

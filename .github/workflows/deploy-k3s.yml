@@ -35,7 +35,7 @@ on:
           - build-and-deploy
       IMAGE_TAG:
         type: string
-        description: "Image tag to DEPLOY (deploy-only). Leave blank to use this commit's short SHA."
+        description: "Version: a git tag (v1.0.12), branch or commit. Blank = this run's commit. Resolved to one commit whose short SHA is the image tag; build-and-deploy skips images the registry already has."
         default: ""
         required: false
       RECREATE_NAMESPACE:
@@ -179,13 +179,30 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       registry: ${{ steps.reg.outputs.registry }}
+      sha: ${{ steps.tag.outputs.sha }}
+      full_sha: ${{ steps.tag.outputs.full }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags + branches, so any version resolves
 
-      - name: Compute image tag (short SHA)
+      # Ring Promoter dispatches this with IMAGE_TAG = the version it is promoting (a
+      # v* tag cut by auto-tag.yml). Resolve it ONCE to a commit and build + deploy
+      # exactly that commit, so every ring runs the same source and image tag.
+      - name: Resolve version to a commit
         id: tag
-        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION: ${{ github.event.inputs.IMAGE_TAG }}
+        run: |
+          set -euo pipefail
+          REF="${VERSION:-$GITHUB_SHA}"
+          FULL="$(git rev-parse -q --verify "origin/${REF}^{commit}" || git rev-parse -q --verify "${REF}^{commit}")" \
+            || { echo "::error::'${REF}' is not a tag, branch or commit of this repo"; exit 1; }
+          git checkout -q --detach "$FULL"
+          echo "full=$FULL" >> "$GITHUB_OUTPUT"
+          echo "sha=${FULL::7}" >> "$GITHUB_OUTPUT"
+          echo "Version '${REF}' -> ${FULL::7}"
 
       # Not gated on DEPLOYMENT_TYPE: `deploy`-only runs still need this output.
       - name: Resolve registry for this environment
@@ -223,6 +240,11 @@ jobs:
           set -euo pipefail
           SHA=${{ steps.tag.outputs.sha }}
           NS="${{ steps.reg.outputs.registry }}/$IMAGE_NAMESPACE"
+          # Already built for this registry (e.g. a promote to prod, which shares int's
+          # registry): deploy that exact image rather than a rebuild of it.
+          if docker manifest inspect "$NS/api:$SHA" >/dev/null 2>&1 && docker manifest inspect "$NS/worker:$SHA" >/dev/null 2>&1; then
+            echo "$NS/api:$SHA and worker:$SHA already exist, not rebuilding"; exit 0
+          fi
           # One backend image contains both binaries; api/worker differ by command.
           # --platform is explicit so a wrong-arch image can never ship silently;
           # --provenance/--sbom off so buildx emits a single manifest the registry accepts.
@@ -258,6 +280,9 @@ jobs:
           else
             FE_SHA="frontend:${BRAND}-$SHA"; FE_LATEST="frontend:${BRAND}-latest"
           fi
+          if docker manifest inspect "$NS/$FE_SHA" >/dev/null 2>&1; then
+            echo "$NS/$FE_SHA already exists, not rebuilding"; exit 0
+          fi
           # Empty NEXT_PUBLIC_API_BASE_URL => the browser calls the API same-origin
           # (/api/...) through the gateway. No CORS.
           docker buildx build --platform "$BUILD_PLATFORM" $BUILDX_FLAGS --load \
@@ -282,6 +307,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.full_sha }} # the chart from the version being deployed
 
       - name: Decode kubeconfig
         if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
@@ -313,8 +340,7 @@ jobs:
         if: ${{ env.DEPLOYMENT_TYPE == 'deploy' || env.DEPLOYMENT_TYPE == 'build-and-deploy' }}
         run: |
           set -euo pipefail
-          TAG="${{ github.event.inputs.IMAGE_TAG }}"
-          [ -z "$TAG" ] && TAG="${GITHUB_SHA::7}"
+          TAG="${{ needs.build.outputs.sha }}"
 
           # Beacon deploys as release `beacon` into the env namespace, exactly as before.
           # A white-label brand deploys as its own release into `<brand>-<env>`, so it
