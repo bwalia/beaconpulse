@@ -59,6 +59,31 @@ struct MonitorSettings: Codable, Equatable {
     var githubNotifyOnSuccess: Bool? = nil
 
     static let empty = MonitorSettings()
+
+    /// Headers as the editable "Name: value" lines the web form shows, sorted so
+    /// the order is stable between edits.
+    static func headerLines(_ headers: [String: String]?) -> String {
+        (headers ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }.joined(separator: "\n")
+    }
+
+    /// Parses "Name: value" lines (the value may itself contain colons). Lines
+    /// without a name are dropped; nothing left means no headers.
+    static func headers(fromLines text: String) -> [String: String]? {
+        var out: [String: String] = [:]
+        for line in text.split(separator: "\n") {
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            let name = line[..<colon].trimmingCharacters(in: .whitespaces)
+            if !name.isEmpty { out[name] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces) }
+        }
+        return out.isEmpty ? nil : out
+    }
+
+    /// Parses "200, 204, 301". Non-numbers are dropped; nothing left means the
+    /// server default (any 2xx/3xx).
+    static func statusCodes(from text: String) -> [Int]? {
+        let codes = text.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+        return codes.isEmpty ? nil : codes
+    }
 }
 
 /// A monitored resource, as returned by GET /api/v1/monitors. Decodes the full
@@ -86,9 +111,19 @@ struct Monitor: Decodable, Identifiable, Equatable {
 /// The monitor types the API accepts.
 enum MonitorKind: String, CaseIterable, Identifiable {
     case http, https, ssl, tcp, icmp, dns, heartbeat
+    case githubActions = "github_actions"
     var id: String { rawValue }
+    /// Types the app can create. A GitHub Actions monitor's ingest token is shown
+    /// only once, on creation, so those are created on the web.
+    static let creatable: [MonitorKind] = [.http, .https, .ssl, .tcp, .icmp, .dns, .heartbeat]
     /// A heartbeat is pinged by the customer's job, so it has no probe target.
     var needsTarget: Bool { self != .heartbeat }
+    /// Probed by us on a schedule, so a timeout applies. Heartbeat and GitHub
+    /// Actions monitors are pushed to instead.
+    var isProbed: Bool { self != .heartbeat && self != .githubActions }
+    /// Types that take request settings (method, status codes, headers…) — the
+    /// same set the web form shows them for.
+    var takesRequestSettings: Bool { self == .http || self == .https || self == .ssl }
 }
 
 /// A notification channel (GET /api/v1/notification-channels). The secret is never
@@ -243,6 +278,14 @@ struct UpdateMonitorBody: Encodable {
     let intervalSeconds: Int
     let timeoutSeconds: Int
     let settings: MonitorSettings
+}
+
+/// Body for POST /api/v1/projects and PATCH /api/v1/projects/{id}. The server
+/// derives the slug from the name on create.
+struct ProjectBody: Encodable {
+    let name: String
+    let description: String
+    let environment: String
 }
 
 /// Body for POST /api/v1/notification-channels.

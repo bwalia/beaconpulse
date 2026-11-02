@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Create or edit a monitor. On edit the form is prefilled from the fetched
-/// record and the full `settings` object is round-tripped, so advanced settings
-/// configured elsewhere (headers, status codes, DNS) survive an edit here. Only
-/// the common fields are surfaced; the rest ride along untouched.
+/// Create or edit a monitor. The per-type fields match the web form. On edit the
+/// form is prefilled from the fetched record and the full `settings` object is
+/// round-tripped, so anything this form doesn't show (e.g. DNS expected IPs)
+/// survives an edit here.
 struct MonitorFormView: View {
     enum Mode {
         case create
@@ -25,7 +25,11 @@ struct MonitorFormView: View {
     @State private var graceSeconds = 60
     @State private var enabled = true
     @State private var alertSensitivity = "balanced"
-    @State private var baseSettings = MonitorSettings.empty
+    @State private var settings = MonitorSettings.empty
+    // Edited as text and parsed on save, so typing "200, " isn't reformatted
+    // mid-keystroke.
+    @State private var statusCodesText = ""
+    @State private var headersText = ""
 
     @State private var projects: [Project] = []
     @State private var isSaving = false
@@ -44,7 +48,9 @@ struct MonitorFormView: View {
             _graceSeconds = State(initialValue: m.graceSeconds ?? 60)
             _enabled = State(initialValue: m.enabled)
             _alertSensitivity = State(initialValue: m.settings.alertSensitivity ?? "balanced")
-            _baseSettings = State(initialValue: m.settings)
+            _settings = State(initialValue: m.settings)
+            _statusCodesText = State(initialValue: (m.settings.validStatusCodes ?? []).map(String.init).joined(separator: ", "))
+            _headersText = State(initialValue: MonitorSettings.headerLines(m.settings.headers))
         }
     }
 
@@ -59,7 +65,7 @@ struct MonitorFormView: View {
 
                     if isCreate {
                         Picker("Type", selection: $type) {
-                            ForEach(MonitorKind.allCases) { Text($0.rawValue.uppercased()).tag($0.rawValue) }
+                            ForEach(MonitorKind.creatable) { Text($0.rawValue.uppercased()).tag($0.rawValue) }
                         }
                         Picker("Project", selection: $projectID) {
                             Text("Select…").tag("")
@@ -78,17 +84,49 @@ struct MonitorFormView: View {
                 }
 
                 Section("Checks") {
-                    Stepper("Interval: \(intervalSeconds)s", value: $intervalSeconds, in: 10...86400, step: 10)
-                    Stepper("Timeout: \(timeoutSeconds)s", value: $timeoutSeconds, in: 1...300)
-                    if kind == .heartbeat {
-                        Stepper("Grace: \(graceSeconds)s", value: $graceSeconds, in: 0...86400, step: 30)
-                    }
-                    Picker("Alert sensitivity", selection: $alertSensitivity) {
-                        Text("Immediate").tag("immediate")
-                        Text("Balanced").tag("balanced")
-                        Text("Relaxed").tag("relaxed")
+                    if kind != .githubActions {
+                        Stepper("Interval: \(intervalSeconds)s", value: $intervalSeconds, in: 10...86400, step: 10)
+                        if kind.isProbed {
+                            Stepper("Timeout: \(timeoutSeconds)s", value: $timeoutSeconds, in: 1...300)
+                        }
+                        if kind == .heartbeat {
+                            // The server sets grace only at creation.
+                            if isCreate {
+                                Stepper("Grace: \(graceSeconds)s", value: $graceSeconds, in: 0...86400, step: 30)
+                            } else {
+                                LabeledContent("Grace", value: "\(graceSeconds)s")
+                            }
+                        }
+                        Picker("Alert sensitivity", selection: $alertSensitivity) {
+                            Text("Immediate").tag("immediate")
+                            Text("Balanced").tag("balanced")
+                            Text("Relaxed").tag("relaxed")
+                        }
                     }
                     Toggle("Enabled", isOn: $enabled)
+                }
+
+                if kind.takesRequestSettings { requestSections }
+
+                if kind == .dns {
+                    Section("DNS") {
+                        Picker("Record type", selection: $settings.dnsQueryType.or("A")) {
+                            ForEach(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA"], id: \.self) { Text($0) }
+                        }
+                    }
+                }
+
+                if kind == .githubActions {
+                    Section {
+                        TextField("Workflow filter (optional)", text: $settings.githubWorkflow.or(""))
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        Toggle("Also notify on every successful run", isOn: $settings.githubNotifyOnSuccess.or(false))
+                    } header: {
+                        Text("GitHub Actions")
+                    } footer: {
+                        Text("Leave the filter blank to alert on any workflow. Rotate the ingest token on the web.")
+                    }
                 }
 
                 if let errorMessage {
@@ -113,6 +151,51 @@ struct MonitorFormView: View {
         }
     }
 
+    /// Method, status codes, headers and response checks for HTTP-family monitors.
+    @ViewBuilder private var requestSections: some View {
+        Section("Request") {
+            Picker("Method", selection: $settings.method.or("GET")) {
+                ForEach(["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE"], id: \.self) { Text($0) }
+            }
+            TextField("Expected status codes, e.g. 200, 204", text: $statusCodesText)
+                .keyboardType(.numbersAndPunctuation)
+            Toggle("Follow redirects", isOn: $settings.followRedirects.or(false))
+            Toggle("Skip TLS verification", isOn: $settings.skipTlsVerify.or(false))
+            TextField("Request body (for POST/PUT/PATCH)", text: $settings.body.or(""), axis: .vertical)
+                .lineLimit(1...6)
+                .font(.body.monospaced())
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        }
+
+        Section {
+            TextField("Name: value, one per line", text: $headersText, axis: .vertical)
+                .lineLimit(2...8)
+                .font(.body.monospaced())
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        } header: {
+            Text("Headers")
+        } footer: {
+            Text("Use for auth, e.g. Authorization: Bearer <token>. Saved values are encrypted and shown as ********: leave a line as it is to keep its value, or delete the line to remove the header.")
+        }
+
+        Section("Response") {
+            TextField("Body must contain", text: $settings.bodyKeyword.or(""))
+            TextField("Body must NOT contain", text: $settings.bodyNotKeyword.or(""))
+            LabeledContent("Slow-response alert (ms)") {
+                TextField("Off", value: $settings.responseTimeWarningMs, format: .number)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.numberPad)
+            }
+            LabeledContent("SSL expiry warning (days)") {
+                TextField("30", value: $settings.sslExpiryWarningDays, format: .number)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.numberPad)
+            }
+        }
+    }
+
     private var targetHint: String {
         switch kind {
         case .http, .https: return "https://example.com"
@@ -121,6 +204,7 @@ struct MonitorFormView: View {
         case .icmp: return "example.com"
         case .dns: return "example.com"
         case .heartbeat: return ""
+        case .githubActions: return "owner/repo"
         }
     }
 
@@ -144,8 +228,12 @@ struct MonitorFormView: View {
         errorMessage = nil
         defer { isSaving = false }
 
-        var settings = baseSettings
+        var settings = settings
         settings.alertSensitivity = alertSensitivity
+        if kind.takesRequestSettings {
+            settings.validStatusCodes = MonitorSettings.statusCodes(from: statusCodesText)
+            settings.headers = MonitorSettings.headers(fromLines: headersText)
+        }
 
         do {
             switch mode {
@@ -180,4 +268,14 @@ struct MonitorFormView: View {
 extension String {
     /// Whitespace-trimmed copy, used across the write forms.
     var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
+}
+
+extension Binding {
+    /// Drives a non-optional control from an optional setting: nil shows as
+    /// `fallback`, and choosing `fallback` (an empty string, false, the server
+    /// default) stores nil so the field is omitted, as the web form does.
+    func or<T: Equatable>(_ fallback: T) -> Binding<T> where Value == T? {
+        Binding<T>(get: { wrappedValue ?? fallback },
+                   set: { wrappedValue = $0 == fallback ? nil : $0 })
+    }
 }

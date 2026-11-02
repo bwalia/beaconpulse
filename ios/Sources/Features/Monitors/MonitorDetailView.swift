@@ -144,13 +144,19 @@ struct MonitorDetailView: View {
                         Text(monitor.status.rawValue.capitalized)
                     }
                 }
-                if monitor.type != "heartbeat" {
-                    LabeledContent("Target", value: monitor.target)
+                let kind = MonitorKind(rawValue: monitor.type)
+                if kind != .heartbeat {
+                    LabeledContent(kind == .githubActions ? "Repository" : "Target", value: monitor.target)
                 }
                 LabeledContent("Type", value: monitor.type.uppercased())
                 LabeledContent("Enabled", value: monitor.enabled ? "Yes" : "No")
-                LabeledContent("Interval", value: "\(monitor.intervalSeconds)s")
-                LabeledContent("Timeout", value: "\(monitor.timeoutSeconds)s")
+                // Push-based monitors aren't probed: no timeout, and GitHub Actions has no interval.
+                if kind != .githubActions {
+                    LabeledContent("Interval", value: "\(monitor.intervalSeconds)s")
+                }
+                if kind?.isProbed ?? true {
+                    LabeledContent("Timeout", value: "\(monitor.timeoutSeconds)s")
+                }
                 if let lastChecked = monitor.lastCheckedAt {
                     LabeledContent("Last checked",
                                    value: lastChecked.formatted(.relative(presentation: .named)))

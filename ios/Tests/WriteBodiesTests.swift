@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import SysOps
 
@@ -43,6 +44,31 @@ final class WriteBodiesTests: XCTestCase {
         XCTAssertTrue(out.contains("\"project_id\":\"p1\""))
         XCTAssertTrue(out.contains("\"interval_seconds\":60"))
         XCTAssertFalse(out.contains("grace_seconds"), "nil grace must be omitted")
+    }
+
+    func testHeaderLinesParseAndFormat() {
+        let parsed = MonitorSettings.headers(fromLines: "X-Env: prod\n\nno colon here\n: no name\nAuthorization:  Bearer a:b ")
+        XCTAssertEqual(parsed, ["X-Env": "prod", "Authorization": "Bearer a:b"], "values may contain colons")
+        XCTAssertEqual(MonitorSettings.headerLines(parsed), "Authorization: Bearer a:b\nX-Env: prod")
+        XCTAssertNil(MonitorSettings.headers(fromLines: "  \n"), "no lines means no headers")
+        // A masked saved value survives the text round trip, so the server keeps it.
+        let masked = ["Authorization": "********"]
+        XCTAssertEqual(MonitorSettings.headers(fromLines: MonitorSettings.headerLines(masked)), masked)
+    }
+
+    func testStatusCodesParse() {
+        XCTAssertEqual(MonitorSettings.statusCodes(from: "200, 204,x, 301"), [200, 204, 301])
+        XCTAssertNil(MonitorSettings.statusCodes(from: " "), "blank means the server default")
+    }
+
+    func testOptionalBindingStoresNilForFallback() {
+        var method: String? = nil
+        let binding = Binding(get: { method }, set: { method = $0 }).or("GET")
+        XCTAssertEqual(binding.wrappedValue, "GET")
+        binding.wrappedValue = "POST"
+        XCTAssertEqual(method, "POST")
+        binding.wrappedValue = "GET"
+        XCTAssertNil(method, "the server default is omitted, not sent")
     }
 
     func testUpdateChannelBodyOmitsNilSecret() throws {

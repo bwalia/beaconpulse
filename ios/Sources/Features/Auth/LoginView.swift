@@ -59,6 +59,11 @@ struct LoginView: View {
                 .padding()
                 .background(.thinMaterial, in: .rect(cornerRadius: 10))
 
+            // The reset email links to the web app anyway, so the flow lives there.
+            Link("Forgot password?", destination: config.apiBaseURL.appending(path: "forgot-password"))
+                .font(.footnote)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+
             if let errorMessage {
                 Text(errorMessage)
                     .font(.footnote)
