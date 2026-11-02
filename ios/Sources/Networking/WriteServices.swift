@@ -24,6 +24,23 @@ struct MonitorService {
     }
 }
 
+/// Project operations. Deleting a project also deletes every monitor in it.
+struct ProjectService {
+    let client: APIClient
+
+    func create(_ body: ProjectBody) async throws -> Project {
+        try await client.send(.init(method: "POST", path: "/api/v1/projects", body: body), as: Project.self)
+    }
+
+    func update(id: String, _ body: ProjectBody) async throws -> Project {
+        try await client.send(.init(method: "PATCH", path: "/api/v1/projects/\(id)", body: body), as: Project.self)
+    }
+
+    func delete(id: String) async throws {
+        try await client.send(.init(method: "DELETE", path: "/api/v1/projects/\(id)"))
+    }
+}
+
 /// Notification-channel operations, including the "send test" action.
 struct ChannelService {
     let client: APIClient

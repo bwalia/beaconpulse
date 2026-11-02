@@ -71,8 +71,7 @@ upload auto-distributes) holds all 7 App Store Connect team accounts, and the
 beta app description + feedback email are set.
 
 Still manual: App Store metadata (privacy labels, screenshots, review demo
-account) and a real privacy-policy page — there is no `/privacy` route on the
-site yet, and App Store review requires one.
+account). The privacy policy App Store review needs is live at `/privacy`.
 
 ## iOS release pipeline (TestFlight on push to main)
 

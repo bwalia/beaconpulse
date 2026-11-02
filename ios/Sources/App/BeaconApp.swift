@@ -30,6 +30,7 @@ final class AppContainer {
     let apiClient: APIClient
     let push: PushManager
     let monitors: MonitorService
+    let projects: ProjectService
     let channels: ChannelService
     let maintenance: MaintenanceService
     let account: AccountService
@@ -46,6 +47,7 @@ final class AppContainer {
         self.apiClient = apiClient
         self.push = PushManager(client: apiClient, session: session)
         self.monitors = MonitorService(client: apiClient)
+        self.projects = ProjectService(client: apiClient)
         self.channels = ChannelService(client: apiClient)
         self.maintenance = MaintenanceService(client: apiClient)
         self.account = AccountService(client: apiClient)
