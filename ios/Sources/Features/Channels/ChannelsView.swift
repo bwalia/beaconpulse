@@ -60,15 +60,11 @@ struct ChannelsView: View {
                                            description: Text("Add a channel to receive alerts."))
                 } else {
                     ForEach(channels) { channel in
-                        ChannelRow(channel: channel) { newValue in
-                            await run { try await store?.setEnabled(channel, newValue) }
-                        }
+                        ChannelRow(channel: channel,
+                                   onToggle: { newValue in await run { try await store?.setEnabled(channel, newValue) } },
+                                   onTest: { await test(channel) })
                         .contentShape(Rectangle())
                         .onTapGesture { if !channel.isManaged { sheet = .edit(channel) } }
-                        .swipeActions(edge: .leading) {
-                            Button { Task { await test(channel) } } label: { Label("Test", systemImage: "paperplane") }
-                                .tint(.blue)
-                        }
                         .swipeActions(edge: .trailing) {
                             if !channel.isManaged {
                                 Button(role: .destructive) {
@@ -131,6 +127,7 @@ struct ChannelsView: View {
 struct ChannelRow: View {
     let channel: Channel
     let onToggle: (Bool) async -> Void
+    let onTest: () async -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -140,6 +137,11 @@ struct ChannelRow: View {
                 Text(subtitle).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            // A visible button: the old swipe-to-test was too hard to find.
+            Button("Test") { Task { await onTest() } }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityLabel("Send a test notification to \(channel.name)")
             Toggle("", isOn: Binding(get: { channel.enabled }, set: { value in Task { await onToggle(value) } }))
                 .labelsHidden()
                 .accessibilityLabel("\(channel.name), notifications")
