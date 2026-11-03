@@ -205,7 +205,7 @@ func (s *Service) Create(ctx context.Context, actor Actor, in CreateInput) (*Mon
 	}
 	if count >= limits.MaxMonitors {
 		return nil, apperror.QuotaExceeded(fmt.Sprintf(
-			"your plan allows up to %d monitors (you already have %d). Upgrade your plan to add more.",
+			"your plan allows up to %d monitors (you already have %d).",
 			limits.MaxMonitors, count))
 	}
 
@@ -575,7 +575,7 @@ func newGitHubIngestToken() (plain, hash, prefix string, err error) {
 func enforceIntervalFloor(interval, minInterval int) error {
 	if interval < minInterval {
 		return apperror.QuotaExceeded(fmt.Sprintf(
-			"your plan's minimum check interval is %ds; choose a slower interval or upgrade.", minInterval))
+			"your plan's minimum check interval is %ds; choose a slower interval.", minInterval))
 	}
 	return nil
 }
