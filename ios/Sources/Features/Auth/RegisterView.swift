@@ -56,6 +56,11 @@ struct RegisterView: View {
                     .controlSize(.large)
                     .disabled(!canSubmit)
                     .padding(.top, 4)
+
+                    Text(LocalizedStringKey("By creating an account you agree to the [Terms of Service](\(config.apiBaseURL.appending(path: "terms"))) and [Privacy Policy](\(config.apiBaseURL.appending(path: "privacy")))."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
                 .padding(24)
             }

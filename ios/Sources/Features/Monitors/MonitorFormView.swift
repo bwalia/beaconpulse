@@ -31,6 +31,7 @@ struct MonitorFormView: View {
     @State private var statusCodesText = ""
     @State private var headersText = ""
 
+    @State private var usage: MonitorUsage?
     @State private var projects: [Project] = []
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -83,9 +84,10 @@ struct MonitorFormView: View {
                     }
                 }
 
-                Section("Checks") {
+                Section {
                     if kind != .githubActions {
-                        Stepper("Interval: \(intervalSeconds)s", value: $intervalSeconds, in: 10...86400, step: 10)
+                        Stepper("Interval: \(Self.duration(intervalSeconds))", value: $intervalSeconds,
+                                in: minInterval...86400, step: minInterval >= 60 ? 60 : 10)
                         if kind.isProbed {
                             Stepper("Timeout: \(timeoutSeconds)s", value: $timeoutSeconds, in: 1...300)
                         }
@@ -104,6 +106,19 @@ struct MonitorFormView: View {
                         }
                     }
                     Toggle("Enabled", isOn: $enabled)
+                } header: {
+                    Text("Checks")
+                } footer: {
+                    if let usage, kind != .githubActions, usage.minIntervalSeconds > 10 {
+                        Text("Your plan checks at most every \(Self.duration(usage.minIntervalSeconds)).")
+                    }
+                }
+
+                if isCreate, let usage, usage.monitorsUsed >= usage.monitorsLimit {
+                    Section {
+                        Text("You’ve reached your plan’s limit of \(usage.monitorsLimit) monitors. Delete one to add another.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 if kind.takesRequestSettings { requestSections }
@@ -147,7 +162,10 @@ struct MonitorFormView: View {
                     }
                 }
             }
-            .task { await loadProjects() }
+            .task {
+                await loadUsage()
+                await loadProjects()
+            }
         }
     }
 
@@ -208,11 +226,27 @@ struct MonitorFormView: View {
         }
     }
 
+    /// The plan's fastest allowed interval (10s until the usage call answers).
+    private var minInterval: Int { usage?.minIntervalSeconds ?? 10 }
+
+    /// "30 min", "1 hr", "45 sec".
+    static func duration(_ seconds: Int) -> String {
+        Duration.seconds(seconds).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated))
+    }
+
     private var canSave: Bool {
         guard !name.trimmed.isEmpty else { return false }
+        if isCreate, let usage, usage.monitorsUsed >= usage.monitorsLimit { return false }
         if kind.needsTarget && target.trimmed.isEmpty { return false }
         if isCreate && projectID.isEmpty { return false }
         return true
+    }
+
+    /// Loads the plan limits so the form never offers an interval or a new monitor
+    /// the server would refuse.
+    private func loadUsage() async {
+        usage = try? await container.apiClient.send(.init(path: "/api/v1/monitors/usage"), as: MonitorUsage.self)
+        if intervalSeconds < minInterval { intervalSeconds = minInterval }
     }
 
     private func loadProjects() async {

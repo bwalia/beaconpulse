@@ -36,6 +36,11 @@ struct SettingsView: View {
                 }
             }
 
+            Section("About") {
+                Link("Privacy Policy", destination: AppConfig.current.apiBaseURL.appending(path: "privacy"))
+                Link("Terms of Service", destination: AppConfig.current.apiBaseURL.appending(path: "terms"))
+            }
+
             Section {
                 Button("Sign Out", role: .destructive) {
                     Task {

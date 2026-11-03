@@ -211,6 +211,13 @@ struct ActiveAlert: Decodable, Identifiable {
     var id: String { "\(name):\(monitorId)" }
 }
 
+/// The org's plan limits (GET /api/v1/monitors/usage).
+struct MonitorUsage: Decodable {
+    let monitorsUsed: Int
+    let monitorsLimit: Int
+    let minIntervalSeconds: Int
+}
+
 /// A project (GET /api/v1/projects). Hashable so it can drive value-based
 /// navigation into its filtered monitor list.
 struct Project: Decodable, Identifiable, Hashable {
