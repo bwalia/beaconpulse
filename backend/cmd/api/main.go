@@ -199,22 +199,25 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	// platform-wide (one first-party app); destinations are the org's device tokens.
 	if cfg.Push.Enabled() {
 		key, err := apns.ParseP8Key([]byte(cfg.Push.APNsKeyP8))
-		if err != nil {
-			return nil, fmt.Errorf("apple push: %w", err)
+		var apnsClient *apns.Client
+		if err == nil {
+			apnsClient, err = apns.New(apns.Config{
+				PrivateKey: key,
+				KeyID:      cfg.Push.APNsKeyID,
+				TeamID:     cfg.Push.APNsTeamID,
+				Topic:      cfg.Push.APNsTopic,
+				Production: cfg.Push.APNsProduction,
+			})
 		}
-		apnsClient, err := apns.New(apns.Config{
-			PrivateKey: key,
-			KeyID:      cfg.Push.APNsKeyID,
-			TeamID:     cfg.Push.APNsTeamID,
-			Topic:      cfg.Push.APNsTopic,
-			Production: cfg.Push.APNsProduction,
-		})
 		if err != nil {
-			return nil, fmt.Errorf("apple push: %w", err)
+			// A mis-pasted key must not take the whole API down (a secret change
+			// restarts it): push stays off and the log says why.
+			log.Error("apple push (APNs) disabled: invalid config", slog.Any("error", err))
+		} else {
+			notifierRegistry[notification.TypeAPNs] = notifier.NewAPNsNotifier(apnsClient, deviceRepo)
+			log.Info("apple push (APNs) enabled",
+				slog.String("topic", cfg.Push.APNsTopic), slog.Bool("production", cfg.Push.APNsProduction))
 		}
-		notifierRegistry[notification.TypeAPNs] = notifier.NewAPNsNotifier(apnsClient, deviceRepo)
-		log.Info("apple push (APNs) enabled",
-			slog.String("topic", cfg.Push.APNsTopic), slog.Bool("production", cfg.Push.APNsProduction))
 	}
 	// Browser push (VAPID). The key comes from BEACON_WEBPUSH_PRIVATE_KEY, or is
 	// generated on first start and kept (encrypted) in the database, so browser

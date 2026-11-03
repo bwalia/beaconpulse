@@ -87,9 +87,10 @@ func New(cfg Config) (*Client, error) {
 }
 
 // ParseP8Key parses a PEM-encoded PKCS#8 EC private key (the contents of an Apple
-// .p8 file) into an ECDSA key.
+// .p8 file) into an ECDSA key. Literal "\n" sequences are read as newlines, so a key
+// pasted into a single-line secret field still parses.
 func ParseP8Key(pemBytes []byte) (*ecdsa.PrivateKey, error) {
-	block, _ := pem.Decode(pemBytes)
+	block, _ := pem.Decode(bytes.ReplaceAll(pemBytes, []byte(`\n`), []byte("\n")))
 	if block == nil {
 		return nil, errors.New("apns: no PEM block found in signing key")
 	}
