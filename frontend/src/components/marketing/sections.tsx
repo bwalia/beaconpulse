@@ -562,6 +562,12 @@ function Footer() {
           >
             Privacy
           </Link>
+          <Link
+            href="/support"
+            className="rounded text-slate-600 transition-colors hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 motion-reduce:transition-none dark:text-slate-300 dark:hover:text-white"
+          >
+            Support
+          </Link>
         </nav>
       </div>
     </footer>
