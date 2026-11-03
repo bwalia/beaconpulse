@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,6 +35,12 @@ func TestParseP8Key(t *testing.T) {
 	}
 	if !got.Equal(k) {
 		t.Fatal("parsed key does not match original")
+	}
+
+	// Pasted into a single-line secret field, the newlines arrive as literal "\n".
+	escaped := []byte(strings.ReplaceAll(string(pemBytes), "\n", `\n`))
+	if got, err := ParseP8Key(escaped); err != nil || !got.Equal(k) {
+		t.Fatalf("ParseP8Key(escaped newlines) = %v, want the original key", err)
 	}
 
 	if _, err := ParseP8Key([]byte("not a pem")); err == nil {
