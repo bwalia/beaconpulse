@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon: the pulse as a plain white silhouette, drawn thicker to read at 24dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <path
+        android:pathData="M96,512L328,512L400,422L490,720L585,212L663,571L712,512L930,512"
+        android:strokeWidth="88"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M870,512a60,60 0,1 0,120 0a60,60 0,1 0,-120 0z" />
+</vector>

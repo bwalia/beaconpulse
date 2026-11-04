@@ -13,6 +13,7 @@ import { ThemeToggle } from "@/lib/theme";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useTranslations } from "next-intl";
 import { brand } from "@/brand";
+import { isPlayApp } from "@/lib/pwa";
 import {
   ActivityIcon,
   AlertTriangleIcon,
@@ -79,6 +80,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  const nav = [
+    // No billing in the Play Store app (Play allows only its own billing).
+    ...(isPlayApp() ? baseNav.filter((i) => i.key !== "billing") : baseNav),
+    ...(user.role === "owner" || user.role === "admin" ? adminNav : []),
+    ...(user.is_platform_admin ? platformNav : []),
+  ];
+
   return (
     <ConfirmProvider>
     <div className="flex min-h-screen">
@@ -90,11 +98,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <span className="text-xl font-bold tracking-tight">{brand.name}</span>
         </div>
         <nav className="space-y-1">
-          {[
-            ...baseNav,
-            ...(user.role === "owner" || user.role === "admin" ? adminNav : []),
-            ...(user.is_platform_admin ? platformNav : []),
-          ].map((item) => {
+          {nav.map((item) => {
             const active = pathname === item.href;
             return (
               <Link
@@ -119,7 +123,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/75 dark:border-slate-800 dark:bg-slate-900/90 dark:supports-[backdrop-filter]:bg-slate-900/75">
+        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-200 bg-white/90 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/75 dark:border-slate-800 dark:bg-slate-900/90 dark:supports-[backdrop-filter]:bg-slate-900/75">
           <Link
             href="/account"
             title="Account settings"
@@ -135,6 +139,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               {t("signOut")}
             </Button>
           </div>
+          {/* Phones: the sidebar is hidden, so the same links scroll across under the header. */}
+          <nav className="-mx-6 flex w-[calc(100%+3rem)] gap-1 overflow-x-auto px-6 md:hidden">
+            {nav.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+                    active
+                      ? "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300"
+                      : "text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  <item.Icon className="h-4 w-4" />
+                  {item.label ?? t(item.key)}
+                </Link>
+              );
+            })}
+          </nav>
         </header>
         <main className="flex-1 p-4 sm:p-6">
           {/* Single content container for every route, so page widths never drift

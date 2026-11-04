@@ -4,9 +4,43 @@
 // public/sw.js; the server side is POST/DELETE /api/v1/devices with
 // platform "web" and GET /api/v1/devices/webpush for the VAPID key.
 
-import { useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useSyncExternalStore } from "react";
 
 import { api } from "@/lib/api";
+
+/* ---------------- Play Store app ---------------- */
+
+// The Android app (android/) is this site in a Trusted Web Activity. Google Play allows
+// only its own billing for in-app purchases, so billing is hidden there, as in the iOS
+// app. The app opens ?app=android and Chrome sets the referrer to android-app://<package>;
+// either marks the tab. sessionStorage, not localStorage: the app shares Chrome's
+// storage, and a lasting flag would hide billing in the phone's browser too.
+const PLAY_APP = "beacon:play-app";
+if (typeof window !== "undefined") {
+  try {
+    if (new URLSearchParams(location.search).get("app") === "android" || document.referrer.startsWith("android-app://"))
+      sessionStorage.setItem(PLAY_APP, "1");
+  } catch {}
+}
+
+/** True inside the Play Store app. Client-only: use it in effects or in UI rendered after auth loads. */
+export function isPlayApp() {
+  try {
+    return sessionStorage.getItem(PLAY_APP) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Sends the Play Store app away from a page that sells plans. Renders nothing. */
+export function NotInPlayApp() {
+  const router = useRouter();
+  useEffect(() => {
+    if (isPlayApp()) router.replace("/dashboard");
+  }, [router]);
+  return null;
+}
 
 /* ---------------- install prompt ---------------- */
 

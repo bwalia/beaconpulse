@@ -4,9 +4,10 @@ Multi-tenant infrastructure-monitoring platform. Same backend ships under multip
 brands (SysOps 24/7, RedFox Signals, Beacon) — **brand is always configuration, never
 hardcoded.**
 
-Brands live in three places, all configuration: `frontend/src/brand/<brand>.ts` (web,
+Brands live in four places, all configuration: `frontend/src/brand/<brand>.ts` (web,
 selected at build time by `NEXT_PUBLIC_BRAND`), `deploy/helm/beacon/values-<brand>-<env>.yaml`
-+ a wslproxy vhost (domain), and `ios/Brands/<Brand>/` (app). See
++ a wslproxy vhost (domain), `ios/Brands/<Brand>/` (iOS app) and a flavor in
+`android/app/build.gradle.kts` + `android/app/src/<brand>/res` (Android app). See
 `deploy/helm/beacon/DEPLOY-A-BRAND.md`.
 
 ## Layout
@@ -21,6 +22,11 @@ selected at build time by `NEXT_PUBLIC_BRAND`), `deploy/helm/beacon/values-<bran
   replicas via Redis (`cache-handler.mjs`), busted by the signed OpsAPI webhook at
   `/cms/revalidate` — same pattern as `../workstation-website`.
 - `ios/` — native SwiftUI iPhone/iPad app (added recently — see below).
+- `android/` — Google Play app: the website in a Trusted Web Activity (no native
+  code). Per-brand flavor + `brand.android` in the web brand file, which serves
+  `/.well-known/assetlinks.json`. Inside the app (`?app=android`) the site hides
+  billing (`isPlayApp()`), as the iOS app has none. CI: `android-release.yml`. See
+  `android/README.md`.
 
 ## iOS app — current status
 
