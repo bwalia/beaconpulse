@@ -51,6 +51,10 @@ export const sysops: Brand = {
   // types.ts; a staging deploy overrides this with NEXT_PUBLIC_SITE_URL.
   url: "https://sysops247.com",
 
+  // sysops247.com has no mailbox, so the Support, Terms and Privacy pages point at the
+  // working Workstation inbox. /platform → Company & contact overrides this at runtime.
+  legal: { contactEmail: "support@workstation.co.uk" },
+
   // A green ramp — visibly not Beacon's blue, so a glance confirms the brand changed.
   // Swap these eleven values for any palette to recolour the whole product.
   primary: {
