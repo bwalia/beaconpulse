@@ -49,6 +49,14 @@ kubectl -n "$NS" get deploy beacon-postgres >/dev/null 2>&1 \
 kubectl -n "$NS" get secret beacon-secrets >/dev/null 2>&1 \
   || { echo "::error::no beacon-secrets in '$NS'"; exit 1; }
 
+# Run the Job on the database's own node. sysops-prod lives on the cloud003 edge node,
+# which the pod network can't reach from the LAN nodes, and nodeName also bypasses
+# that node's NoSchedule taint (the scheduler is skipped).
+PG_SEL="$(kubectl -n "$NS" get deploy beacon-postgres -o go-template='{{range $k,$v := .spec.selector.matchLabels}}{{$k}}={{$v}},{{end}}')"
+PG_NODE="$(kubectl -n "$NS" get pods -l "${PG_SEL%,}" --field-selector=status.phase=Running \
+  -o jsonpath='{.items[0].spec.nodeName}' 2>/dev/null || true)"
+[ -n "$PG_NODE" ] || { echo "::error::beacon-postgres is not running in '$NS'"; exit 1; }
+
 cleanup() {
   kubectl -n "$NS" delete job "$JOB" --ignore-not-found >/dev/null 2>&1 || true
   kubectl -n "$NS" delete configmap "$CM" --ignore-not-found >/dev/null 2>&1 || true
@@ -115,6 +123,7 @@ spec:
       labels: { app.kubernetes.io/part-of: beacon, app.kubernetes.io/component: pg-backup }
     spec:
       restartPolicy: Never
+      nodeName: ${PG_NODE}
       containers:
         - name: backup
           image: postgres:16-alpine
@@ -147,7 +156,7 @@ ${STORAGE_ENVFROM}
           configMap: { name: ${CM}, defaultMode: 0555 }
 YAML
 
-echo "==> applied Job ${NS}/${JOB}; waiting (max 25m) ..."
+echo "==> applied Job ${NS}/${JOB} on ${PG_NODE}; waiting (max 25m) ..."
 # Wait for either completion or failure; kubectl wait can't OR the two, so poll.
 deadline=$(( $(date +%s) + 1500 ))
 status=""
