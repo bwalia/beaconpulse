@@ -8,7 +8,7 @@ import (
 	"beacon/internal/platform/apperror"
 )
 
-type fakeMailer struct{ sent, verify []string } // links
+type fakeMailer struct{ sent, verify, welcome []string } // links
 
 func (m *fakeMailer) SendPasswordReset(_ context.Context, _, _, link string) error {
 	m.sent = append(m.sent, link)
@@ -17,6 +17,11 @@ func (m *fakeMailer) SendPasswordReset(_ context.Context, _, _, link string) err
 
 func (m *fakeMailer) SendEmailVerification(_ context.Context, _, _, link string) error {
 	m.verify = append(m.verify, link)
+	return nil
+}
+
+func (m *fakeMailer) SendWelcome(_ context.Context, _, _, link string) error {
+	m.welcome = append(m.welcome, link)
 	return nil
 }
 
@@ -149,5 +154,38 @@ func TestEmailVerification_PasswordResetVerifies(t *testing.T) {
 	}
 	if jane, _ := svc.users.GetUserByEmail(ctx, "jane@example.com"); !jane.EmailVerified() {
 		t.Fatal("completing a reset proves inbox access and should verify the address")
+	}
+}
+
+func TestWelcome_SentOnceWhenAPasswordSignupConfirms(t *testing.T) {
+	svc, m := resetFixture(t)
+	ctx := context.Background()
+	if len(m.welcome) != 0 {
+		t.Fatal("no welcome before the address is confirmed")
+	}
+	token := verifyTokenFrom(t, m.verify[0])
+	for i := 0; i < 2; i++ { // the second confirmation is a no-op
+		if err := svc.VerifyEmail(ctx, token, RequestMeta{}); err != nil {
+			t.Fatalf("verify: %v", err)
+		}
+	}
+	if len(m.welcome) != 1 || m.welcome[0] != "https://app.example.com/billing" {
+		t.Fatalf("want one welcome linking the plans page, got %v", m.welcome)
+	}
+}
+
+func TestWelcome_SentAtGoogleSignupButNotOnLaterLogins(t *testing.T) {
+	m := &fakeMailer{}
+	svc := newTestService().WithPasswordReset(m, "https://app.example.com").WithGoogle(fakeGoogleVerifier{
+		id: &GoogleIdentity{Subject: "google-9", Email: "g@example.com", EmailVerified: true, Name: "G"},
+	})
+	svc.async = func(f func()) { f() }
+	for i := 0; i < 2; i++ {
+		if _, err := svc.LoginWithGoogle(context.Background(), "tok", RequestMeta{}); err != nil {
+			t.Fatalf("LoginWithGoogle: %v", err)
+		}
+	}
+	if len(m.welcome) != 1 || m.welcome[0] != "https://app.example.com/billing" {
+		t.Fatalf("want one welcome on the first (signup) login only, got %v", m.welcome)
 	}
 }

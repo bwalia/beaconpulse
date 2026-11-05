@@ -228,6 +228,27 @@ func (s *Service) sendVerification(ctx context.Context, user *User, meta Request
 	})
 }
 
+// sendWelcome mails a new owner a welcome pointing at the web plans page, off the
+// request path. The mobile apps sell nothing (App Store / Play rules), so this is how
+// someone who signed up in an app learns plans are bought on the web. Sent once the
+// address is known good: on confirmation for a password signup, at signup for
+// Google/Apple/SSO. Owners only: they are the ones who can buy.
+func (s *Service) sendWelcome(ctx context.Context, user *User, meta RequestMeta) {
+	if s.mailer == nil || user.Role != RoleOwner {
+		return
+	}
+	bg := context.WithoutCancel(ctx)
+	s.async(func() {
+		ctx, cancel := context.WithTimeout(bg, 30*time.Second)
+		defer cancel()
+		var md map[string]any
+		if err := s.mailer.SendWelcome(ctx, user.Email, user.Name, s.appBaseURL+"/billing"); err != nil {
+			md = map[string]any{"send_error": err.Error()}
+		}
+		s.audit(ctx, user, audit.ActionWelcomeSent, "user", user.ID.String(), meta, md)
+	})
+}
+
 // ResendVerification mails a fresh confirmation link to the signed-in user.
 // alreadyVerified is true (and nothing is sent) when the address is confirmed.
 func (s *Service) ResendVerification(ctx context.Context, userID uuid.UUID, meta RequestMeta) (alreadyVerified bool, err error) {
@@ -274,6 +295,7 @@ func (s *Service) VerifyEmail(ctx context.Context, token string, meta RequestMet
 		return err
 	}
 	s.audit(ctx, user, audit.ActionEmailVerified, "user", user.ID.String(), meta, nil)
+	s.sendWelcome(ctx, user, meta)
 	return nil
 }
 
@@ -478,6 +500,7 @@ func (s *Service) registerGoogleUser(ctx context.Context, id *GoogleIdentity, em
 		"email":  owner.Email,
 		"via":    "google",
 	})
+	s.sendWelcome(ctx, owner, meta)
 	return result, nil
 }
 
@@ -581,6 +604,7 @@ func (s *Service) registerOIDCUser(ctx context.Context, subject, email, name, pr
 		"email":  owner.Email,
 		"via":    provider,
 	})
+	s.sendWelcome(ctx, owner, meta)
 	return result, nil
 }
 

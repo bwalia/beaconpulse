@@ -130,6 +130,15 @@ function ServerError({ message }: { message: string | null }) {
   );
 }
 
+/** Where to go after signing in: ?next= when it is a page on this site (never another site), else the dashboard. */
+function afterSignIn() {
+  const next = new URLSearchParams(window.location.search).get("next");
+  try {
+    if (next?.startsWith("/") && new URL(next, window.location.origin).origin === window.location.origin) return next;
+  } catch {}
+  return "/dashboard";
+}
+
 function LoginForm() {
   const t = useTranslations("auth");
   const { login } = useAuth();
@@ -146,7 +155,7 @@ function LoginForm() {
     setServerError(null);
     try {
       await login(values.email, values.password);
-      router.replace("/dashboard");
+      router.replace(afterSignIn());
     } catch (err) {
       setServerError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
       // Send focus back to the field they will need to correct, rather than
@@ -195,7 +204,7 @@ function RegisterForm() {
     setServerError(null);
     try {
       await registerAccount(values);
-      router.replace("/dashboard");
+      router.replace(afterSignIn());
     } catch (err) {
       setServerError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
       setFocus("email");
@@ -271,7 +280,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
   // Already signed in? Login/register have nothing to offer — send them to the app.
   // Mirrors the dashboard layout's inverse guard so the two routes stay consistent.
   useEffect(() => {
-    if (!loading && user) router.replace("/dashboard");
+    if (!loading && user) router.replace(afterSignIn());
   }, [loading, user, router]);
 
   // Keep the URL honest as the user switches, without a navigation (which would
@@ -282,7 +291,7 @@ export function AuthScreen({ initialMode }: { initialMode: Mode }) {
   // visitor is left staring at a blank /register instead of landing on the app.
   useEffect(() => {
     if (loading || user) return;
-    window.history.replaceState(null, "", mode === "register" ? "/register" : "/login");
+    window.history.replaceState(null, "", (mode === "register" ? "/register" : "/login") + window.location.search);
   }, [mode, loading, user]);
 
   // Don't flash the form to a signed-in user while the redirect above fires.

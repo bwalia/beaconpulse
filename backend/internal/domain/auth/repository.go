@@ -36,6 +36,7 @@ type UserRepository interface {
 type Mailer interface {
 	SendPasswordReset(ctx context.Context, to, name, link string) error
 	SendEmailVerification(ctx context.Context, to, name, link string) error
+	SendWelcome(ctx context.Context, to, name, link string) error
 }
 
 // GoogleIdentity is the verified result of a Google ID token.
