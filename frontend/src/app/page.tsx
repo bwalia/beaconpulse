@@ -14,6 +14,7 @@ import {
 } from "@/components/marketing/sections";
 import { StructuredData } from "@/components/marketing/structured-data";
 import type { LivePlans } from "@/lib/plans";
+import { NotInPlayApp } from "@/lib/pwa";
 import { apiInternal } from "@/lib/site";
 
 // Live, operator-tuned pricing for the cards and the schema.org Offers. Never throws:
@@ -76,6 +77,8 @@ export default async function LandingPage() {
       >
         {t("skipToContent")}
       </a>
+      {/* The Play Store app has no use for the sales page (it lists prices). */}
+      <NotInPlayApp />
       <StructuredData live={live} />
       <MarketingNav />
       <main id="main">

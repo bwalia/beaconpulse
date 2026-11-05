@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The pulse line with its soft halo, shrunk into the adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <group
+        android:pivotX="512"
+        android:pivotY="512"
+        android:scaleX="0.66"
+        android:scaleY="0.66">
+        <path
+            android:pathData="M96,512L328,512L400,422L490,720L585,212L663,571L712,512L930,512"
+            android:strokeWidth="120"
+            android:strokeColor="#2EFFFFFF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M96,512L328,512L400,422L490,720L585,212L663,571L712,512L930,512"
+            android:strokeWidth="56"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M887,512a43,43 0,1 0,86 0a43,43 0,1 0,-86 0z" />
+    </group>
+</vector>
