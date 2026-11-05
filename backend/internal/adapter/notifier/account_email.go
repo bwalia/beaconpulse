@@ -51,6 +51,20 @@ func (m *AccountMailer) SendEmailVerification(ctx context.Context, to, name, lin
 	})
 }
 
+// SendWelcome greets a new account owner and links the web plans page. Plans are sold
+// on the web only, so this is how someone who signed up in a mobile app finds them.
+func (m *AccountMailer) SendWelcome(ctx context.Context, to, name, link string) error {
+	brand := brandOr(m.email.brand)
+	return m.send(ctx, to, name, link, accountEmail{
+		subject: "Welcome to " + brand,
+		intro: "Your " + brand + " account is ready. When you need more monitors or faster checks, choose a monthly plan " +
+			"or add pay-as-you-go credit on the " + brand + " website. Plans are sold on the web rather than in the " +
+			"mobile apps, and whatever you choose works in the apps straight away.",
+		button: "See plans",
+		ignore: "You're getting this because you just created a " + brand + " account.",
+	})
+}
+
 func (m *AccountMailer) send(ctx context.Context, to, name, link string, e accountEmail) error {
 	// Validate and default the relay settings exactly as a configured channel would.
 	cfg, err := parseEmailConfig(notification.Decrypted{Config: map[string]string{

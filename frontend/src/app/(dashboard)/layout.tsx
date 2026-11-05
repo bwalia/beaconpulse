@@ -69,8 +69,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const t = useTranslations("sidebar");
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
+    // ?next brings them back here after signing in (e.g. /billing from the welcome email).
+    if (!loading && !user) router.replace("/login?next=" + encodeURIComponent(pathname));
+  }, [loading, user, router, pathname]);
 
   if (loading || !user) {
     return (
