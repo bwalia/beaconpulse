@@ -6,6 +6,9 @@
 package config
 
 import (
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -316,6 +319,22 @@ type Push struct {
 	// WebPushSubject is the VAPID contact (a mailto: or https: URL) push services
 	// use to reach the sender. Defaults to the dashboard URL.
 	WebPushSubject string
+
+	// FCM is the Firebase service account Android push signs in as, parsed from
+	// BEACON_FCM_CREDENTIALS. Zero (Android push off) when unset.
+	FCM FCM
+}
+
+// FCM is the part of a Firebase service-account key Android push needs.
+type FCM struct {
+	ProjectID   string `json:"project_id"`
+	ClientEmail string `json:"client_email"`
+	PrivateKey  string `json:"private_key"`
+}
+
+// Enabled reports whether Android push (FCM) is configured.
+func (f FCM) Enabled() bool {
+	return f.ProjectID != "" && f.ClientEmail != "" && f.PrivateKey != ""
 }
 
 // Enabled reports whether APNs push is configured.
@@ -458,6 +477,7 @@ func Load() (Config, error) {
 			APNsProduction:    getBool("BEACON_APNS_PRODUCTION", false, add),
 			WebPushPrivateKey: getStr("BEACON_WEBPUSH_PRIVATE_KEY", ""),
 			WebPushSubject:    getStr("BEACON_WEBPUSH_SUBJECT", ""),
+			FCM:               parseFCM(getStr("BEACON_FCM_CREDENTIALS", ""), add),
 		},
 		OIDC: OIDC{
 			Provider:     getStr("BEACON_OIDC_PROVIDER", "OpsAPI"),
@@ -627,6 +647,36 @@ func decodeKey(v string, add func(string, ...any)) []byte {
 	}
 	add("BEACON_ENCRYPTION_KEY must be hex or base64 encoded")
 	return nil
+}
+
+// parseFCM reads BEACON_FCM_CREDENTIALS: the contents (not a path) of a Firebase
+// service-account key JSON. Unset leaves Android push off; set but unusable fails
+// Load, so a mis-pasted key surfaces at deploy rather than at the first alert.
+func parseFCM(raw string, add func(string, ...any)) FCM {
+	if raw == "" {
+		return FCM{}
+	}
+	var f FCM
+	if err := json.Unmarshal([]byte(raw), &f); err != nil {
+		add("BEACON_FCM_CREDENTIALS is not valid JSON (want a Firebase service-account key): %v", err)
+		return FCM{}
+	}
+	if !f.Enabled() {
+		add("BEACON_FCM_CREDENTIALS must include project_id, client_email and private_key")
+		return FCM{}
+	}
+	// A key that went through a single-line secret field keeps literal "\n"s.
+	f.PrivateKey = strings.ReplaceAll(f.PrivateKey, `\n`, "\n")
+	block, _ := pem.Decode([]byte(f.PrivateKey))
+	if block == nil {
+		add("BEACON_FCM_CREDENTIALS private_key is not a PEM key")
+		return FCM{}
+	}
+	if _, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
+		add("BEACON_FCM_CREDENTIALS private_key does not parse: %v", err)
+		return FCM{}
+	}
+	return f
 }
 
 var errBadEncoding = errors.New("bad encoding")

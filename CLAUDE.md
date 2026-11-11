@@ -105,6 +105,8 @@ configured.
 - `BEACON_APNS_PRODUCTION` — `true` for TestFlight/App Store builds (**TestFlight uses
   the *production* APNs environment**; also set `aps-environment: production` in the
   release entitlement); `false` only for an Xcode debug build on a device
+- `BEACON_FCM_CREDENTIALS` — Android push: contents (not a path) of a Firebase
+  service-account key JSON. Unset → Android push off; set but malformed → the API won't start
 - `BEACON_APPLE_CLIENT_ID` — the bundle id(s), comma-separated per brand
 - `BEACON_GOOGLE_CLIENT_ID` — existing web client id(s), comma-separated
 - `BEACON_WEBPUSH_PRIVATE_KEY` — optional VAPID key for browser (PWA) push (raw P-256

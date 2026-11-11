@@ -20,6 +20,7 @@ import (
 	"beacon/internal/adapter/ai"
 	"beacon/internal/adapter/apns"
 	"beacon/internal/adapter/appleauth"
+	"beacon/internal/adapter/fcm"
 	"beacon/internal/adapter/googleauth"
 	"beacon/internal/adapter/netprobe"
 	"beacon/internal/adapter/notifier"
@@ -219,6 +220,17 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 				slog.String("topic", cfg.Push.APNsTopic), slog.Bool("production", cfg.Push.APNsProduction))
 		}
 	}
+	// Android push (FCM): registered only when BEACON_FCM_CREDENTIALS is set
+	// (config.Load already rejected a malformed key). Destinations are the org's
+	// android device tokens.
+	if cfg.Push.FCM.Enabled() {
+		notifierRegistry[notification.TypeFCM] = notifier.NewFCMNotifier(fcm.New(fcm.Config{
+			ProjectID:   cfg.Push.FCM.ProjectID,
+			ClientEmail: cfg.Push.FCM.ClientEmail,
+			PrivateKey:  cfg.Push.FCM.PrivateKey,
+		}), deviceRepo)
+		log.Info("android push (FCM) enabled", slog.String("project", cfg.Push.FCM.ProjectID))
+	}
 	// Browser push (VAPID). The key comes from BEACON_WEBPUSH_PRIVATE_KEY, or is
 	// generated on first start and kept (encrypted) in the database, so browser
 	// push works on every deployment with no setup and the key stays stable.
@@ -234,7 +246,7 @@ func buildRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, rdb *r
 	}
 	projectLookup := postgres.NewProjectLookupAdapter(projectRepo)
 	notifySvc := notification.NewService(notificationRepo, cipher, notifierRegistry, auditRec, cfg.Notify.DashboardURL)
-	// Device registration auto-enables the org's Apple Push channel via notifySvc;
+	// Device registration auto-enables the org's push channel via notifySvc;
 	// a nil activator would just skip that convenience.
 	deviceSvc := device.NewService(deviceRepo, notifySvc)
 	// Maintenance windows both CRUD (below) and suppress alerts: the same service

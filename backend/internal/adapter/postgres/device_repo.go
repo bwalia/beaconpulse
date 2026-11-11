@@ -58,9 +58,9 @@ func (r *DeviceRepository) DeleteByToken(ctx context.Context, orgID uuid.UUID, t
 	return nil
 }
 
-// TokensByOrg returns an org's iOS tokens, for APNs fan-out.
-func (r *DeviceRepository) TokensByOrg(ctx context.Context, orgID uuid.UUID) ([]string, error) {
-	rows, err := r.pool.Query(ctx, `SELECT token FROM device_tokens WHERE org_id = $1 AND platform = 'ios'`, orgID)
+// TokensByOrg returns an org's tokens for one platform, for APNs/FCM fan-out.
+func (r *DeviceRepository) TokensByOrg(ctx context.Context, orgID uuid.UUID, platform device.Platform) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `SELECT token FROM device_tokens WHERE org_id = $1 AND platform = $2`, orgID, string(platform))
 	if err != nil {
 		return nil, apperror.Internal(fmt.Errorf("list device tokens: %w", err))
 	}
@@ -76,8 +76,8 @@ func (r *DeviceRepository) TokensByOrg(ctx context.Context, orgID uuid.UUID) ([]
 	return out, rows.Err()
 }
 
-// Delete removes a token unconditionally, to prune one APNs has reported dead.
-// Not org-scoped: a token APNs rejects as invalid is dead for everyone, and the
+// Delete removes a token unconditionally, to prune one APNs/FCM reported dead.
+// Not org-scoped: a token the provider rejects is dead for everyone, and the
 // prune runs from the notifier, which holds no actor.
 func (r *DeviceRepository) Delete(ctx context.Context, token string) error {
 	if _, err := r.pool.Exec(ctx, `DELETE FROM device_tokens WHERE token = $1`, token); err != nil {

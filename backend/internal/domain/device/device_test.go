@@ -22,7 +22,13 @@ func (f *fakeRepo) DeleteByToken(_ context.Context, _ uuid.UUID, token string) e
 type fakeActivator struct {
 	called    bool
 	webCalled bool
+	fcmCalled bool
 	err       error
+}
+
+func (f *fakeActivator) EnsureFCMChannel(_ context.Context, _ uuid.UUID) error {
+	f.fcmCalled = true
+	return f.err
 }
 
 func (f *fakeActivator) EnsureAPNsChannel(_ context.Context, _ uuid.UUID) error {
@@ -139,5 +145,22 @@ func TestRegisterWebSubscription(t *testing.T) {
 	in.Token, in.Auth = "https://web.push.apple.com/abc", "short"
 	if _, err := svc.Register(context.Background(), actor(), in); err == nil {
 		t.Error("a malformed auth secret was accepted")
+	}
+}
+
+// TestRegisterAndroidEnablesFCMOnly: an android token turns on Android push, not
+// Apple Push.
+func TestRegisterAndroidEnablesFCMOnly(t *testing.T) {
+	repo := &fakeRepo{}
+	act := &fakeActivator{}
+	svc := NewService(repo, act)
+	if _, err := svc.Register(context.Background(), actor(), RegisterInput{Token: "fcm-token", Platform: PlatformAndroid}); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	if repo.upserted.Platform != PlatformAndroid {
+		t.Errorf("platform=%q want android", repo.upserted.Platform)
+	}
+	if !act.fcmCalled || act.called || act.webCalled {
+		t.Errorf("android registration should enable FCM only (fcm=%v apns=%v web=%v)", act.fcmCalled, act.called, act.webCalled)
 	}
 }

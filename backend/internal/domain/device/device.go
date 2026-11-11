@@ -1,7 +1,7 @@
 // Package device stores the push-notification tokens a user's devices register
-// — mobile apps (APNs) and browsers (web push) — and turns push on for their
-// organization the first time a device enrolls. The apns and webpush notifiers
-// fan an org's alerts out to every device its members have registered.
+// — mobile apps (APNs, FCM) and browsers (web push) — and turns push on for their
+// organization the first time a device enrolls. The apns, fcm and webpush
+// notifiers fan an org's alerts out to every device its members have registered.
 package device
 
 import (
@@ -17,9 +17,8 @@ import (
 	"beacon/internal/platform/logger"
 )
 
-// Platform identifies the push transport a token belongs to. iOS (APNs) and web
-// (browser push) deliver; android is reserved so the schema and API need not
-// change when an Android app is added.
+// Platform identifies the push transport a token belongs to: iOS (APNs),
+// android (FCM) or web (browser push).
 type Platform string
 
 const (
@@ -89,12 +88,12 @@ type Repository interface {
 }
 
 // TokenStore reads and prunes device tokens for alert fan-out. Consumed by the
-// apns notifier; implemented by the same postgres repository as Repository. Kept
-// separate so the notifier depends only on what it uses.
+// apns and fcm notifiers; implemented by the same postgres repository as
+// Repository. Kept separate so the notifiers depend only on what they use.
 type TokenStore interface {
-	// TokensByOrg returns the org's iOS (APNs) tokens.
-	TokensByOrg(ctx context.Context, orgID uuid.UUID) ([]string, error)
-	// Delete removes a token unconditionally, to prune one APNs has reported dead.
+	// TokensByOrg returns the org's tokens for one platform (ios or android).
+	TokensByOrg(ctx context.Context, orgID uuid.UUID, platform Platform) ([]string, error)
+	// Delete removes a token unconditionally, to prune one the provider reported dead.
 	Delete(ctx context.Context, token string) error
 }
 
@@ -118,6 +117,7 @@ type WebSubscriptionStore interface {
 type PushActivator interface {
 	EnsureAPNsChannel(ctx context.Context, orgID uuid.UUID) error
 	EnsureWebPushChannel(ctx context.Context, orgID uuid.UUID) error
+	EnsureFCMChannel(ctx context.Context, orgID uuid.UUID) error
 }
 
 // Service registers and removes device tokens.
@@ -142,10 +142,11 @@ type RegisterInput struct {
 }
 
 // Register enrolls (or refreshes) a device token for the caller, then ensures the
-// org's Apple Push channel is on so alerts start flowing without a separate setup
-// step. Auto-enable is best-effort: the device is registered even if turning the
-// channel on fails, and it never re-enables a channel the org has deliberately
-// switched off (EnsureAPNsChannel only creates a missing one).
+// org's push channel for that platform (Apple Push, Android push or Browser push)
+// is on so alerts start flowing without a separate setup step. Auto-enable is
+// best-effort: the device is registered even if turning the channel on fails, and
+// it never re-enables a channel the org has deliberately switched off (the
+// Ensure*Channel calls only create a missing one).
 func (s *Service) Register(ctx context.Context, actor Actor, in RegisterInput) (*Device, error) {
 	token := strings.TrimSpace(in.Token)
 	if token == "" {
@@ -187,8 +188,11 @@ func (s *Service) Register(ctx context.Context, actor Actor, in RegisterInput) (
 	}
 	if s.activator != nil {
 		ensure := s.activator.EnsureAPNsChannel
-		if platform == PlatformWeb {
+		switch platform {
+		case PlatformWeb:
 			ensure = s.activator.EnsureWebPushChannel
+		case PlatformAndroid:
+			ensure = s.activator.EnsureFCMChannel
 		}
 		if err := ensure(ctx, actor.OrgID); err != nil {
 			// Non-fatal: the device is registered; the org just did not get its push

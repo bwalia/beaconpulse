@@ -116,6 +116,7 @@ export const CHANNEL_TYPES: ChannelTypeDef[] = [
 /** Push channels: created automatically when a device enables notifications, never by hand. */
 export const PUSH_CHANNELS: Record<string, { label: string; summary: string }> = {
   apns: { label: "Apple Push", summary: "Every iPhone and iPad signed in to the app" },
+  fcm: { label: "Android push", summary: "Every Android phone signed in to the app" },
   webpush: { label: "Browser push", summary: "Every browser that turned on notifications" },
 };
 

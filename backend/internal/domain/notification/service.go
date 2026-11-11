@@ -111,6 +111,12 @@ func (s *Service) EnsureWebPushChannel(ctx context.Context, orgID uuid.UUID) err
 	return s.ensurePushChannel(ctx, orgID, TypeWebPush, "Browser push")
 }
 
+// EnsureFCMChannel is EnsureAPNsChannel for Android: the first android device
+// that registers turns the org's channel on; a channel the org paused stays paused.
+func (s *Service) EnsureFCMChannel(ctx context.Context, orgID uuid.UUID) error {
+	return s.ensurePushChannel(ctx, orgID, TypeFCM, "Android push")
+}
+
 func (s *Service) ensurePushChannel(ctx context.Context, orgID uuid.UUID, t ChannelType, name string) error {
 	existing, err := s.repo.FindByType(ctx, orgID, t)
 	if err != nil {

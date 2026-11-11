@@ -32,6 +32,10 @@ const (
 	// secret: the VAPID key is platform config and the destinations are the org's
 	// registered browser subscriptions.
 	TypeWebPush ChannelType = "webpush"
+	// TypeFCM delivers to Android devices via Firebase Cloud Messaging. Like APNs,
+	// the service account is platform config and the destinations are the org's
+	// registered android tokens.
+	TypeFCM ChannelType = "fcm"
 )
 
 // SupportedTypes are the channel types with a working Notifier today. Others are
@@ -48,6 +52,7 @@ var SupportedTypes = map[ChannelType]bool{
 	TypeWebhook:  true,
 	TypeAPNs:     true,
 	TypeWebPush:  true,
+	TypeFCM:      true,
 }
 
 // Channel is a configured delivery destination for an organization.
