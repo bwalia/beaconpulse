@@ -135,10 +135,10 @@ $(POSTGRES_PASSWORD). Non-secret config is rendered inline. Usage:
       name: beacon-secrets
       key: BEACON_GOOGLE_CLIENT_ID
       optional: true
-# iPhone app: Apple Push (alerts to the phone) and Sign in with Apple. All from
+# Phone apps: Apple Push, Android push (FCM) and Sign in with Apple. All from
 # beacon-secrets and all optional; the API turns each feature off when its keys are
 # absent. See CLAUDE.md "Backend env / secrets to set" for what each one holds.
-{{- range list "BEACON_APNS_KEY_P8" "BEACON_APNS_KEY_ID" "BEACON_APNS_TEAM_ID" "BEACON_APNS_TOPIC" "BEACON_APNS_PRODUCTION" "BEACON_APPLE_CLIENT_ID" }}
+{{- range list "BEACON_APNS_KEY_P8" "BEACON_APNS_KEY_ID" "BEACON_APNS_TEAM_ID" "BEACON_APNS_TOPIC" "BEACON_APNS_PRODUCTION" "BEACON_APPLE_CLIENT_ID" "BEACON_FCM_CREDENTIALS" }}
 - name: {{ . }}
   valueFrom:
     secretKeyRef:
