@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- System bars match the site's header: white, or slate-900 in dark mode. -->
-    <color name="bar">#FFFFFF</color>
-    <color name="bar_dark">#0F172A</color>
+    <color name="window">#FFFFFFFF</color>
 </resources>

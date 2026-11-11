@@ -2,8 +2,8 @@ name: Android Release (Google Play)
 
 # Builds the Play Store bundle (AAB) for every Android brand on every push to main, and
 # uploads it to Play's internal testing track once the Play secrets exist — the Android
-# twin of ios-release.yml, and unfiltered on android/** for the same reason: the app is
-# the website (android/ is a Trusted Web Activity), so a web change is an app change.
+# twin of ios-release.yml, and unfiltered on android/** for the same reason: the native
+# app is a client of this backend, so a backend merge can change it as much as Kotlin can.
 #
 # Secrets (repository):
 #   ANDROID_UPLOAD_KEYSTORE_B64       base64 of the upload keystore (alias "upload")
@@ -52,11 +52,11 @@ jobs:
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
           echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
 
-      - name: Build bundle
+      - name: Test and build bundle
         working-directory: android
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
-        run: ./gradlew --no-daemon "bundle${BRAND^}Release" -PversionCode="$GITHUB_RUN_NUMBER"
+        run: ./gradlew --no-daemon "test${BRAND^}DebugUnitTest" "bundle${BRAND^}Release" -PversionCode="$GITHUB_RUN_NUMBER"
 
       - uses: actions/upload-artifact@v4
         with:

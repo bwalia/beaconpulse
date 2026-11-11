@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-import { NotInPlayApp } from "@/lib/pwa";
 import { useNow } from "@/lib/time";
 
 import {
@@ -55,7 +54,6 @@ function checkoutNotice(param: string | null): Notice {
 export default function BillingPage() {
   return (
     <Suspense fallback={<Skeleton className="h-40 w-full" />}>
-      <NotInPlayApp />
       <BillingContent />
     </Suspense>
   );

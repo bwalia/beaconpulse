@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- The iOS app icon's blue, behind the splash pulse. -->
-    <color name="splash">#1D64E7</color>
-</resources>

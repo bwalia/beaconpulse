@@ -55,13 +55,6 @@ export const sysops: Brand = {
   // working Workstation inbox. /platform → Company & contact overrides this at runtime.
   legal: { contactEmail: "support@workstation.co.uk" },
 
-  // The Play Store app (android/, flavor "sysops"). Upload key below; add Google's
-  // app-signing key from Play Console once the app exists there.
-  android: {
-    package: "com.sysops247.app",
-    sha256: ["61:73:EA:34:32:7F:80:05:DE:D2:5D:8F:96:52:96:97:84:D8:90:2B:4C:C8:4B:F0:55:EB:8B:4F:D7:8D:6C:C0"],
-  },
-
   // A green ramp — visibly not Beacon's blue, so a glance confirms the brand changed.
   // Swap these eleven values for any palette to recolour the whole product.
   primary: {

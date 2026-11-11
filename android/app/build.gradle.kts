@@ -1,9 +1,11 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
-    namespace = "com.beacon.twa"
+    namespace = "com.beacon.app"
     compileSdk = 36
 
     defaultConfig {
@@ -15,19 +17,31 @@ android {
     }
 
     buildFeatures {
+        compose = true
+        buildConfig = true
         resValues = true
     }
 
-    // One flavor per brand: its id and website here, its icon and splash colour in
-    // app/src/<brand>/res. The app opens https://<host>, which must serve
-    // /.well-known/assetlinks.json for this package (frontend/src/brand/<brand>.ts → android).
+    // One flavor per brand, the Android twin of ios/Brands/<Brand>/brand.xcconfig: its
+    // id, name, server and sign-in/push ids here, its icon in app/src/<brand>/res.
     flavorDimensions += "brand"
     productFlavors {
         create("sysops") {
             dimension = "brand"
             applicationId = "com.sysops247.app"
-            resValue("string", "app_name", "SysOps 24/7")
-            site("sysops247.com")
+            brand(
+                name = "SysOps 24/7",
+                apiBaseUrl = "https://sysops247.com",
+                accent = "#1D64E8",
+                // The *web* OAuth client: Android's Google sign-in returns an ID token
+                // issued to it, which /api/v1/auth/google already accepts.
+                googleServerClientId = "325734158501-h2skbm9bq6mk2niquqvo8kkpv8qn0hbh.apps.googleusercontent.com",
+                // From Firebase console → Project settings → the Android app. Blank = no push.
+                firebaseAppId = "",
+                firebaseApiKey = "",
+                firebaseProjectId = "",
+                firebaseSenderId = "",
+            )
         }
     }
 
@@ -41,17 +55,69 @@ android {
         }
         buildTypes.getByName("release").signingConfig = upload
     }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlin {
+        compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
+    }
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    }
 }
 
-/** Points the flavor at its website: the launch URL and the app → site half of the link check. */
-fun com.android.build.api.dsl.ApplicationProductFlavor.site(host: String) {
-    manifestPlaceholders["host"] = host
-    resValue(
-        "string", "asset_statements",
-        """[{\"relation\":[\"delegate_permission/common.handle_all_urls\"],\"target\":{\"namespace\":\"web\",\"site\":\"https://$host\"}}]""",
-    )
+fun com.android.build.api.dsl.ApplicationProductFlavor.brand(
+    name: String, apiBaseUrl: String, accent: String, googleServerClientId: String,
+    firebaseAppId: String, firebaseApiKey: String, firebaseProjectId: String, firebaseSenderId: String,
+) {
+    resValue("string", "app_name", name)
+    resValue("color", "brand", accent)
+    fun field(key: String, value: String) = buildConfigField("String", key, "\"$value\"")
+    field("API_BASE_URL", apiBaseUrl)
+    field("GOOGLE_SERVER_CLIENT_ID", googleServerClientId)
+    field("FIREBASE_APP_ID", firebaseAppId)
+    field("FIREBASE_API_KEY", firebaseApiKey)
+    field("FIREBASE_PROJECT_ID", firebaseProjectId)
+    field("FIREBASE_SENDER_ID", firebaseSenderId)
 }
 
 dependencies {
-    implementation("com.google.androidbrowserhelper:androidbrowserhelper:2.7.4")
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("androidx.navigation:navigation-compose:2.8.5")
+    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // Continue with Google: Credential Manager shows the account chooser and hands back
+    // a Google ID token for the same /api/v1/auth/google the website and iOS use.
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
+    // Alert push. Configured in code from the flavor's ids (no google-services.json).
+    implementation("com.google.firebase:firebase-messaging:24.1.0")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }

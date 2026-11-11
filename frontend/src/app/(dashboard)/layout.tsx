@@ -13,7 +13,6 @@ import { ThemeToggle } from "@/lib/theme";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useTranslations } from "next-intl";
 import { brand } from "@/brand";
-import { isPlayApp } from "@/lib/pwa";
 import {
   ActivityIcon,
   AlertTriangleIcon,
@@ -82,8 +81,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   const nav = [
-    // No billing in the Play Store app (Play allows only its own billing).
-    ...(isPlayApp() ? baseNav.filter((i) => i.key !== "billing") : baseNav),
+    ...baseNav,
     ...(user.role === "owner" || user.role === "admin" ? adminNav : []),
     ...(user.is_platform_admin ? platformNav : []),
   ];
