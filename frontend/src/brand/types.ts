@@ -59,14 +59,6 @@ export interface Brand {
     website?: string;
   };
 
-  /**
-   * This brand's Play Store app (android/, the site in a Trusted Web Activity), served as
-   * /.well-known/assetlinks.json so Android lets the app show this site full screen.
-   * `sha256` lists the SHA-256 fingerprints of the Play upload key and of Google's
-   * app-signing key (Play Console → Test and release → App integrity). Unset = no file.
-   */
-  android?: { package: string; sha256: string[] };
-
   /** Google OAuth 2.0 Client ID for "Sign in with Google". Empty = Google sign-in hidden. Per-brand so each white-label uses its own Google app. */
   googleClientId?: string;
 

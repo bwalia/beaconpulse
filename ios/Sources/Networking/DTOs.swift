@@ -136,9 +136,9 @@ struct Channel: Decodable, Identifiable, Equatable {
     let config: [String: String]
     let hasSecret: Bool
 
-    /// The Apple Push channel is created and managed automatically; the app only
-    /// toggles it, never edits config/secret.
-    var isManaged: Bool { type == "apns" }
+    /// Push channels (Apple, Android, browser) are created and managed automatically;
+    /// the app only toggles them, never edits config/secret.
+    var isManaged: Bool { ["apns", "fcm", "webpush"].contains(type) }
 }
 
 /// A maintenance window (GET /api/v1/maintenance-windows). While active, alerts

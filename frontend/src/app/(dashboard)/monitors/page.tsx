@@ -21,7 +21,6 @@ import {
   useUsage,
 } from "@/lib/hooks";
 import { ApiRequestError } from "@/lib/api";
-import { isPlayApp } from "@/lib/pwa";
 import {
   Button,
   Card,
@@ -478,7 +477,7 @@ export default function MonitorsPage() {
       {atLimit && !showForm && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
           You&apos;ve reached your <span className="font-medium uppercase">{usage?.plan}</span> plan limit of{" "}
-          {usage?.monitors_limit} monitors. {isPlayApp() ? "Delete one to add another." : "Delete one or upgrade to add more."}
+          {usage?.monitors_limit} monitors. Delete one or upgrade to add more.
         </div>
       )}
 

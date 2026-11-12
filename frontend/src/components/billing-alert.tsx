@@ -3,7 +3,6 @@
 import Link from "next/link";
 
 import { useBilling } from "@/lib/hooks";
-import { isPlayApp } from "@/lib/pwa";
 
 // Stripe subscription statuses that mean a payment problem the customer must act on:
 // their card failed and the paid tier is lapsing or already lapsed. "canceled" is
@@ -17,7 +16,7 @@ const DUNNING = new Set(["past_due", "unpaid", "incomplete"]);
 // (healthy / never-subscribed) case.
 export function BillingAlert() {
   const { data } = useBilling();
-  if (!data || !DUNNING.has(data.subscription_status) || isPlayApp()) return null;
+  if (!data || !DUNNING.has(data.subscription_status)) return null;
 
   const unpaid = data.subscription_status === "unpaid";
   return (

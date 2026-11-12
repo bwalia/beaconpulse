@@ -161,6 +161,11 @@ struct ChannelRow: View {
     }
 
     private var subtitle: String {
-        channel.isManaged ? "Apple Push · this org’s devices" : channel.type.capitalized
+        switch channel.type {
+        case "apns": return "Apple Push · this org’s devices"
+        case "fcm": return "Android push · this org’s phones"
+        case "webpush": return "Browser push"
+        default: return channel.type.capitalized
+        }
     }
 }

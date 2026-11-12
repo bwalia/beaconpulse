@@ -22,11 +22,10 @@ selected at build time by `NEXT_PUBLIC_BRAND`), `deploy/helm/beacon/values-<bran
   replicas via Redis (`cache-handler.mjs`), busted by the signed OpsAPI webhook at
   `/cms/revalidate` — same pattern as `../workstation-website`.
 - `ios/` — native SwiftUI iPhone/iPad app (added recently — see below).
-- `android/` — Google Play app: the website in a Trusted Web Activity (no native
-  code). Per-brand flavor + `brand.android` in the web brand file, which serves
-  `/.well-known/assetlinks.json`. Inside the app (`?app=android`) the site hides
-  billing (`isPlayApp()`), as the iOS app has none. CI: `android-release.yml`. See
-  `android/README.md`.
+- `android/` — native Kotlin Google Play app (Jetpack Compose + Material 3), the
+  Android twin of `ios/` with the same screens. Per-brand product flavor (`brand(...)`
+  in `app/build.gradle.kts`); push over FCM (`fcm` notifier); no billing, as on iOS.
+  CI: `android-release.yml`. See `android/README.md`.
 
 ## iOS app — current status
 

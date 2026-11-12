@@ -8,7 +8,6 @@ import { Button, Card } from "@/components/ui";
 import { AlertTriangleIcon, CheckCircleIcon } from "@/components/icons";
 import { ApiRequestError } from "@/lib/api";
 import { useBilling, useDiagnose } from "@/lib/hooks";
-import { isPlayApp } from "@/lib/pwa";
 import { useRevealVariants } from "@/lib/motion";
 import type { BillingInfo, Diagnosis } from "@/lib/types";
 
@@ -182,16 +181,15 @@ export function DiagnosePanel({ d }: { d: Diagnosis }) {
 
 /** The Free-tier state: an honest description of what they'd get, not a nag. */
 export function DiagnoseUpsell({ onDismiss }: { onDismiss: () => void }) {
-  const play = isPlayApp(); // no purchase prompts in the Play Store app
   return (
     <Card className="mt-3 border-brand-200 p-5 dark:border-brand-900">
       <h4 className="font-semibold text-slate-900 dark:text-white">AI diagnosis is on paid plans</h4>
       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
         We check DNS, the port, the TLS certificate and the response from our probes, then explain what
-        broke and how to fix it.{!play && " Add credit and it works by the hour — no subscription needed."}
+        broke and how to fix it. Add credit and it works by the hour — no subscription needed.
       </p>
       <div className="mt-4 flex gap-2">
-        {!play && <Button onClick={() => (window.location.href = "/billing")}>Add credit</Button>}
+        <Button onClick={() => (window.location.href = "/billing")}>Add credit</Button>
         <Button variant="secondary" onClick={onDismiss}>
           Not now
         </Button>
