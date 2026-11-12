@@ -67,7 +67,7 @@ func (n *APNsNotifier) Send(ctx context.Context, ch notification.Decrypted, msg 
 	if ch.OrgID == uuid.Nil {
 		return fmt.Errorf("apns: channel has no org id")
 	}
-	tokens, err := n.store.TokensByOrg(ctx, ch.OrgID)
+	tokens, err := n.store.TokensByOrg(ctx, ch.OrgID, device.PlatformIOS)
 	if err != nil {
 		return fmt.Errorf("apns: load device tokens: %w", err)
 	}

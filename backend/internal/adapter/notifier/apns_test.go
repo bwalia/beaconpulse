@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"beacon/internal/adapter/apns"
+	"beacon/internal/domain/device"
 	"beacon/internal/domain/notification"
 )
 
@@ -26,11 +27,13 @@ func (f *fakePush) Push(_ context.Context, token string, _ []byte) (apns.Result,
 }
 
 type fakeStore struct {
-	tokens  []string
-	deleted []string
+	tokens   []string
+	deleted  []string
+	platform device.Platform
 }
 
-func (f *fakeStore) TokensByOrg(_ context.Context, _ uuid.UUID) ([]string, error) {
+func (f *fakeStore) TokensByOrg(_ context.Context, _ uuid.UUID, p device.Platform) ([]string, error) {
+	f.platform = p
 	return f.tokens, nil
 }
 
@@ -58,6 +61,9 @@ func TestAPNsSendPrunesDeadTokens(t *testing.T) {
 	}
 	if len(store.deleted) != 1 || store.deleted[0] != "dead" {
 		t.Fatalf("expected only the dead token pruned, got %v", store.deleted)
+	}
+	if store.platform != device.PlatformIOS {
+		t.Fatalf("APNs must read ios tokens, read %q", store.platform)
 	}
 }
 

@@ -1,6 +1,11 @@
 package config
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"strings"
 	"testing"
 )
@@ -90,5 +95,54 @@ func TestProductionRejectsDefaultSecrets(t *testing.T) {
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), "change-me") {
 		t.Fatalf("expected refusal of default secrets in production, got %v", err)
+	}
+}
+
+// fcmKeyJSON returns a Firebase service-account key JSON with a fresh RSA key.
+func fcmKeyJSON(t *testing.T) string {
+	t.Helper()
+	k, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, _ := x509.MarshalPKCS8PrivateKey(k)
+	b, _ := json.Marshal(map[string]string{
+		"type":         "service_account",
+		"project_id":   "beacon-demo",
+		"client_email": "push@beacon-demo.iam.gserviceaccount.com",
+		"private_key":  string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})),
+	})
+	return string(b)
+}
+
+func TestFCMCredentials(t *testing.T) {
+	setValidBase(t)
+	cfg, err := Load()
+	if err != nil || cfg.Push.FCM.Enabled() {
+		t.Fatalf("unset: want Android push off and no error, got enabled=%v err=%v", cfg.Push.FCM.Enabled(), err)
+	}
+
+	key := fcmKeyJSON(t)
+	t.Setenv("BEACON_FCM_CREDENTIALS", key)
+	cfg, err = Load()
+	if err != nil || !cfg.Push.FCM.Enabled() || cfg.Push.FCM.ProjectID != "beacon-demo" {
+		t.Fatalf("valid key: enabled=%v project=%q err=%v", cfg.Push.FCM.Enabled(), cfg.Push.FCM.ProjectID, err)
+	}
+
+	// A single-line secret store can leave the key's newlines as literal "\n".
+	t.Setenv("BEACON_FCM_CREDENTIALS", strings.ReplaceAll(key, `\n`, `\\n`))
+	if cfg, err = Load(); err != nil || !cfg.Push.FCM.Enabled() {
+		t.Fatalf("escaped newlines: %v", err)
+	}
+
+	for name, raw := range map[string]string{
+		"not json":       "/path/to/key.json",
+		"missing fields": `{"project_id":"p"}`,
+		"bad key":        `{"project_id":"p","client_email":"e","private_key":"nope"}`,
+	} {
+		t.Setenv("BEACON_FCM_CREDENTIALS", raw)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "BEACON_FCM_CREDENTIALS") {
+			t.Errorf("%s: want a BEACON_FCM_CREDENTIALS error, got %v", name, err)
+		}
 	}
 }
