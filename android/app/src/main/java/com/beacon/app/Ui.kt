@@ -357,8 +357,10 @@ fun Panel(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
 fun InfoRow(label: String, value: String, trailing: @Composable (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-        if (trailing != null) trailing()
-        Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End, modifier = Modifier.weight(1.4f))
+        Row(Modifier.weight(1.4f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            if (trailing != null) trailing()
+            Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End)
+        }
     }
 }
 
@@ -440,7 +442,7 @@ fun LineChart(points: List<MetricPoint>, color: Color, filled: Boolean, label: (
         )
         return
     }
-    val lo = points.minOf { it.v }
+    val lo = minOf(0.0, points.minOf { it.v }) // from zero, like Swift Charts on iOS: a flat 100% sits at the top
     val hi = points.maxOf { it.v }
     val span = (hi - lo).takeIf { it > 0 } ?: 1.0
     val t0 = points.first().t.toEpochMilli()
@@ -448,7 +450,14 @@ fun LineChart(points: List<MetricPoint>, color: Color, filled: Boolean, label: (
     val grid = MaterialTheme.colorScheme.outlineVariant
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val axis = MaterialTheme.typography.labelSmall
-    val timeFormat = DateTimeFormatter.ofPattern(if (tSpan <= 86_400_000f) "HH:mm" else "d MMM").withZone(ZoneId.systemDefault())
+    // A 24h window starts and ends at the same clock time, so it needs the day too.
+    val timeFormat = DateTimeFormatter.ofPattern(
+        when {
+            tSpan <= 21_600_000f -> "HH:mm"
+            tSpan <= 172_800_000f -> "EEE HH:mm"
+            else -> "d MMM"
+        },
+    ).withZone(ZoneId.systemDefault())
 
     Column {
         Row(Modifier.fillMaxWidth().height(150.dp)) {

@@ -174,7 +174,10 @@ func (s *Service) MonitorMetrics(ctx context.Context, orgID, monitorID uuid.UUID
 	end := s.now().UTC()
 	start := end.Add(-window)
 	step := window / 60 // ~60 points across the window
-	m.ResponseMs = firstSeries(s.rng(ctx, fmt.Sprintf(`probe_duration_seconds{monitor_id="%s"} * 1000`, id), start, end, step))
+	// Each point averages its whole slot, like Up below. A bare selector only sees the
+	// last 5 minutes before each point, so a monitor checked every 30 minutes left most
+	// points empty, and whether the chart drew at all depended on when you opened it.
+	m.ResponseMs = firstSeries(s.rng(ctx, fmt.Sprintf(`avg_over_time(probe_duration_seconds{monitor_id="%s"}[%s]) * 1000`, id, promSeconds(step)), start, end, step))
 	m.Up = firstSeries(s.rng(ctx, fmt.Sprintf(`avg_over_time(probe_success{monitor_id="%s"}[%s])`, id, promSeconds(step)), start, end, step))
 	return m, nil
 }
@@ -204,7 +207,7 @@ func (s *Service) Overview(ctx context.Context, orgID uuid.UUID, window time.Dur
 	// window and paint an outage between samples green.
 	slot := promSeconds(step)
 	o.UptimeSeries = firstSeries(s.rng(ctx, fmt.Sprintf(`avg(avg_over_time(probe_success{org_id="%s"}[%s])) * 100`, org, slot), start, end, step))
-	o.ResponseSeries = firstSeries(s.rng(ctx, fmt.Sprintf(`avg(probe_duration_seconds{org_id="%s"}) * 1000`, org), start, end, step))
+	o.ResponseSeries = firstSeries(s.rng(ctx, fmt.Sprintf(`avg(avg_over_time(probe_duration_seconds{org_id="%s"}[%s])) * 1000`, org, slot), start, end, step))
 
 	// Per-monitor average response time over the window, keyed by monitor id.
 	respByID := map[string]float64{}
