@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -729,6 +731,12 @@ func (s *Service) uniqueOrgSlug(ctx context.Context, name string) (string, error
 }
 
 func (s *Service) audit(ctx context.Context, user *User, action audit.Action, resType, resID string, meta RequestMeta, md map[string]any) {
+	// A failed account email used to be visible only in audit_logs, so a broken SMTP
+	// relay went unnoticed. Log it too (by user id: no address in the logs).
+	if e, ok := md["send_error"]; ok {
+		slog.Warn("account email not sent", "action", string(action), "user_id", user.ID.String(),
+			"error", strings.ReplaceAll(fmt.Sprint(e), user.Email, "<recipient>")) // "RCPT <addr> rejected"
+	}
 	orgID := user.OrgID
 	uid := user.ID
 	_ = s.auditlog.Record(ctx, audit.Entry{
