@@ -33,14 +33,16 @@ android {
                 name = "SysOps 24/7",
                 apiBaseUrl = "https://sysops247.com",
                 accent = "#1D64E8",
-                // The *web* OAuth client: Android's Google sign-in returns an ID token
-                // issued to it, which /api/v1/auth/google already accepts.
-                googleServerClientId = "325734158501-h2skbm9bq6mk2niquqvo8kkpv8qn0hbh.apps.googleusercontent.com",
+                // Google Cloud project sysops-24-7 (also its Firebase project). The *web*
+                // OAuth client there: Android's Google sign-in returns an ID token issued to
+                // it, so it must be in the API's BEACON_GOOGLE_CLIENT_ID. Its Android clients
+                // (package + SHA-1 of the upload and Play signing keys) live in the same project.
+                googleServerClientId = "295233398456-mi4a9ssp0ap38t9m9r210kvov0ftench.apps.googleusercontent.com",
                 // From Firebase console → Project settings → the Android app. Blank = no push.
-                firebaseAppId = "",
-                firebaseApiKey = "",
-                firebaseProjectId = "",
-                firebaseSenderId = "",
+                firebaseAppId = "1:295233398456:android:32771b797e85fe02a1764d",
+                firebaseApiKey = "AIzaSyC6YemBywL5w-74PFQUW-RKs7ofeRo37kU",
+                firebaseProjectId = "sysops-24-7",
+                firebaseSenderId = "295233398456",
             )
         }
     }
