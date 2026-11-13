@@ -32,7 +32,7 @@ android {
             brand(
                 name = "SysOps 24/7",
                 apiBaseUrl = "https://sysops247.com",
-                accent = "#1D64E8",
+                accent = "#059669",
                 // Google Cloud project sysops-24-7 (also its Firebase project). The *web*
                 // OAuth client there: Android's Google sign-in returns an ID token issued to
                 // it, so it must be in the API's BEACON_GOOGLE_CLIENT_ID. Its Android clients

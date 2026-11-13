@@ -1,29 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The pulse line with its soft halo, shrunk into the adaptive-icon safe zone. -->
+<!--
+  The web mark (BrandMark in ios/Sources/Shared/Theme.swift): a ring of radius 2.5 and
+  eight round-capped ticks in a 24-unit box, scaled ×2.6 about the centre of the 108dp
+  layer, so it spans ~44dp: the iOS icon's proportions, well inside the 66dp safe zone.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="1024"
-    android:viewportHeight="1024">
+    android:viewportWidth="108"
+    android:viewportHeight="108">
     <group
-        android:pivotX="512"
-        android:pivotY="512"
-        android:scaleX="0.66"
-        android:scaleY="0.66">
+        android:scaleX="2.6"
+        android:scaleY="2.6"
+        android:translateX="22.8"
+        android:translateY="22.8">
         <path
-            android:pathData="M96,512L328,512L400,422L490,720L585,212L663,571L712,512L930,512"
-            android:strokeWidth="120"
-            android:strokeColor="#2EFFFFFF"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
+            android:pathData="M12,9.5a2.5,2.5 0,1 1,0 5a2.5,2.5 0,1 1,0 -5z"
+            android:strokeWidth="1.85"
+            android:strokeColor="#FFFFFFFF" />
         <path
-            android:pathData="M96,512L328,512L400,422L490,720L585,212L663,571L712,512L930,512"
-            android:strokeWidth="56"
+            android:pathData="M12,4.5L12,6.5M12,17.5L12,19.5M4.5,12L6.5,12M17.5,12L19.5,12M6.7,6.7L8.1,8.1M15.9,15.9L17.3,17.3M17.3,6.7L15.9,8.1M8.1,15.9L6.7,17.3"
+            android:strokeWidth="1.85"
             android:strokeColor="#FFFFFFFF"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M887,512a43,43 0,1 0,86 0a43,43 0,1 0,-86 0z" />
+            android:strokeLineCap="round" />
     </group>
 </vector>

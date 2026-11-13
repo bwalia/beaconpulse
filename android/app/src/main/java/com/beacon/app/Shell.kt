@@ -6,9 +6,15 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.MonitorHeart
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.MonitorHeart
@@ -17,6 +23,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -32,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -42,12 +51,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
-enum class Tab(val route: String, val label: String, val icon: ImageVector) {
-    Overview("overview", "Overview", Icons.Outlined.Insights),
-    Monitors("monitors", "Monitors", Icons.Outlined.MonitorHeart),
-    Alerts("alerts", "Alerts", Icons.Outlined.NotificationsActive),
-    Projects("projects", "Projects", Icons.Outlined.Folder),
-    Settings("settings", "Settings", Icons.Outlined.Settings),
+enum class Tab(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
+    Overview("overview", "Overview", Icons.Outlined.Insights, Icons.Filled.Insights),
+    Monitors("monitors", "Monitors", Icons.Outlined.MonitorHeart, Icons.Filled.MonitorHeart),
+    Alerts("alerts", "Alerts", Icons.Outlined.NotificationsActive, Icons.Filled.NotificationsActive),
+    Projects("projects", "Projects", Icons.Outlined.Folder, Icons.Filled.Folder),
+    Settings("settings", "Settings", Icons.Outlined.Settings, Icons.Filled.Settings),
 }
 
 /** The signed-in app: five tabs, each keeping its own back stack. Mirrors iOS MainTabView. */
@@ -82,18 +91,31 @@ fun Shell() {
     CompositionLocalProvider(LocalSnack provides snack) {
         Scaffold(
             bottomBar = {
-                NavigationBar {
-                    Tab.entries.forEach { t ->
-                        NavigationBarItem(
-                            selected = t == tab,
-                            onClick = { if (t == tab) nav.popBackStack(t.route, inclusive = false) else go(t) },
-                            icon = { Icon(t.icon, null) },
-                            label = { Text(t.label) },
-                        )
+                // The card surface with a hairline on top, the accent on the chosen tab.
+                Column {
+                    RowDivider()
+                    NavigationBar(containerColor = Theme.card, tonalElevation = 0.dp) {
+                        Tab.entries.forEach { t ->
+                            val selected = t == tab
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = { if (selected) nav.popBackStack(t.route, inclusive = false) else go(t) },
+                                icon = { Icon(if (selected) t.selectedIcon else t.icon, null) },
+                                label = { Text(t.label, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Theme.accent,
+                                    selectedTextColor = Theme.accent,
+                                    indicatorColor = Theme.accent.copy(alpha = 0.12f),
+                                    unselectedIconColor = Theme.muted,
+                                    unselectedTextColor = Theme.muted,
+                                ),
+                            )
+                        }
                     }
                 }
             },
             snackbarHost = { SnackbarHost(snack) },
+            containerColor = Theme.canvas,
             contentWindowInsets = WindowInsets(0),
         ) { padding ->
             Routes(nav, Modifier.padding(padding))

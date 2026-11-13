@@ -14,8 +14,9 @@ iOS.
 | `Api.kt` | `Api` (the only HTTP entry point: OkHttp + kotlinx.serialization, typed `ApiError`), the authenticated client (bearer + one coalesced refresh-and-retry on 401), `Session` (tokens + user, signs out only when the server refuses a refresh), `Vault` (session encrypted with an Android Keystore key) |
 | `Models.kt` | Wire models. Monitor `settings` stays raw JSON so an edit sends back keys only the web sets |
 | `App.kt` | Composition root (`Container`), push (`Push`, `PushService`: Firebase Cloud Messaging, the `alerts` channel, `/api/v1/devices`) |
-| `Ui.kt` | Shared pieces: `Loader`/`LoadableContent` (loading, error + retry, pull to refresh), forms, dropdowns, chart, date-time picker |
-| `MainActivity.kt`, `Shell.kt` | Theme, sign-in gate, five tabs with their own back stacks, alert-tap deep links |
+| `Theme.kt` | The visual system, the twin of `ios/Sources/Shared/Theme.swift`: palette tokens (canvas, card, border, subtle, muted; status colours), the card surface, `Eyebrow`, `StatTile`, `StatusBadge`, `TypeBadge`, `Pill`, `IconTile`, the brand mark and `BrandTile` |
+| `Ui.kt` | Shared pieces: `Loader`/`LoadableContent` (loading, error + retry, pull to refresh), screen chrome, the form kit (the twin of iOS `FormKit.swift`: `FormCard`, `Field`, `Input`, `ChoiceChips`, `SwitchRow`, `StepperRow`, `ErrorBanner`), `TrendChart`, date-time picker |
+| `MainActivity.kt`, `Shell.kt` | Material 3 colour scheme from the palette, sign-in gate, five tabs with their own back stacks, alert-tap deep links |
 | `Login.kt`, `Overview.kt`, `Monitors.kt`, `Projects.kt`, `Settings.kt` | The screens |
 
 ## Brands

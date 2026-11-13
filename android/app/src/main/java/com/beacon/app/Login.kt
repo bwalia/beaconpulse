@@ -1,8 +1,11 @@
 package com.beacon.app
 
+import android.app.Activity
 import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,20 +18,20 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -37,12 +40,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -50,6 +60,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -62,7 +74,7 @@ import kotlinx.coroutines.launch
 
 private val base = BuildConfig.API_BASE_URL.trimEnd('/')
 
-/** Sign-in: email/password and Continue with Google; sign-up opens over it. Mirrors iOS LoginView. */
+/** Sign-in: email/password and Continue with Google over the brand hero; sign-up opens over it. Mirrors iOS LoginView. */
 @Composable
 fun LoginScreen() {
     val app = App.container
@@ -87,75 +99,122 @@ fun LoginScreen() {
 
     val signIn = { if (email.isNotBlank() && password.isNotEmpty()) submit("Sign in failed. Please try again.") { app.login(email.trim(), password) } }
 
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    LightStatusBarIcons()
+    Box(Modifier.fillMaxSize().background(Theme.canvas)) {
+        // The brand gradient behind the header, with faint rings echoing the mark.
+        Box(
+            Modifier.fillMaxWidth().height(420.dp).background(Theme.brandGradient).drawBehind {
+                drawRings(listOf(220.dp, 340.dp, 460.dp), Offset(center.x + 120.dp.toPx(), center.y - 40.dp.toPx()))
+            },
+        )
         Column(
-            Modifier.widthIn(max = 440.dp).fillMaxSize().verticalScroll(rememberScrollState())
-                .systemBarsPadding().imePadding().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).systemBarsPadding().imePadding().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(Modifier.size(76.dp).clip(RoundedCornerShape(20.dp)).background(colorResource(R.color.brand))) {
-                // The launcher art keeps a safe margin for icon masks; scaled up, the pulse fills the tile.
-                Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(76.dp).scale(1.5f))
-            }
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Sign in to your monitors", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(28.dp))
+            Header()
 
-            Field(
-                "Email", email, { email = it },
-                keyboard = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next, autoCorrectEnabled = false),
-            )
-            androidx.compose.material3.OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { signIn() }),
-            )
-            // The reset email links to the website anyway, so the flow lives there.
-            TextButton(onClick = { openUrl(context, "$base/forgot-password") }, modifier = Modifier.align(Alignment.End)) {
-                Text("Forgot password?")
-            }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.fillMaxWidth()) }
-
-            Button(
-                onClick = signIn,
-                enabled = !busy && email.isNotBlank() && password.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+            val shape = RoundedCornerShape(20.dp)
+            Column(
+                Modifier.widthIn(max = 440.dp).fillMaxWidth()
+                    .shadow(16.dp, shape, ambientColor = Color(0x22000000), spotColor = Color(0x22000000))
+                    .clip(shape).background(Theme.card).border(1.dp, Theme.border, shape).padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) else Text("Sign in")
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                HorizontalDivider(Modifier.weight(1f))
-                Text("or", Modifier.padding(horizontal = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                HorizontalDivider(Modifier.weight(1f))
-            }
-
-            OutlinedButton(
-                onClick = {
-                    submit("Google sign-in failed. Please try again.") {
-                        val token = googleIdToken(context) ?: return@submit
-                        app.signInWithGoogle(token)
+                Input(
+                    email, { email = it },
+                    placeholder = "Email",
+                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next, autoCorrectEnabled = false),
+                )
+                Input(
+                    password, { password = it },
+                    placeholder = "Password",
+                    secret = true,
+                    keyboard = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    actions = KeyboardActions(onDone = { signIn() }),
+                )
+                // The reset email links to the website anyway, so the flow lives there.
+                Text(
+                    "Forgot password?",
+                    Modifier.align(Alignment.End).clip(RoundedCornerShape(6.dp)).clickable(role = Role.Button) { openUrl(context, "$base/forgot-password") }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                    color = Theme.accent,
+                )
+                error?.let {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Error, null, Modifier.size(16.dp), tint = Down)
+                        Spacer(Modifier.width(6.dp))
+                        Text(it, style = TextStyle(fontSize = 13.sp), color = Down)
                     }
-                },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) {
-                Image(painterResource(R.drawable.ic_google), null, Modifier.size(20.dp))
-                Spacer(Modifier.size(10.dp))
-                Text("Continue with Google")
+                }
+                AccentButton("Sign in", signIn, Modifier.fillMaxWidth().height(50.dp), enabled = email.isNotBlank() && password.isNotEmpty(), busy = busy)
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RowDivider(Modifier.weight(1f))
+                    Text("or", Modifier.padding(horizontal = 10.dp), style = MaterialTheme.typography.bodySmall, color = Theme.muted)
+                    RowDivider(Modifier.weight(1f))
+                }
+
+                val buttonShape = RoundedCornerShape(12.dp)
+                Row(
+                    Modifier.fillMaxWidth().height(50.dp).clip(buttonShape).background(Theme.card).border(1.dp, Theme.border, buttonShape)
+                        .clickable(enabled = !busy, role = Role.Button) {
+                            submit("Google sign-in failed. Please try again.") {
+                                val token = googleIdToken(context) ?: return@submit
+                                app.signInWithGoogle(token)
+                            }
+                        },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Image(painterResource(R.drawable.ic_google), null, Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("Continue with Google", style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium), color = Theme.text)
+                }
             }
 
-            TextButton(onClick = { signingUp = true }, enabled = !busy) { Text("New here? Create an account") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("New here?", style = TextStyle(fontSize = 14.sp), color = Theme.muted)
+                Text(
+                    "Create an account",
+                    Modifier.clip(RoundedCornerShape(6.dp)).clickable(enabled = !busy, role = Role.Button) { signingUp = true }.padding(4.dp),
+                    style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+                    color = Theme.accent,
+                )
+            }
         }
     }
 
     if (signingUp) RegisterDialog(onDismiss = { signingUp = false })
+}
+
+/** The mark on a frosted tile, the brand name and the prompt, in white over the hero. */
+@Composable
+private fun Header() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        val tile = RoundedCornerShape(18.dp)
+        Box(
+            Modifier.size(68.dp).background(Color.White.copy(alpha = 0.18f), tile).border(1.dp, Color.White.copy(alpha = 0.35f), tile),
+            contentAlignment = Alignment.Center,
+        ) { BrandMark(Modifier.size(44.dp), strokeUnits = 1.65f) }
+        Text(stringResource(R.string.app_name), style = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp), color = Color.White)
+        Text("Sign in to your monitors", style = TextStyle(fontSize = 16.sp), color = Color.White.copy(alpha = 0.85f))
+    }
+}
+
+/** White status-bar icons while the hero is under them; back to the theme's on leaving. */
+@Composable
+private fun LightStatusBarIcons() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.context as? Activity)?.window
+        val bars = window?.let { WindowCompat.getInsetsController(it, view) }
+        val before = bars?.isAppearanceLightStatusBars
+        bars?.isAppearanceLightStatusBars = false
+        onDispose { if (before != null) bars.isAppearanceLightStatusBars = before }
+    }
 }
 
 /**
@@ -210,25 +269,35 @@ private fun RegisterDialog(onDismiss: () -> Unit) {
             }
         },
     ) {
-        Text(
-            "Create your ${stringResource(R.string.app_name)} account",
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Field("Organisation name", org, { org = it })
-        Field("Your name", name, { name = it })
-        Field("Email", email, { email = it }, keyboard = KeyboardOptions(keyboardType = KeyboardType.Email, autoCorrectEnabled = false))
-        SecretField("Password (at least 8 characters)", password, { password = it }, KeyboardOptions(keyboardType = KeyboardType.Password))
+        Column(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            BrandTile(48.dp)
+            Text(
+                "Create your ${stringResource(R.string.app_name)} account",
+                style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
+                textAlign = TextAlign.Center,
+            )
+        }
+        FormCard {
+            Field("Organisation name") { Input(org, { org = it }, placeholder = "e.g. Acme Ltd") }
+            Field("Your name") { Input(name, { name = it }, placeholder = "Jane Doe") }
+            Field("Email") {
+                Input(email, { email = it }, placeholder = "you@example.com", keyboard = KeyboardOptions(keyboardType = KeyboardType.Email, autoCorrectEnabled = false))
+            }
+            Field("Password", hint = "At least 8 characters.") {
+                Input(password, { password = it }, secret = true, keyboard = KeyboardOptions(keyboardType = KeyboardType.Password))
+            }
+        }
+        val linkStyle = TextLinkStyles(SpanStyle(color = Theme.accent, fontWeight = FontWeight.Medium))
         Text(
             buildAnnotatedString {
                 append("By creating an account you agree to the ")
-                withLink(LinkAnnotation.Url("$base/terms")) { append("Terms of Service") }
+                withLink(LinkAnnotation.Url("$base/terms", linkStyle)) { append("Terms of Service") }
                 append(" and ")
-                withLink(LinkAnnotation.Url("$base/privacy")) { append("Privacy Policy") }
+                withLink(LinkAnnotation.Url("$base/privacy", linkStyle)) { append("Privacy Policy") }
                 append(".")
             },
-            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            style = MaterialTheme.typography.bodySmall.copy(color = Theme.muted, textAlign = TextAlign.Center),
         )
     }
 }
