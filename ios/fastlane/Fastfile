@@ -145,20 +145,19 @@ def write_export_options(path, profile_name, installer: false)
 end
 
 # The persistent signing keychain on the self-hosted runner, shared by the iOS and
-# Mac lanes. Returns [path, password].
+# Mac lanes. Returns its path; the password stays in BUILD_KEYCHAIN_PASSWORD.
 def setup_build_keychain!
   kc_path = ENV.fetch("BUILD_KEYCHAIN_PATH")
-  kc_pass = ENV.fetch("BUILD_KEYCHAIN_PASSWORD")
 
   # The keychain persists across runs on the self-hosted runner so `cert` reuses
   # the same Apple Distribution certificate instead of minting a new one every
   # build (Apple caps distribution certs). Create it on first use, unlock after.
   if File.exist?(kc_path)
-    unlock_keychain(path: kc_path, password: kc_pass, set_default: false)
+    unlock_keychain(path: kc_path, password: ENV.fetch("BUILD_KEYCHAIN_PASSWORD"), set_default: false)
   else
     create_keychain(
       path: kc_path,
-      password: kc_pass,
+      password: ENV.fetch("BUILD_KEYCHAIN_PASSWORD"),
       default_keychain: false,
       unlock: true,
       timeout: 3600,
@@ -171,7 +170,7 @@ def setup_build_keychain!
   # Disable the auto-lock timeout so the keychain stays unlocked between the
   # prepare_signing and build_ipa steps (separate fastlane processes).
   sh("security", "set-keychain-settings", kc_path)
-  [kc_path, kc_pass]
+  kc_path
 end
 
 platform :ios do
@@ -204,7 +203,7 @@ platform :ios do
   lane :prepare_signing do
     assert_generated_project!
     api_key = asc_api_key
-    kc_path, kc_pass = setup_build_keychain!
+    kc_path = setup_build_keychain!
     tmp_dir = ENV["RUNNER_TEMP"] || Dir.pwd
 
     # Create (first run) or reuse (later runs) the distribution certificate from
@@ -212,7 +211,7 @@ platform :ios do
     cert(
       api_key: api_key,
       keychain_path: kc_path,
-      keychain_password: kc_pass,
+      keychain_password: ENV.fetch("BUILD_KEYCHAIN_PASSWORD"),
       output_path: tmp_dir
     )
 
@@ -323,9 +322,9 @@ platform :mac do
   lane :prepare_signing do
     assert_generated_project!
     api_key = asc_api_key
-    kc_path, kc_pass = setup_build_keychain!
+    kc_path = setup_build_keychain!
     tmp_dir = ENV["RUNNER_TEMP"] || Dir.pwd
-    keychain = { keychain_path: kc_path, keychain_password: kc_pass, output_path: tmp_dir }
+    keychain = { keychain_path: kc_path, keychain_password: ENV.fetch("BUILD_KEYCHAIN_PASSWORD"), output_path: tmp_dir }
 
     # Apple Distribution signs the app on every platform; the installer certificate
     # signs the .pkg that App Store Connect takes for a Mac build.
