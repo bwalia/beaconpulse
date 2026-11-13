@@ -56,7 +56,7 @@ struct OverviewView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         summary(overview)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 14)], spacing: 14) {
+                        FitRow(spacing: 14, narrowColumns: 1) {
                             chartCard("Uptime", series: overview.uptimeSeries, color: Theme.up)
                             chartCard("Response time", series: overview.responseSeries, color: Theme.accent)
                         }
@@ -85,7 +85,7 @@ struct OverviewView: View {
     // MARK: - Sections
 
     private func summary(_ overview: Overview) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+        FitRow {
             StatTile(label: "Uptime", value: String(format: "%.2f%%", overview.uptimePercent),
                      tint: Theme.uptimeColor(overview.uptimePercent), icon: "checkmark.shield")
             StatTile(label: "Avg response", value: String(format: "%.0f ms", overview.avgResponseMs),
@@ -107,6 +107,7 @@ struct OverviewView: View {
                 TrendChart(series: series, color: color, label: title)
             }
         }
+        .frame(minWidth: 300)
         .card()
     }
 
