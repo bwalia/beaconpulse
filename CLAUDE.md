@@ -21,7 +21,8 @@ selected at build time by `NEXT_PUBLIC_BRAND`), `deploy/helm/beacon/values-<bran
   `beaconpulse`; split by category slug) through a tagged data cache shared across
   replicas via Redis (`cache-handler.mjs`), busted by the signed OpsAPI webhook at
   `/cms/revalidate` — same pattern as `../workstation-website`.
-- `ios/` — native SwiftUI iPhone/iPad app (added recently — see below).
+- `ios/` — native SwiftUI iPhone/iPad app, and from the same `Sources/` the native Mac
+  app (`SysOps-macOS` target, Universal Purchase with iOS). See `ios/README.md` → Mac app.
 - `android/` — native Kotlin Google Play app (Jetpack Compose + Material 3), the
   Android twin of `ios/` with the same screens. Per-brand product flavor (`brand(...)`
   in `app/build.gradle.kts`); push over FCM (`fcm` notifier); no billing, as on iOS.

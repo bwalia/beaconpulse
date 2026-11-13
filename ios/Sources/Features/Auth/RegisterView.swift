@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 /// Email/password signup: creates an organization and its owner, then lands on
 /// the same session as login. Presented as a sheet from the sign-in screen. On

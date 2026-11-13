@@ -1,6 +1,5 @@
 import Charts
 import SwiftUI
-import UIKit
 
 /// Loads one monitor plus its 24h metrics. Fetched by id so the same screen works
 /// from a list tap and from a push-notification deep-link.
@@ -200,7 +199,7 @@ struct MonitorDetailView: View {
         Section("Heartbeat") {
             LabeledContent("Ping URL") {
                 Button {
-                    UIPasteboard.general.string = full
+                    Platform.copy(full)
                 } label: {
                     Image(systemName: "doc.on.doc")
                 }

@@ -119,6 +119,28 @@ eval "$(VAULT_TOKEN_FILE=$HOME/.secrets/acc-vault/login-token.json ./ci/load-ios
 bundle exec fastlane ios ci_build_number   # needs VERSION_NAME set
 ```
 
+## Mac app
+
+The same `Sources/` also build a native Mac app (target `SysOps-macOS`, macOS 14+):
+a sidebar instead of tabs, and otherwise the same screens. `Sources/App/Platform.swift`
+holds everything that differs between iPhone and Mac (copy, notification settings,
+push registration, and no-op stand-ins for iPhone-only keyboard modifiers).
+
+- **One listing.** It uses the iOS bundle id, so App Store Connect sells it as a
+  Universal Purchase alongside the iPhone app. Add the macOS platform to the app
+  record once; after that the Mac build gets its own version and screenshots there.
+- **Push.** APNs, exactly as on iOS: the Mac registers as an `ios` device and the
+  `apns` notifier reaches it with the same topic.
+- **Sign-in.** Apple and Google work with the iOS settings (Google's iOS client id
+  covers a Mac app with the same bundle id).
+- **Release.** `fastlane mac prepare_signing | build_pkg | beta | release`, run by
+  `ios-release.yml` as one more matrix entry once the repo variable
+  `MACOS_RELEASE` is `true`.
+- **Run it locally.** `xcodegen generate`, then the `SysOps-macOS` scheme in Xcode.
+  For a quick unsigned build:
+  `xcodebuild -scheme SysOps-macOS -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
+  (push and Sign in with Apple need a signed build).
+
 ## Tests
 
 `Cmd-U` under the **SysOps** scheme. `Tests/APIClientTests.swift` covers decoding,

@@ -70,9 +70,19 @@ jobs:
       - id: matrix
         env:
           SELECTED: ${{ github.event_name == 'workflow_dispatch' && inputs.brand || 'all' }}
+          MACOS_RELEASE: ${{ vars.MACOS_RELEASE }}
         run: |
           set -euo pipefail
-          ALL='[{"key":"sysops","dir":"SysOps"},{"key":"redfox","dir":"RedFox"}]'
+          # One entry per app: brand x platform. `scheme` is the Xcode target,
+          # `ent`/`aps` its entitlements file and push key (the Mac spells it
+          # differently), `out` the signed file it produces.
+          ALL='[{"key":"sysops","dir":"SysOps","platform":"ios","scheme":"SysOps","ent":"SysOps.entitlements","aps":"aps-environment","out":"SysOps.ipa"},{"key":"redfox","dir":"RedFox","platform":"ios","scheme":"RedFox","ent":"RedFox.entitlements","aps":"aps-environment","out":"RedFox.ipa"}]'
+          # The Mac app ships once App Store Connect's SysOps247 record has the macOS
+          # platform; until then every upload would fail, so it is opt-in:
+          #   gh variable set MACOS_RELEASE --body true
+          if [ "${MACOS_RELEASE:-}" = "true" ]; then
+            ALL="$(printf '%s' "$ALL" | python3 -c 'import json,sys; a=json.load(sys.stdin); a.append({"key":"sysops","dir":"SysOps","platform":"mac","scheme":"SysOps-macOS","ent":"SysOps-macOS.entitlements","aps":"com.apple.developer.aps-environment","out":"SysOps-macOS.pkg"}); print(json.dumps(a))')"
+          fi
           if [ "$SELECTED" = "all" ]; then
             BRANDS="$ALL"
           else
@@ -83,7 +93,7 @@ jobs:
           echo "brands=$BRANDS" >> "$GITHUB_OUTPUT"
 
   release:
-    name: ${{ matrix.brand.dir }} → ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'testflight' }}
+    name: ${{ matrix.brand.scheme }} → ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'testflight' }}
     needs: [prepare]
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 90
@@ -139,8 +149,8 @@ jobs:
           xcodegen generate
           # TestFlight and the App Store deliver over the *production* APNs
           # environment; the generated entitlements default to development.
-          /usr/libexec/PlistBuddy -c "Set :aps-environment production" \
-            "Brands/${{ matrix.brand.dir }}/${{ matrix.brand.dir }}.entitlements"
+          /usr/libexec/PlistBuddy -c "Set :${{ matrix.brand.aps }} production" \
+            "Brands/${{ matrix.brand.dir }}/${{ matrix.brand.ent }}"
 
           # A brand with no Google iOS client leaves GOOGLE_REVERSED_CLIENT_ID as the
           # REPLACE_WITH_… placeholder. That still gets substituted into
@@ -151,7 +161,7 @@ jobs:
           # The app already disables Google sign-in for a placeholder (AppConfig
           # treats a REPLACE_WITH prefix as nil), so the scheme is dead weight in that
           # case: drop the whole CFBundleURLTypes array rather than ship an invalid one.
-          plist="Brands/${{ matrix.brand.dir }}/Info.plist"
+          plist="${{ matrix.brand.platform == 'mac' && 'Mac' || format('Brands/{0}', matrix.brand.dir) }}/Info.plist"
           xcconfig="Brands/${{ matrix.brand.dir }}/brand.xcconfig"
           if grep -qE '^ *GOOGLE_REVERSED_CLIENT_ID *= *REPLACE_WITH' "$xcconfig"; then
             echo "No Google iOS client for ${{ matrix.brand.dir }} — removing CFBundleURLTypes"
@@ -174,30 +184,30 @@ jobs:
 
       - name: Compute next build number
         id: build
-        run: bundle exec fastlane ios ci_build_number
+        run: bundle exec fastlane ${{ matrix.brand.platform }} ci_build_number
 
       - name: Prepare code signing
-        run: bundle exec fastlane ios prepare_signing
+        run: bundle exec fastlane ${{ matrix.brand.platform }} prepare_signing
 
-      - name: Build signed IPA
+      - name: Build signed app
         env:
           BUILD_NUMBER: ${{ steps.build.outputs.build_number }}
-        run: bundle exec fastlane ios build_ipa
+        run: bundle exec fastlane ${{ matrix.brand.platform }} ${{ matrix.brand.platform == 'mac' && 'build_pkg' || 'build_ipa' }}
 
       - name: Upload to TestFlight (internal)
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.target == 'testflight')
-        run: bundle exec fastlane ios beta
+        run: bundle exec fastlane ${{ matrix.brand.platform }} beta
 
       - name: Submit for App Store review
         if: github.event_name == 'workflow_dispatch' && inputs.target == 'app_store'
-        run: bundle exec fastlane ios release
+        run: bundle exec fastlane ${{ matrix.brand.platform }} release
 
-      - name: Archive IPA artifact
+      - name: Archive build artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.brand.key }}-ios-ipa
-          path: ios/build/${{ matrix.brand.dir }}.ipa
+          name: ${{ matrix.brand.key }}-${{ matrix.brand.platform }}-build
+          path: ios/build/${{ matrix.brand.out }}
           if-no-files-found: warn
           retention-days: 14
 

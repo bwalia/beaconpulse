@@ -3,7 +3,11 @@ import SwiftUI
 
 @main
 struct BeaconApp: App {
+    #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #else
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #endif
     @State private var container = AppContainer()
 
     var body: some Scene {

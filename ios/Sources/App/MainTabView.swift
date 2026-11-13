@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The signed-in shell: four read-parity tabs, each its own navigation stack.
+/// The signed-in shell: five sections, each its own navigation stack (tabs on
+/// iPhone/iPad, a sidebar on the Mac).
 /// A tapped push notification switches to the Monitors tab and deep-links to the
 /// monitor. Sign-out (which also unregisters this device from push) lives on the
 /// Overview tab.
@@ -10,34 +11,88 @@ struct MainTabView: View {
     @State private var selection: Tab = .overview
     @State private var monitorsPath = NavigationPath()
 
-    enum Tab: Hashable { case overview, monitors, alerts, projects, settings }
+    enum Tab: Hashable, CaseIterable {
+        case overview, monitors, alerts, projects, settings
+
+        var title: String {
+            switch self {
+            case .overview: "Overview"
+            case .monitors: "Monitors"
+            case .alerts: "Alerts"
+            case .projects: "Projects"
+            case .settings: "Settings"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .overview: "chart.bar.xaxis"
+            case .monitors: "dot.radiowaves.left.and.right"
+            case .alerts: "bell.badge"
+            case .projects: "folder"
+            case .settings: "gearshape"
+            }
+        }
+    }
 
     var body: some View {
+        shell
+            .task { await push.requestAuthorizationAndRegister() }
+            .onChange(of: push.pendingMonitorID) { _, id in
+                guard let id else { return }
+                selection = .monitors
+                monitorsPath.append(id)
+                push.pendingMonitorID = nil
+            }
+    }
+
+    /// Tabs on iPhone and iPad; the Mac's usual sidebar on macOS. Same screens.
+    @ViewBuilder
+    private var shell: some View {
+        #if os(macOS)
+        NavigationSplitView {
+            List(selection: Binding($selection)) {
+                ForEach(Tab.allCases, id: \.self) { tab in
+                    Label(tab.title, systemImage: tab.symbol).tag(tab)
+                }
+            }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+        } detail: {
+            stack(for: selection)
+        }
+        #else
         TabView(selection: $selection) {
+            ForEach(Tab.allCases, id: \.self) { tab in
+                stack(for: tab)
+                    .tabItem { Label(tab.title, systemImage: tab.symbol) }
+                    .tag(tab)
+            }
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    private func stack(for tab: Tab) -> some View {
+        switch tab {
+        case .overview:
             NavigationStack {
                 OverviewView()
                     .navigationTitle("Overview")
                     .monitorDetailDestination()
             }
-            .tabItem { Label("Overview", systemImage: "chart.bar.xaxis") }
-            .tag(Tab.overview)
-
+        case .monitors:
             NavigationStack(path: $monitorsPath) {
                 MonitorsListView()
                     .navigationTitle("Monitors")
                     .monitorDetailDestination()
             }
-            .tabItem { Label("Monitors", systemImage: "dot.radiowaves.left.and.right") }
-            .tag(Tab.monitors)
-
+        case .alerts:
             NavigationStack {
                 AlertsView()
                     .navigationTitle("Alerts")
                     .monitorDetailDestination()
             }
-            .tabItem { Label("Alerts", systemImage: "bell.badge") }
-            .tag(Tab.alerts)
-
+        case .projects:
             NavigationStack {
                 ProjectsView()
                     .navigationTitle("Projects")
@@ -47,22 +102,11 @@ struct MainTabView: View {
                     }
                     .monitorDetailDestination()
             }
-            .tabItem { Label("Projects", systemImage: "folder") }
-            .tag(Tab.projects)
-
+        case .settings:
             NavigationStack {
                 SettingsView()
                     .navigationTitle("Settings")
             }
-            .tabItem { Label("Settings", systemImage: "gearshape") }
-            .tag(Tab.settings)
-        }
-        .task { await push.requestAuthorizationAndRegister() }
-        .onChange(of: push.pendingMonitorID) { _, id in
-            guard let id else { return }
-            selection = .monitors
-            monitorsPath.append(id)
-            push.pendingMonitorID = nil
         }
     }
 }
