@@ -10,6 +10,7 @@ import AppKit
 /// AuthResponse, which the session store adopts.
 struct LoginView: View {
     @Environment(AppContainer.self) private var container
+    @Environment(\.colorScheme) private var colorScheme
     private var config: AppConfig { .current }
 
     @State private var email = ""
@@ -19,69 +20,122 @@ struct LoginView: View {
     @State private var showingSignUp = false
 
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            header
-            emailPasswordForm
-            thirdPartyButtons
-            signUpPrompt
-            Spacer()
+        ScrollView {
+            VStack(spacing: 22) {
+                header.padding(.top, 44)
+                VStack(spacing: 16) {
+                    emailPasswordForm
+                    orDivider
+                    thirdPartyButtons
+                }
+                .padding(22)
+                .background(Theme.card, in: .rect(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.border))
+                .shadow(color: .black.opacity(0.08), radius: 18, y: 8)
+                signUpPrompt
+            }
+            .padding(20)
+            .frame(maxWidth: 440)
+            .frame(maxWidth: .infinity)
         }
-        .padding(24)
+        .scrollBounceBehavior(.basedOnSize)
+        .background(alignment: .top) { heroBackground }
+        .background(Theme.canvas.ignoresSafeArea())
         .sheet(isPresented: $showingSignUp) { RegisterView() }
     }
 
+    /// The brand gradient behind the header, with faint rings echoing the mark.
+    private var heroBackground: some View {
+        LinearGradient(colors: [Theme.accent, Theme.accentDeep], startPoint: .topLeading, endPoint: .bottomTrailing)
+            .overlay {
+                ZStack {
+                    ForEach([220.0, 340.0, 460.0], id: \.self) { size in
+                        Circle().stroke(.white.opacity(0.08), lineWidth: 1).frame(width: size, height: size)
+                    }
+                }
+                .offset(x: 120, y: -40)
+            }
+            .clipped()
+            .frame(height: 400)
+            .ignoresSafeArea()
+    }
+
     private var signUpPrompt: some View {
-        Button("New here? Create an account") { showingSignUp = true }
-            .font(.subheadline)
-            .disabled(isSubmitting)
+        HStack(spacing: 4) {
+            Text("New here?").foregroundStyle(Theme.muted)
+            Button("Create an account") { showingSignUp = true }
+                .fontWeight(.semibold)
+                .disabled(isSubmitting)
+        }
+        .font(.subheadline)
     }
 
     private var header: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "dot.radiowaves.left.and.right")
-                .font(.system(size: 44))
-                .foregroundStyle(config.accentColor)
-            Text(config.brandDisplayName).font(.largeTitle.bold())
-            Text("Sign in to your monitors").foregroundStyle(.secondary)
+        VStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 18)
+                .fill(.white.opacity(0.18))
+                .frame(width: 68, height: 68)
+                .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.35)))
+                .overlay(BrandMark().stroke(.white, style: StrokeStyle(lineWidth: 3, lineCap: .round)).padding(12))
+                .accessibilityHidden(true)
+            Text(config.brandDisplayName).font(.largeTitle.bold()).foregroundStyle(.white)
+            Text("Sign in to your monitors").foregroundStyle(.white.opacity(0.85))
         }
+    }
+
+    private var orDivider: some View {
+        HStack(spacing: 10) {
+            Rectangle().fill(Theme.border).frame(height: 1)
+            Text("or").font(.caption).foregroundStyle(Theme.muted)
+            Rectangle().fill(Theme.border).frame(height: 1)
+        }
+    }
+
+    private func field<F: View>(_ content: F) -> some View {
+        content
+            .padding(14)
+            .background(Theme.canvas, in: .rect(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
     }
 
     private var emailPasswordForm: some View {
         VStack(spacing: 12) {
-            TextField("Email", text: $email)
-                .textContentType(.emailAddress)
-                .keyboardType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding()
-                .background(.thinMaterial, in: .rect(cornerRadius: 10))
+            field(
+                TextField("Email", text: $email)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            )
 
-            SecureField("Password", text: $password)
-                .textContentType(.password)
-                .padding()
-                .background(.thinMaterial, in: .rect(cornerRadius: 10))
+            field(
+                SecureField("Password", text: $password)
+                    .textContentType(.password)
+            )
 
             // The reset email links to the web app anyway, so the flow lives there.
             Link("Forgot password?", destination: config.apiBaseURL.appending(path: "forgot-password"))
-                .font(.footnote)
+                .font(.footnote.weight(.medium))
                 .frame(maxWidth: .infinity, alignment: .trailing)
 
             if let errorMessage {
-                Text(errorMessage)
+                Label(errorMessage, systemImage: "exclamationmark.circle.fill")
                     .font(.footnote)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.down)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Button {
                 Task { await run { try await container.authService.login(email: email, password: password) } }
             } label: {
-                if isSubmitting {
-                    ProgressView().frame(maxWidth: .infinity)
-                } else {
-                    Text("Sign In").frame(maxWidth: .infinity)
+                Group {
+                    if isSubmitting {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Sign in").fontWeight(.semibold)
+                    }
                 }
+                .frame(maxWidth: .infinity, minHeight: 26)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -94,8 +148,8 @@ struct LoginView: View {
             SignInWithAppleButton(.signIn,
                                   onRequest: { $0.requestedScopes = [.fullName, .email] },
                                   onCompletion: handleApple)
-                .signInWithAppleButtonStyle(.black)
-                .frame(height: 48)
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                .frame(height: 46)
                 .clipShape(.rect(cornerRadius: 10))
 
             if config.googleEnabled {
@@ -103,10 +157,14 @@ struct LoginView: View {
                     Task { await signInWithGoogle() }
                 } label: {
                     Label("Continue with Google", systemImage: "g.circle.fill")
-                        .frame(maxWidth: .infinity)
+                        .font(.body.weight(.medium))
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .foregroundStyle(.primary)
+                        .background(Theme.card, in: .rect(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
+                        .contentShape(.rect(cornerRadius: 10))
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(.plain)
             }
         }
         .disabled(isSubmitting)
