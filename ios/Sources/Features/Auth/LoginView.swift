@@ -92,10 +92,7 @@ struct LoginView: View {
     }
 
     private func field<F: View>(_ content: F) -> some View {
-        content
-            .padding(14)
-            .background(Theme.canvas, in: .rect(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
+        content.padding(.vertical, 3).inputStyle()
     }
 
     private var emailPasswordForm: some View {

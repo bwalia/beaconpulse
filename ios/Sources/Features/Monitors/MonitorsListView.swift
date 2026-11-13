@@ -186,18 +186,7 @@ struct MonitorRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var symbol: String {
-        switch monitor.type.lowercased() {
-        case "http", "https": "globe"
-        case "ssl", "tls": "lock.shield"
-        case "dns": "server.rack"
-        case "tcp": "network"
-        case "ping", "icmp": "dot.radiowaves.left.and.right"
-        case "heartbeat": "waveform.path.ecg"
-        case "github_actions": "gearshape.2"
-        default: "dot.radiowaves.left.and.right"
-        }
-    }
+    private var symbol: String { Theme.symbol(forMonitorType: monitor.type) }
 }
 
 /// A coloured dot encoding a monitor's health at a glance.

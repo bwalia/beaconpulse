@@ -35,20 +35,25 @@ struct ProjectFormView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Name", text: $name)
-                    Picker("Environment", selection: $environment) {
-                        Text("Production").tag("production")
-                        Text("Staging").tag("staging")
-                        Text("Development").tag("development")
+            FormScreen {
+                FormCard("Project") {
+                    Field("Name") {
+                        TextField("e.g. Customer portal", text: $name).inputStyle()
                     }
-                    TextField("Description (optional)", text: $details, axis: .vertical)
+                    Field("Environment") {
+                        ChoiceChips(choices: [Choice("production", "Production", icon: "bolt.fill"),
+                                              Choice("staging", "Staging", icon: "hammer.fill"),
+                                              Choice("development", "Development", icon: "chevron.left.forwardslash.chevron.right")],
+                                    selection: $environment, minWidth: 130)
+                    }
+                    Field("Description") {
+                        TextField("Optional", text: $details, axis: .vertical)
+                            .lineLimit(2...5)
+                            .inputStyle()
+                    }
                 }
 
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
-                }
+                if let errorMessage { ErrorBanner(errorMessage) }
             }
             .navigationTitle(isCreate ? "New Project" : "Edit Project")
             .navigationBarTitleDisplayMode(.inline)
