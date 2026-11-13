@@ -113,7 +113,7 @@ private fun MonitorsCard(monitors: List<MonitorUptime>, openMonitor: (String) ->
             Text("No monitors reporting yet.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall, color = Theme.muted)
         }
         monitors.forEachIndexed { i, m ->
-            if (i > 0) RowDivider(Modifier.padding(start = 16.dp))
+            if (i > 0) RowDivider(Modifier.padding(horizontal = 16.dp))
             Row(
                 Modifier.fillMaxWidth().clickable { openMonitor(m.monitorId) }.padding(start = 16.dp, end = 10.dp, top = 11.dp, bottom = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
