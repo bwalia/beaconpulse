@@ -87,6 +87,9 @@ targetTemplates:
     dependencies:
       - package: GoogleSignIn
         product: GoogleSignIn
+    # A shared scheme: fastlane (gym) only sees shared schemes, unlike a local
+    # xcodebuild, which falls back to one Xcode makes on the fly.
+    scheme: {}
 
 targets:
   SysOps:
