@@ -50,21 +50,26 @@ struct OverviewView: View {
             }
             .pickerStyle(.segmented)
             .padding([.horizontal, .top])
+            .padding(.bottom, 4)
 
             LoadableView(state: store?.state ?? .loading, retry: reload) { overview in
                 ScrollView {
-                    VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 14) {
                         summary(overview)
-                        chartCard("Uptime", series: overview.uptimeSeries, filled: true, color: .green)
-                        chartCard("Response time", series: overview.responseSeries, filled: false,
-                                  color: AppConfig.current.accentColor)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 320), spacing: 14)], spacing: 14) {
+                            chartCard("Uptime", series: overview.uptimeSeries, color: Theme.up)
+                            chartCard("Response time", series: overview.responseSeries, color: Theme.accent)
+                        }
                         monitorsSection(overview.monitors)
                     }
                     .padding()
+                    .frame(maxWidth: 1200)
+                    .frame(maxWidth: .infinity)
                 }
                 .refreshable { await load() }
             }
         }
+        .canvas()
         .task {
             if store == nil { store = OverviewStore(client: container.apiClient) }
             await load()
@@ -80,87 +85,69 @@ struct OverviewView: View {
     // MARK: - Sections
 
     private func summary(_ overview: Overview) -> some View {
-        HStack(spacing: 12) {
-            metricTile("Uptime", value: String(format: "%.2f%%", overview.uptimePercent),
-                       color: uptimeColor(overview.uptimePercent))
-            metricTile("Avg response", value: String(format: "%.0f ms", overview.avgResponseMs),
-                       color: .primary)
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+            StatTile(label: "Uptime", value: String(format: "%.2f%%", overview.uptimePercent),
+                     tint: Theme.uptimeColor(overview.uptimePercent), icon: "checkmark.shield")
+            StatTile(label: "Avg response", value: String(format: "%.0f ms", overview.avgResponseMs),
+                     icon: "speedometer")
+            StatTile(label: "Monitors", value: "\(overview.monitors.count)",
+                     icon: "dot.radiowaves.left.and.right", note: "Reporting in \(window.rawValue)")
         }
-    }
-
-    private func metricTile(_ label: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title2.bold()).monospacedDigit().foregroundStyle(color)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial, in: .rect(cornerRadius: 12))
     }
 
     @ViewBuilder
-    private func chartCard(_ title: String, series: [MetricPoint], filled: Bool, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func chartCard(_ title: String, series: [MetricPoint], color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text(title).font(.headline)
             if series.isEmpty {
                 Text("No data for this window.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 120)
+                    .font(.footnote).foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, minHeight: 170)
             } else {
-                Chart(series) { point in
-                    if filled {
-                        AreaMark(x: .value("Time", point.t), y: .value(title, point.v))
-                            .foregroundStyle(color.opacity(0.2))
-                            .interpolationMethod(.catmullRom)
-                    }
-                    LineMark(x: .value("Time", point.t), y: .value(title, point.v))
-                        .foregroundStyle(color)
-                        .interpolationMethod(.catmullRom)
-                }
-                .frame(height: 150)
-                .chartYAxis { AxisMarks(position: .leading) }
-                .accessibilityLabel("\(title) trend over the selected window")
+                TrendChart(series: series, color: color, label: title)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial, in: .rect(cornerRadius: 12))
+        .card()
     }
 
     private func monitorsSection(_ monitors: [MonitorUptime]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Monitors").font(.headline)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Monitors").font(.headline)
+                Spacer()
+                Eyebrow("Avg response")
+            }
+            .padding(.bottom, 6)
             if monitors.isEmpty {
-                Text("No monitors reporting yet.").font(.footnote).foregroundStyle(.secondary)
+                Text("No monitors reporting yet.").font(.footnote).foregroundStyle(Theme.muted)
             } else {
                 ForEach(monitors) { monitor in
                     NavigationLink(value: monitor.monitorId) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(monitor.monitorName).font(.subheadline.weight(.medium))
-                                Text(monitor.target).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(monitor.monitorName).font(.subheadline.weight(.semibold))
+                                Text(monitor.target)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(Theme.muted)
+                                    .lineLimit(1)
                             }
                             Spacer()
                             Text(String(format: "%.0f ms", monitor.avgResponseMs))
-                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                                .font(.caption.weight(.semibold)).monospacedDigit()
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .background(Theme.subtle, in: .capsule)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(Theme.muted)
                         }
+                        .padding(.vertical, 8)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    if monitor.id != monitors.last?.id { Divider() }
+                    if monitor.id != monitors.last?.id { Divider().overlay(Theme.border) }
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial, in: .rect(cornerRadius: 12))
-    }
-
-    private func uptimeColor(_ percent: Double) -> Color {
-        switch percent {
-        case 99.9...: return .green
-        case 99...: return .yellow
-        default: return .orange
-        }
+        .card()
     }
 }

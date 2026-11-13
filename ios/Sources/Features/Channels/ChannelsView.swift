@@ -77,6 +77,7 @@ struct ChannelsView: View {
                     }
                 }
             }
+            .canvas()
             .refreshable { await store?.load() }
         }
         .navigationTitle("Notification Channels")

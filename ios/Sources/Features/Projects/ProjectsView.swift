@@ -56,9 +56,11 @@ struct ProjectsView: View {
             } else {
                 List {
                     ForEach(projects) { project in
-                        NavigationLink(value: project) {
+                        ZStack {
+                            NavigationLink(value: project) { EmptyView() }.opacity(0)
                             ProjectRow(project: project)
                         }
+                        .cardRow()
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) { pendingDelete = project } label: {
                                 Label("Delete", systemImage: "trash")
@@ -70,6 +72,7 @@ struct ProjectsView: View {
                     }
                 }
                 .listStyle(.plain)
+                .canvas()
                 .refreshable { await store?.load() }
             }
         }
@@ -119,20 +122,27 @@ struct ProjectRow: View {
     let project: Project
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
+        HStack(spacing: 12) {
+            Image(systemName: "folder.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 38, height: 38)
+                .background(Theme.accent.opacity(0.13), in: .rect(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 4) {
                 Text(project.name).font(.headline)
-                Spacer()
-                EnvironmentBadge(environment: project.environment)
+                if !project.description.isEmpty {
+                    Text(project.description)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(2)
+                }
             }
-            if !project.description.isEmpty {
-                Text(project.description)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            Spacer(minLength: 8)
+            EnvironmentBadge(environment: project.environment)
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Theme.muted)
         }
-        .padding(.vertical, 4)
     }
 }
 
@@ -151,9 +161,9 @@ struct EnvironmentBadge: View {
 
     private var color: Color {
         switch environment {
-        case "production": return .red
-        case "staging": return .orange
-        default: return .blue
+        case "production": return Theme.down
+        case "staging": return Theme.degraded
+        default: return Color(hex: "3B82F6") // blue-500
         }
     }
 }

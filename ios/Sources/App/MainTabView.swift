@@ -52,8 +52,18 @@ struct MainTabView: View {
         #if os(macOS)
         NavigationSplitView {
             List(selection: Binding($selection)) {
-                ForEach(Tab.allCases, id: \.self) { tab in
-                    Label(tab.title, systemImage: tab.symbol).tag(tab)
+                Section {
+                    ForEach(Tab.allCases, id: \.self) { tab in
+                        Label(tab.title, systemImage: tab.symbol).tag(tab)
+                    }
+                } header: {
+                    HStack(spacing: 8) {
+                        BrandTile(size: 26)
+                        Text(AppConfig.current.brandDisplayName)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(.bottom, 10)
                 }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)

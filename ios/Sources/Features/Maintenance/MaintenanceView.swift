@@ -61,6 +61,7 @@ struct MaintenanceView: View {
                     }
                 }
                 .listStyle(.plain)
+                .canvas()
                 .refreshable { await store?.load() }
             }
         }

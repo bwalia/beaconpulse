@@ -70,9 +70,13 @@ struct MonitorsListView: View {
                     ContentUnavailableView.search(text: search)
                 } else {
                     List(shown) { monitor in
-                        NavigationLink(value: monitor.id) {
+                        // The link is invisible so the card draws its own chevron
+                        // inside it rather than the List adding one outside.
+                        ZStack {
+                            NavigationLink(value: monitor.id) { EmptyView() }.opacity(0)
                             MonitorRow(monitor: monitor)
                         }
+                        .cardRow()
                         .swipeActions(edge: .leading) {
                             Button {
                                 Task { await setEnabled(monitor, !monitor.enabled) }
@@ -91,6 +95,7 @@ struct MonitorsListView: View {
                         }
                     }
                     .listStyle(.plain)
+                    .canvas()
                     .refreshable { await store?.load() }
                 }
             }
@@ -155,22 +160,43 @@ struct MonitorRow: View {
     let monitor: Monitor
 
     var body: some View {
+        let color = Theme.color(for: monitor.status)
         HStack(spacing: 12) {
-            StatusDot(status: monitor.status)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(monitor.name).font(.headline)
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 38, height: 38)
+                .background(color.opacity(0.13), in: .rect(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(monitor.name).font(.headline).lineLimit(1)
                 Text(monitor.target)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(Theme.muted)
                     .lineLimit(1)
             }
-            Spacer()
-            Text(monitor.type.uppercased())
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 6) {
+                StatusBadge(status: monitor.status)
+                TypeBadge(text: monitor.type)
+            }
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Theme.muted)
         }
-        .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+
+    private var symbol: String {
+        switch monitor.type.lowercased() {
+        case "http", "https": "globe"
+        case "ssl", "tls": "lock.shield"
+        case "dns": "server.rack"
+        case "tcp": "network"
+        case "ping", "icmp": "dot.radiowaves.left.and.right"
+        case "heartbeat": "waveform.path.ecg"
+        case "github_actions": "gearshape.2"
+        default: "dot.radiowaves.left.and.right"
+        }
     }
 }
 
@@ -180,18 +206,8 @@ struct StatusDot: View {
 
     var body: some View {
         Circle()
-            .fill(color)
+            .fill(Theme.color(for: status))
             .frame(width: 10, height: 10)
             .accessibilityLabel(status.rawValue)
-    }
-
-    private var color: Color {
-        switch status {
-        case .up: return .green
-        case .down: return .red
-        case .degraded: return .orange
-        case .paused: return .gray
-        case .unknown: return .secondary
-        }
     }
 }

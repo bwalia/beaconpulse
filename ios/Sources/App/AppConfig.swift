@@ -12,6 +12,8 @@ struct AppConfig {
     let googleClientID: String?
     let brandDisplayName: String
     let accentColor: Color
+    /// A deeper shade of the accent, for gradients (the brand tile, the sign-in header).
+    let accentDeepColor: Color
 
     /// The resolved configuration for this build. Loaded once.
     static let current = load()
@@ -32,19 +34,20 @@ struct AppConfig {
         let name = bundle.object(forInfoDictionaryKey: "BrandDisplayName") as? String ?? "Beacon"
         let hex = bundle.object(forInfoDictionaryKey: "BrandAccentHex") as? String ?? "1D64E8"
         return AppConfig(apiBaseURL: url, googleClientID: google,
-                         brandDisplayName: name, accentColor: Color(hex: hex))
+                         brandDisplayName: name, accentColor: Color(hex: hex),
+                         accentDeepColor: Color(hex: hex, scale: 0.62))
     }
 }
 
 extension Color {
-    /// Builds a Color from a 6-digit hex string (no leading `#`).
-    init(hex: String) {
+    /// Builds a Color from a 6-digit hex string (no leading `#`); `scale` < 1 darkens it.
+    init(hex: String, scale: Double = 1) {
         var value: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&value)
         self.init(.sRGB,
-                  red: Double((value >> 16) & 0xFF) / 255,
-                  green: Double((value >> 8) & 0xFF) / 255,
-                  blue: Double(value & 0xFF) / 255,
+                  red: Double((value >> 16) & 0xFF) / 255 * scale,
+                  green: Double((value >> 8) & 0xFF) / 255 * scale,
+                  blue: Double(value & 0xFF) / 255 * scale,
                   opacity: 1)
     }
 }

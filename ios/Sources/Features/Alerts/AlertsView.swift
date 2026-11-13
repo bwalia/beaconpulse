@@ -28,15 +28,17 @@ struct AlertsView: View {
     var body: some View {
         LoadableView(state: store?.state ?? .loading, retry: { Task { await store?.load() } }) { alerts in
             if alerts.isEmpty {
-                ContentUnavailableView("All clear", systemImage: "checkmark.seal",
-                                       description: Text("No active alerts right now."))
+                AllClearView()
             } else {
                 List(alerts) { alert in
-                    NavigationLink(value: alert.monitorId) {
+                    ZStack {
+                        NavigationLink(value: alert.monitorId) { EmptyView() }.opacity(0)
                         AlertRow(alert: alert)
                     }
+                    .cardRow()
                 }
                 .listStyle(.plain)
+                .canvas()
                 .refreshable { await store?.load() }
             }
         }
@@ -51,46 +53,83 @@ struct AlertRow: View {
     let alert: ActiveAlert
 
     var body: some View {
+        let color = SeverityIndicator.color(alert.severity)
         HStack(spacing: 12) {
-            SeverityIndicator(severity: alert.severity)
-            VStack(alignment: .leading, spacing: 2) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: 4)
+                .frame(maxHeight: .infinity)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(alert.monitorName).font(.headline)
-                Text(alert.name).font(.subheadline).foregroundStyle(.secondary)
+                Text(alert.name).font(.subheadline).foregroundStyle(Theme.muted)
                 if let since = alert.since {
-                    Text("Firing \(since.formatted(.relative(presentation: .named)))")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Label("Firing \(since.formatted(.relative(presentation: .named)))", systemImage: "clock")
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
                 }
             }
-            Spacer()
-            if alert.inMaintenance {
-                Image(systemName: "wrench.and.screwdriver.fill")
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel("Under maintenance")
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 6) {
+                SeverityIndicator(severity: alert.severity)
+                if alert.inMaintenance {
+                    Label("Maintenance", systemImage: "wrench.and.screwdriver.fill")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.muted)
+                        .accessibilityLabel("Under maintenance")
+                }
             }
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Theme.muted)
         }
-        .padding(.vertical, 4)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
     }
 }
 
-/// Severity as an icon + colour, so criticality reads at a glance.
+/// Severity as a tinted pill, so criticality reads at a glance.
 struct SeverityIndicator: View {
     let severity: String
 
     var body: some View {
-        Image(systemName: symbol)
+        let color = Self.color(severity)
+        Label(severity.capitalized, systemImage: severity.lowercased() == "critical"
+              ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill")
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
             .foregroundStyle(color)
-            .accessibilityLabel(severity)
+            .background(color.opacity(0.13), in: .capsule)
+            .accessibilityLabel("Severity: \(severity)")
     }
 
-    private var color: Color {
+    static func color(_ severity: String) -> Color {
         switch severity.lowercased() {
-        case "critical": return .red
-        case "warning": return .orange
-        default: return .yellow
+        case "critical": Theme.down
+        case "warning": Theme.degraded
+        default: Color(hex: "EAB308") // yellow-500
         }
     }
+}
 
-    private var symbol: String {
-        severity.lowercased() == "critical" ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill"
+/// No firing alerts: said plainly, with the reassurance that matters.
+struct AllClearView: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(Theme.up)
+                .frame(width: 88, height: 88)
+                .background(Theme.up.opacity(0.12), in: .circle)
+            Text("All clear").font(.title3.bold())
+            Text("No active alerts right now. You’ll get a notification the moment something goes wrong.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 320)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.canvas.ignoresSafeArea())
     }
 }

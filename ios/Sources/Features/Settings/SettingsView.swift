@@ -29,9 +29,27 @@ struct SettingsView: View {
 
             if let user = session.user {
                 Section("Account") {
-                    LabeledContent("Name", value: user.name)
-                    LabeledContent("Email", value: user.email)
-                    LabeledContent("Role", value: user.role.capitalized)
+                    HStack(spacing: 14) {
+                        Text(Self.initials(user.name))
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(width: 46, height: 46)
+                            .background(LinearGradient(colors: [Theme.accent, Theme.accentDeep],
+                                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                                        in: .circle)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(user.name).font(.headline)
+                            Text(user.email).font(.subheadline).foregroundStyle(Theme.muted)
+                        }
+                        Spacer()
+                        Text(user.role.capitalized)
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .foregroundStyle(Theme.accent)
+                            .background(Theme.accent.opacity(0.13), in: .capsule)
+                    }
+                    .padding(.vertical, 4)
+                    .accessibilityElement(children: .combine)
                 }
             }
 
@@ -65,14 +83,25 @@ struct SettingsView: View {
                 }
             }
         }
+        .canvas()
         .task { await push.refreshAuthorizationStatus() }
+    }
+
+    /// "Jane Doe" → "JD", for the account avatar.
+    static func initials(_ name: String) -> String {
+        let letters = name.split(separator: " ").prefix(2).compactMap(\.first)
+        return letters.isEmpty ? "?" : String(letters).uppercased()
     }
 
     @ViewBuilder
     private var pushStatusRow: some View {
         switch push.authorizationStatus {
         case .authorized, .provisional, .ephemeral:
-            LabeledContent("Push notifications") { Text("On").foregroundStyle(.secondary) }
+            LabeledContent {
+                Label("On", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.up)
+            } label: {
+                Label("Push notifications", systemImage: "bell.and.waves.left.and.right")
+            }
         case .denied:
             Button {
                 if let url = Platform.notificationSettingsURL { openURL(url) }
