@@ -10,4 +10,5 @@ API_BASE_URL = https:/$()/beaconpulse.net
 GOOGLE_CLIENT_ID = REPLACE_WITH_GOOGLE_IOS_CLIENT_ID
 GOOGLE_REVERSED_CLIENT_ID = REPLACE_WITH_REVERSED_GOOGLE_IOS_CLIENT_ID
 
+// Keep Assets.xcassets/AccentColor in step (macOS sidebar selection).
 BRAND_ACCENT_HEX = 0E8B9A

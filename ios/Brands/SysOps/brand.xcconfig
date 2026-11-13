@@ -18,5 +18,6 @@ API_BASE_URL = https:/$()/sysops247.com
 GOOGLE_CLIENT_ID = 325734158501-9aic9mkka0n3hmdhfm4l4kbfklsd6esm.apps.googleusercontent.com
 GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.325734158501-9aic9mkka0n3hmdhfm4l4kbfklsd6esm
 
-// Brand accent colour (hex, no #). Drives the app tint via AppConfig.
+// Brand accent colour (hex, no #). Drives the app tint via AppConfig. Keep
+// Assets.xcassets/AccentColor in step: macOS uses it for the sidebar selection.
 BRAND_ACCENT_HEX = 059669

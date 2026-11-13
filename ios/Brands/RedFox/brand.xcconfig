@@ -20,4 +20,5 @@ GOOGLE_CLIENT_ID = REPLACE_WITH_GOOGLE_IOS_CLIENT_ID
 GOOGLE_REVERSED_CLIENT_ID = REPLACE_WITH_REVERSED_GOOGLE_IOS_CLIENT_ID
 
 // Brand accent colour (hex, no #). Fox orange — matches frontend/src/brand/redfox.ts.
+// Keep Assets.xcassets/AccentColor in step (macOS sidebar selection).
 BRAND_ACCENT_HEX = EA580C
