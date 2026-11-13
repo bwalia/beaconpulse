@@ -10,6 +10,7 @@ name: Beacon
 options:
   deploymentTarget:
     iOS: "17.0"
+    macOS: "14.0"
   developmentLanguage: en
   createIntermediateGroups: true
   groupSortPosition: top
@@ -55,6 +56,38 @@ targetTemplates:
       testTargets:
         - BeaconTests
 
+  # The Mac app: the same Sources/ and brand folder, a Mac Info.plist shared by all
+  # brands (Mac/Info.plist, values from brand.xcconfig), and the same bundle id as
+  # iOS, so App Store Connect sells it as one Universal Purchase app and APNs push
+  # reaches it through the same `ios` device path.
+  BrandMacApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+      - path: Brands/${brand}/Assets.xcassets
+    configFiles:
+      Debug: Brands/${brand}/brand.xcconfig
+      Release: Brands/${brand}/brand.xcconfig
+    settings:
+      base:
+        INFOPLIST_FILE: Mac/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_HARDENED_RUNTIME: "YES"
+    entitlements:
+      path: Brands/${brand}/${brand}-macOS.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.developer.aps-environment: development # App Store export switches it to production
+        com.apple.developer.applesignin:
+          - Default
+        keychain-access-groups: # GoogleSignIn keeps its session in this shared group on macOS
+          - $(AppIdentifierPrefix)com.google.GIDSignIn
+    dependencies:
+      - package: GoogleSignIn
+        product: GoogleSignIn
+
 targets:
   SysOps:
     templates: [BrandApp]
@@ -68,6 +101,10 @@ targets:
     templates: [BrandApp]
     templateAttributes:
       brand: RedFox
+  SysOps-macOS:
+    templates: [BrandMacApp]
+    templateAttributes:
+      brand: SysOps
 
   BeaconTests:
     type: bundle.unit-test

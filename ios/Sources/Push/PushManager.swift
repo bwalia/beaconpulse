@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import UIKit
 import UserNotifications
 
 /// Owns the push lifecycle on the device side: ask permission, register with
@@ -36,7 +35,7 @@ final class PushManager: NSObject {
         let granted = (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) ?? false
         authorizationStatus = await center.notificationSettings().authorizationStatus
         guard granted else { return }
-        UIApplication.shared.registerForRemoteNotifications()
+        Platform.registerForRemoteNotifications()
     }
 
     /// Re-reads the current permission (e.g. when Settings appears, in case the

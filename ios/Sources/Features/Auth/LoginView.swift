@@ -1,6 +1,9 @@
 import AuthenticationServices
 import GoogleSignIn
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// Sign-in screen: email/password, Sign in with Apple, and (when the brand ships
 /// a Google client id) Continue with Google. Every path lands on the same
@@ -112,7 +115,11 @@ struct LoginView: View {
     // MARK: - Actions
 
     private func signInWithGoogle() async {
+        #if os(iOS)
         guard let presenter = UIApplication.shared.topViewController else { return }
+        #else
+        guard let presenter = NSApp.keyWindow else { return }
+        #endif
         do {
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: presenter)
             guard let idToken = result.user.idToken?.tokenString else {

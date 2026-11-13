@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import UserNotifications
 
 /// The Settings tab: manage alert delivery (channels, maintenance), see push
@@ -76,7 +75,7 @@ struct SettingsView: View {
             LabeledContent("Push notifications") { Text("On").foregroundStyle(.secondary) }
         case .denied:
             Button {
-                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                if let url = Platform.notificationSettingsURL { openURL(url) }
             } label: {
                 HStack {
                     Label("Push notifications", systemImage: "bell.slash")

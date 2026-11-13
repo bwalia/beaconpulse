@@ -1,3 +1,4 @@
+#if os(iOS)
 import UIKit
 
 extension UIApplication {
@@ -11,3 +12,4 @@ extension UIApplication {
         return top
     }
 }
+#endif
