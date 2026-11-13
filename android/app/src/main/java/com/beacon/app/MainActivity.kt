@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -40,38 +41,46 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Material 3 in the brand's colour, light and dark. */
+/**
+ * Material 3 dressed in the app's palette (see Theme.kt): the flavor's accent on slate
+ * surfaces, light and dark. Screens read the palette through [Theme].
+ */
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
-    val brand = colorResource(R.color.brand)
-    val scheme = if (isSystemInDarkTheme()) {
-        darkColorScheme(
-            primary = lerp(brand, Color.White, 0.35f),
-            onPrimary = Color(0xFF0B1B3A),
-            primaryContainer = lerp(brand, Color(0xFF0F172A), 0.55f),
-            onPrimaryContainer = lerp(brand, Color.White, 0.8f),
-            background = Color(0xFF0F172A),
-            surface = Color(0xFF0F172A),
-            surfaceContainerLowest = Color(0xFF0B1222),
-            surfaceContainerLow = Color(0xFF131C30),
-            surfaceContainer = Color(0xFF172036),
-            surfaceContainerHigh = Color(0xFF1B253C),
-            surfaceContainerHighest = Color(0xFF1E293B),
-        )
-    } else {
-        lightColorScheme(
-            primary = brand,
-            onPrimary = Color.White,
-            primaryContainer = lerp(brand, Color.White, 0.86f),
-            onPrimaryContainer = lerp(brand, Color.Black, 0.45f),
-            background = Color.White,
-            surface = Color.White,
-            surfaceContainerLowest = Color.White,
-            surfaceContainerLow = Color(0xFFF8FAFC),
-            surfaceContainer = Color(0xFFF1F5F9),
-            surfaceContainerHigh = Color(0xFFEDF1F6),
-            surfaceContainerHighest = Color(0xFFF1F5F9),
-        )
+    val dark = isSystemInDarkTheme()
+    val p = palette(colorResource(R.color.brand), dark)
+    val tint = lerp(p.card, p.accent, if (dark) 0.22f else 0.12f)
+    val base = if (dark) darkColorScheme() else lightColorScheme()
+    val scheme = base.copy(
+        primary = p.accent,
+        onPrimary = Color.White,
+        primaryContainer = tint,
+        onPrimaryContainer = if (dark) lerp(p.accent, Color.White, 0.55f) else p.accentDeep,
+        secondary = p.accent,
+        onSecondary = Color.White,
+        secondaryContainer = tint,
+        onSecondaryContainer = if (dark) lerp(p.accent, Color.White, 0.55f) else p.accentDeep,
+        tertiary = p.accentDeep,
+        background = p.canvas,
+        onBackground = p.text,
+        surface = p.card,
+        onSurface = p.text,
+        surfaceVariant = p.subtle,
+        onSurfaceVariant = p.muted,
+        surfaceTint = Color.Transparent,
+        surfaceBright = p.card,
+        surfaceDim = p.canvas,
+        surfaceContainerLowest = p.card,
+        surfaceContainerLow = p.card,
+        surfaceContainer = p.card,
+        surfaceContainerHigh = p.card,
+        surfaceContainerHighest = p.subtle,
+        outline = if (dark) Color(0xFF334155) else Color(0xFFCBD5E1),
+        outlineVariant = p.border,
+        error = Down,
+        onError = Color.White,
+    )
+    CompositionLocalProvider(LocalPalette provides p) {
+        MaterialTheme(colorScheme = scheme, content = content)
     }
-    MaterialTheme(colorScheme = scheme, content = content)
 }

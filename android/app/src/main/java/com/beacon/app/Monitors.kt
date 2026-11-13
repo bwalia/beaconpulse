@@ -1,5 +1,7 @@
 package com.beacon.app
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,26 +12,32 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Balance
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.MonitorHeart
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.outlined.Spa
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.VerifiedUser
+import androidx.compose.material.icons.outlined.WifiTethering
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,11 +51,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -80,50 +91,37 @@ fun MonitorsScreen(projectId: String?, title: String, onBack: (() -> Unit)?, ope
         }
     }
 
-    Screen(title, onBack, fab = {
-        FloatingActionButton(onClick = { creating = true }) { Icon(Icons.Default.Add, "Add monitor") }
-    }) { padding ->
+    Screen(title, onBack, fab = { AddFab("Add monitor") { creating = true } }) { padding ->
         Column(Modifier.padding(padding)) {
             LoadableContent(loader) { monitors ->
                 if (monitors.isEmpty()) {
-                    Message(Icons.Outlined.MonitorHeart, "No monitors yet", "Add one to start checking your sites and servers.", "Add monitor") { creating = true }
+                    Message(Icons.Outlined.WifiTethering, "No monitors yet", "Add one to start checking your sites and servers.", "Add monitor") { creating = true }
                 } else {
                     val shown = monitors.filter { search.isBlank() || it.name.contains(search.trim(), true) || it.target.contains(search.trim(), true) }
-                    LazyColumn(Modifier.fillMaxSize()) {
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 0.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         item {
-                            OutlinedTextField(
-                                value = search,
-                                onValueChange = { search = it },
-                                placeholder = { Text("Search monitors") },
-                                leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            Input(
+                                search, { search = it },
+                                placeholder = "Search monitors",
+                                leading = Icons.Outlined.Search,
+                                keyboard = KeyboardOptions(imeAction = ImeAction.Search, autoCorrectEnabled = false),
+                                modifier = Modifier.padding(bottom = 4.dp),
                             )
                         }
                         if (shown.isEmpty()) {
-                            item { Text("No monitors match “${search.trim()}”.", Modifier.padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            item { Text("No monitors match “${search.trim()}”.", Modifier.padding(24.dp), color = Theme.muted) }
                         }
                         items(shown, key = { it.id }) { m ->
-                            ListItem(
-                                modifier = Modifier.clickable { openMonitor(m.id) },
-                                leadingContent = { StatusDot(if (m.enabled) m.lastStatus else "paused", 12) },
-                                headlineContent = { Text(m.name, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                supportingContent = { Text(m.target.ifEmpty { "Heartbeat" }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                trailingContent = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(m.type.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        OverflowMenu(
-                                            MenuItem(if (m.enabled) "Pause" else "Resume", if (m.enabled) Icons.Outlined.Pause else Icons.Outlined.PlayArrow) {
-                                                act("Couldn’t update the monitor.") { setEnabled(m.id, !m.enabled) }
-                                            },
-                                            MenuItem("Delete", Icons.Outlined.Delete, destructive = true) { deleting = m },
-                                        )
-                                    }
-                                },
-                            )
-                            HorizontalDivider()
+                            MonitorRow(m, onClick = { openMonitor(m.id) }) {
+                                OverflowMenu(
+                                    MenuItem(if (m.enabled) "Pause" else "Resume", if (m.enabled) Icons.Outlined.Pause else Icons.Outlined.PlayArrow) {
+                                        act("Couldn’t update the monitor.") { setEnabled(m.id, !m.enabled) }
+                                    },
+                                    MenuItem("Delete", Icons.Outlined.Delete, destructive = true) { deleting = m },
+                                )
+                            }
                         }
-                        item { Spacer(Modifier.height(88.dp)) } // clear of the + button
+                        item { FabClearance() }
                     }
                 }
             }
@@ -137,6 +135,29 @@ fun MonitorsScreen(projectId: String?, title: String, onBack: (() -> Unit)?, ope
             onConfirm = { act("Couldn’t delete the monitor.") { deleteMonitor(m.id) } },
             onDismiss = { deleting = null },
         )
+    }
+}
+
+/** A monitor as a card: its type's icon in its status colour, name and target, status and type badges. */
+@Composable
+private fun MonitorRow(m: Monitor, onClick: () -> Unit, menu: @Composable () -> Unit) {
+    val color = statusColor(m.status)
+    Row(
+        Modifier.fillMaxWidth().card().clickable(onClick = onClick).padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconTile(monitorTypeIcon(m.type), color)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(m.name, style = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(m.target.ifEmpty { "Heartbeat" }, style = monoCaption, color = Theme.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            StatusBadge(m.status)
+            TypeBadge(m.type)
+        }
+        menu()
     }
 }
 
@@ -174,47 +195,100 @@ fun MonitorDetailScreen(id: String, onBack: () -> Unit) {
         Column(Modifier.padding(padding)) {
             LoadableContent(loader) { (m, metrics) ->
                 val kind = m.kind
-                LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
                     item {
-                        Panel {
-                            val status = if (m.enabled) m.lastStatus else "paused"
-                            InfoRow("Status", status.replaceFirstChar { it.uppercase() }) { StatusDot(status); Spacer(Modifier.width(8.dp)) }
-                            if (kind != MonitorKind.HEARTBEAT) InfoRow(if (kind == MonitorKind.GITHUB_ACTIONS) "Repository" else "Target", m.target)
-                            InfoRow("Type", m.type.uppercase())
-                            InfoRow("Enabled", if (m.enabled) "Yes" else "No")
-                            if (kind != MonitorKind.GITHUB_ACTIONS) InfoRow("Interval", duration(m.intervalSeconds))
-                            if (kind?.isProbed != false) InfoRow("Timeout", "${m.timeoutSeconds}s")
-                            m.lastCheckedAt?.let { InfoRow("Last checked", relative(it)) }
+                        Card(spacing = 10.dp) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                StatusBadge(m.status)
+                                TypeBadge(m.type)
+                            }
+                            Text(m.name, style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.2).sp))
+                            if (kind != MonitorKind.HEARTBEAT && m.target.isNotEmpty()) {
+                                SelectionContainer {
+                                    Text(m.target, style = TextStyle(fontSize = 14.sp, fontFamily = FontFamily.Monospace), color = Theme.muted)
+                                }
+                            }
+                            m.lastCheckedAt?.let { MetaLine(Icons.Outlined.Schedule, "Checked ${relative(it)}") }
+                        }
+                    }
+                    if (metrics != null) {
+                        item {
+                            val tiles = buildList<@Composable () -> Unit> {
+                                add {
+                                    StatTile(
+                                        "Uptime · 24h", "%.2f%%".format(Locale.US, metrics.uptimePercent),
+                                        tint = uptimeColor(metrics.uptimePercent), icon = Icons.Outlined.VerifiedUser,
+                                    )
+                                }
+                                metrics.responseMsAvg?.let { avg ->
+                                    add { StatTile("Avg response", "%.0f ms".format(Locale.US, avg), icon = Icons.Outlined.Speed) }
+                                }
+                                // Push-based monitors aren't probed: GitHub Actions has no interval.
+                                if (kind != MonitorKind.GITHUB_ACTIONS) {
+                                    add { StatTile("Check every", duration(m.intervalSeconds), icon = Icons.Outlined.Timer) }
+                                }
+                            }
+                            AdaptiveGrid(tiles, minWidth = 150.dp, stretchLastRow = true) { it() }
+                        }
+                        val series = metrics.responseMs.orEmpty()
+                        if (series.isNotEmpty()) {
+                            item {
+                                Card(spacing = 12.dp) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Response time", style = cardTitle, modifier = Modifier.weight(1f))
+                                        Eyebrow("Last 24 hours")
+                                    }
+                                    TrendChart(series, Theme.accent, height = 190.dp) { "%.0f ms".format(Locale.US, it) }
+                                }
+                            }
                         }
                     }
                     if (kind == MonitorKind.HEARTBEAT && m.pingUrl != null) {
                         // Stored relative ("/api/v1/ping/<token>"): show the full URL the job should call.
                         val full = if (m.pingUrl.startsWith("http")) m.pingUrl else BuildConfig.API_BASE_URL.trimEnd('/') + m.pingUrl
                         item {
-                            Panel("Heartbeat") {
-                                Text("Have your job call this URL on every run.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Card(spacing = 10.dp) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(full, Modifier.weight(1f), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-                                    IconButton(onClick = {
-                                        clipboard.setText(AnnotatedString(full))
-                                        scope.launch { snack.showSnackbar("Ping URL copied") }
-                                    }) { Icon(Icons.Outlined.ContentCopy, "Copy ping URL") }
+                                    Text("Heartbeat", style = cardTitle, modifier = Modifier.weight(1f))
+                                    OutlinedButton(
+                                        onClick = {
+                                            clipboard.setText(AnnotatedString(full))
+                                            scope.launch { snack.showSnackbar("Ping URL copied") }
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, Theme.border),
+                                        contentPadding = PaddingValues(horizontal = 10.dp),
+                                        modifier = Modifier.height(32.dp),
+                                    ) {
+                                        Icon(Icons.Outlined.ContentCopy, null, Modifier.size(15.dp), tint = Theme.accent)
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Copy URL", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Theme.accent)
+                                    }
                                 }
-                                InfoRow("Last ping", m.lastPingAt?.let(::relative) ?: "Never")
+                                Text("Have your job call this URL on every run.", style = MaterialTheme.typography.bodySmall, color = Theme.muted)
+                                SelectionContainer {
+                                    Text(full, Modifier.fillMaxWidth().background(Theme.subtle, RoundedCornerShape(8.dp)).padding(10.dp), style = monoCaption)
+                                }
+                                MetaLine(Icons.Outlined.GraphicEq, "Last ping ${m.lastPingAt?.let(::relative) ?: "never"}")
                             }
                         }
                     }
-                    if (metrics != null) {
-                        item {
-                            Panel("Last 24 hours") {
-                                InfoRow("Uptime", "%.2f%%".format(Locale.US, metrics.uptimePercent))
-                                metrics.responseMsAvg?.let { InfoRow("Avg response", "%.0f ms".format(Locale.US, it)) }
-                            }
+                    item {
+                        val rows = buildList {
+                            add("Type" to m.type.uppercase())
+                            add("Enabled" to if (m.enabled) "Yes" else "No — paused")
+                            // Without metrics there are no tiles, so the interval shows here.
+                            if (metrics == null && kind != MonitorKind.GITHUB_ACTIONS) add("Check every" to duration(m.intervalSeconds))
+                            if (kind?.isProbed != false) add("Timeout" to "${m.timeoutSeconds}s")
                         }
-                        val series = metrics.responseMs.orEmpty()
-                        if (series.isNotEmpty()) {
-                            item {
-                                Panel("Response time") { LineChart(series, MaterialTheme.colorScheme.primary, filled = false) { "%.0f ms".format(Locale.US, it) } }
+                        Column(Modifier.fillMaxWidth().card()) {
+                            rows.forEachIndexed { i, (label, value) ->
+                                if (i > 0) RowDivider(Modifier.padding(start = 16.dp))
+                                InfoRow(label, value, Modifier.padding(horizontal = 16.dp, vertical = 13.dp))
                             }
                         }
                     }
@@ -246,6 +320,12 @@ private val graces = listOf(0, 30, 60, 120, 300, 600, 1800, 3600, 21600, 86400)
 /** Presets plus whatever is set now (it may have come from the web), as value to label. */
 private fun choices(presets: List<Int>, current: Int, min: Int = 0) =
     (presets.filter { it >= min } + current).distinct().sorted().map { it to duration(it) }
+
+private fun sensitivityHint(sensitivity: String) = when (sensitivity) {
+    "immediate" -> "Alert on the first failed check."
+    "relaxed" -> "Alert only on prolonged outages (about 5 minutes)."
+    else -> "Alert on a sustained failure (about 2 checks), ignoring one-off blips."
+}
 
 /**
  * Create or edit a monitor, with the web form's per-type fields. Editing sends back the
@@ -348,6 +428,8 @@ private fun MonitorForm(existing: Monitor?, defaultProject: String?, onDismiss: 
         }
     }
 
+    val noCaps = KeyboardOptions(autoCorrectEnabled = false)
+
     FormDialog(
         title = if (creating) "New monitor" else "Edit monitor",
         onDismiss = onDismiss,
@@ -356,85 +438,112 @@ private fun MonitorForm(existing: Monitor?, defaultProject: String?, onDismiss: 
         error = error,
         onSave = ::save,
     ) {
-        SectionTitle("Details")
-        Field("Name", name, { name = it })
-        if (creating) {
-            Dropdown("Type", MonitorKind.creatable.map { it.wire to it.wire.uppercase() }, type, { type = it })
-            if (projects.isEmpty()) {
-                Text("Create a project first: monitors live in projects.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                Dropdown("Project", projects.map { it.id to it.name }, projectId, { projectId = it })
+        FormCard("Details") {
+            Field("Name") { Input(name, { name = it }, placeholder = "e.g. Marketing site") }
+            Field("Type") {
+                if (creating) {
+                    ChoiceChips(
+                        MonitorKind.creatable.map { Choice(it.wire, it.wire.uppercase(), monitorTypeIcon(it.wire)) },
+                        type, { type = it }, minWidth = 104.dp,
+                    )
+                } else {
+                    ReadOnlyValue(type.uppercase())
+                }
             }
-        } else {
-            InfoRow("Type", type.uppercase())
-        }
-        if (kind.needsTarget) {
-            Field(
-                if (kind == MonitorKind.GITHUB_ACTIONS) "Repository" else "Target", target, { target = it },
-                placeholder = kind.targetHint,
-                keyboard = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
-            )
+            if (creating) {
+                Field("Project", hint = if (projects.isEmpty()) "Create a project first: monitors live in projects." else null) {
+                    MenuInput(projects.map { it.id to it.name }, projectId, { projectId = it }, enabled = projects.isNotEmpty())
+                }
+            }
+            if (kind.needsTarget) {
+                Field(if (kind == MonitorKind.GITHUB_ACTIONS) "Repository" else "Target") {
+                    Input(
+                        target, { target = it },
+                        placeholder = kind.targetHint,
+                        mono = true,
+                        keyboard = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
+                    )
+                }
+            }
         }
 
-        SectionTitle("Checks")
-        if (kind != MonitorKind.GITHUB_ACTIONS) {
-            Dropdown("Check every", choices(intervals, interval, minInterval), interval, { interval = it })
-            if (kind.isProbed) Dropdown("Timeout", choices(timeouts, timeout), timeout, { timeout = it })
-            if (kind == MonitorKind.HEARTBEAT) {
-                // The server sets grace only at creation.
-                if (creating) Dropdown("Grace period", choices(graces, grace), grace, { grace = it }) else InfoRow("Grace period", duration(grace))
+        FormCard(
+            "Checks",
+            footer = if (kind != MonitorKind.GITHUB_ACTIONS && minInterval > 10) "Your plan checks at most every ${duration(minInterval)}." else null,
+        ) {
+            if (kind != MonitorKind.GITHUB_ACTIONS) {
+                StepperRow("Check every", choices(intervals, interval, minInterval), interval, { interval = it })
+                if (kind.isProbed) StepperRow("Timeout", choices(timeouts, timeout), timeout, { timeout = it })
+                if (kind == MonitorKind.HEARTBEAT) {
+                    // The server sets grace only at creation.
+                    if (creating) StepperRow("Grace period", choices(graces, grace), grace, { grace = it })
+                    else Field("Grace period") { ReadOnlyValue(duration(grace)) }
+                }
+                Field("Alert sensitivity", hint = sensitivityHint(sensitivity)) {
+                    ChoiceChips(
+                        listOf(
+                            Choice("immediate", "Immediate", Icons.Outlined.Bolt),
+                            Choice("balanced", "Balanced", Icons.Outlined.Balance),
+                            Choice("relaxed", "Relaxed", Icons.Outlined.Spa),
+                        ),
+                        sensitivity, { sensitivity = it }, minWidth = 104.dp,
+                    )
+                }
             }
-            Dropdown("Alert sensitivity", listOf("immediate" to "Immediate", "balanced" to "Balanced", "relaxed" to "Relaxed"), sensitivity, { sensitivity = it })
-            if (minInterval > 10) {
-                Text("Your plan checks at most every ${duration(minInterval)}.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            SwitchRow("Enabled", enabled, { enabled = it }, "Run checks and send alerts")
         }
-        SwitchRow("Enabled", enabled, { enabled = it })
-        if (atLimit) {
-            Text(
-                "You’ve reached your plan’s limit of ${usage?.monitorsLimit} monitors. Delete one to add another.",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error,
-            )
-        }
+
+        if (atLimit) ErrorBanner("You’ve reached your plan’s limit of ${usage?.monitorsLimit} monitors. Delete one to add another.")
 
         if (kind.takesRequestSettings) {
-            SectionTitle("Request")
-            Dropdown("Method", listOf("GET", "POST", "HEAD", "PUT", "PATCH", "DELETE").map { it to it }, method, { method = it })
-            Field("Expected status codes", codes, { codes = it }, placeholder = "e.g. 200, 204 (blank = any 2xx/3xx)")
-            SwitchRow("Follow redirects", follow, { follow = it })
-            SwitchRow("Skip TLS verification", skipTls, { skipTls = it })
-            Field("Request body (for POST/PUT/PATCH)", body, { body = it }, singleLine = false, mono = true)
+            FormCard("Request") {
+                Field("Method") {
+                    ChoiceChips(listOf("GET", "POST", "HEAD", "PUT", "PATCH", "DELETE").map { Choice(it, it) }, method, { method = it }, minWidth = 76.dp)
+                }
+                Field("Expected status codes", hint = "Comma-separated. Blank accepts any 2xx/3xx.") {
+                    Input(codes, { codes = it }, placeholder = "200, 204", keyboard = noCaps)
+                }
+                SwitchRow("Follow redirects", follow, { follow = it })
+                SwitchRow("Skip TLS verification", skipTls, { skipTls = it }, "Only for self-signed certificates")
+                Field("Request body", hint = "Sent with POST, PUT and PATCH.") {
+                    Input(body, { body = it }, placeholder = "{ }", singleLine = false, minLines = 2, mono = true, keyboard = noCaps)
+                }
+            }
 
-            SectionTitle("Headers")
-            Field("Name: value, one per line", headers, { headers = it }, singleLine = false, mono = true,
-                keyboard = KeyboardOptions(autoCorrectEnabled = false))
-            Text(
-                "Use for auth, e.g. Authorization: Bearer <token>. Saved values are encrypted and shown as ********: leave a line as it is to keep its value, or delete the line to remove the header.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            FormCard(
+                "Headers",
+                footer = "Use for auth, e.g. Authorization: Bearer <token>. Saved values are encrypted and shown as ********: leave a line as it is to keep its value, or delete the line to remove the header.",
+            ) {
+                Input(headers, { headers = it }, placeholder = "Name: value, one per line", singleLine = false, minLines = 3, mono = true, keyboard = noCaps)
+            }
 
-            SectionTitle("Response")
-            Field("Body must contain", mustContain, { mustContain = it })
-            Field("Body must NOT contain", mustNotContain, { mustNotContain = it })
-            Field("Slow-response alert (ms)", slowMs, { slowMs = it.filter(Char::isDigit) }, placeholder = "Off",
-                keyboard = KeyboardOptions(keyboardType = KeyboardType.Number))
-            Field("SSL expiry warning (days)", sslDays, { sslDays = it.filter(Char::isDigit) }, placeholder = "30",
-                keyboard = KeyboardOptions(keyboardType = KeyboardType.Number))
+            FormCard("Response") {
+                Field("Body must contain") { Input(mustContain, { mustContain = it }, placeholder = "Optional") }
+                Field("Body must not contain") { Input(mustNotContain, { mustNotContain = it }, placeholder = "Optional") }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Field("Slow response (ms)", modifier = Modifier.weight(1f)) {
+                        Input(slowMs, { slowMs = it.filter(Char::isDigit) }, placeholder = "Off", keyboard = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    }
+                    Field("SSL expiry (days)", modifier = Modifier.weight(1f)) {
+                        Input(sslDays, { sslDays = it.filter(Char::isDigit) }, placeholder = "30", keyboard = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    }
+                }
+            }
         }
 
         if (kind == MonitorKind.DNS) {
-            SectionTitle("DNS")
-            Dropdown("Record type", listOf("A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA").map { it to it }, dnsType, { dnsType = it })
+            FormCard("DNS") {
+                Field("Record type") {
+                    ChoiceChips(listOf("A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA").map { Choice(it, it) }, dnsType, { dnsType = it }, minWidth = 70.dp)
+                }
+            }
         }
 
         if (kind == MonitorKind.GITHUB_ACTIONS) {
-            SectionTitle("GitHub Actions")
-            Field("Workflow filter (optional)", workflow, { workflow = it })
-            SwitchRow("Also notify on every successful run", notifySuccess, { notifySuccess = it })
-            Text(
-                "Leave the filter blank to alert on any workflow. Rotate the ingest token on the web.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            FormCard("GitHub Actions", footer = "Leave the filter blank to alert on any workflow. Rotate the ingest token on the web.") {
+                Field("Workflow filter") { Input(workflow, { workflow = it }, placeholder = "Optional, e.g. deploy.yml", keyboard = noCaps) }
+                SwitchRow("Notify on success", notifySuccess, { notifySuccess = it }, "Also send a message for every successful run")
+            }
         }
     }
 }
