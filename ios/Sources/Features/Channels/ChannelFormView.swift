@@ -34,9 +34,6 @@ struct ChannelFormView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
-    /// The types the app can create (those with a working notifier server-side).
-    private static let creatableTypes = ["telegram", "slack", "email", "webhook"]
-
     init(mode: Mode, onSaved: @escaping () -> Void) {
         self.mode = mode
         self.onSaved = onSaved
@@ -61,24 +58,24 @@ struct ChannelFormView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Name", text: $name)
-                    if isCreate {
-                        Picker("Type", selection: $type) {
-                            ForEach(Self.creatableTypes, id: \.self) { Text($0.capitalized).tag($0) }
-                        }
-                    } else {
-                        LabeledContent("Type", value: type.capitalized)
+            FormScreen {
+                FormCard("Channel") {
+                    Field("Name") {
+                        TextField("e.g. On-call team", text: $name).inputStyle()
                     }
-                    Toggle("Enabled", isOn: $enabled)
+                    Field("Type") {
+                        if isCreate {
+                            ChoiceChips(choices: Self.typeChoices, selection: $type, minWidth: 110)
+                        } else {
+                            ReadOnlyValue(type.capitalized)
+                        }
+                    }
+                    SwitchRow(title: "Enabled", subtitle: "Send alerts to this channel", isOn: $enabled)
                 }
 
                 typeFields
 
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
-                }
+                if let errorMessage { ErrorBanner(errorMessage) }
             }
             .navigationTitle(isCreate ? "New Channel" : "Edit Channel")
             .navigationBarTitleDisplayMode(.inline)
@@ -92,40 +89,71 @@ struct ChannelFormView: View {
         }
     }
 
+    /// The types the app can create (those with a working notifier server-side).
+    private static let typeChoices = [
+        Choice("telegram", "Telegram", icon: "paperplane.fill"),
+        Choice("slack", "Slack", icon: "number"),
+        Choice("email", "Email", icon: "envelope.fill"),
+        Choice("webhook", "Webhook", icon: "link"),
+    ]
+
     @ViewBuilder
     private var typeFields: some View {
         switch type {
         case "telegram":
-            Section("Telegram") {
-                TextField("Chat ID", text: $chatID).keyboardType(.numbersAndPunctuation)
-                secretField("Bot token")
+            FormCard("Telegram", footer: "Message @BotFather to create a bot, then add it to your chat or group.") {
+                Field("Chat ID", hint: "A number like 123456789, or -100… for a group.") {
+                    TextField("123456789", text: $chatID).keyboardType(.numbersAndPunctuation).inputStyle()
+                }
+                Field("Bot token") { secretField("123456:ABC-DEF…") }
             }
         case "slack":
-            Section("Slack") {
-                secretField("Incoming webhook URL")
+            FormCard("Slack") {
+                Field("Incoming webhook URL", hint: "From your Slack app’s Incoming Webhooks page.") {
+                    secretField("https://hooks.slack.com/services/…")
+                }
             }
         case "email":
-            Section("SMTP") {
-                TextField("Host", text: $emailHost).textInputAutocapitalization(.never).autocorrectionDisabled()
-                TextField("Port", text: $emailPort).keyboardType(.numberPad)
-                Picker("Security", selection: $emailSecurity) {
-                    Text("STARTTLS").tag("starttls")
-                    Text("TLS").tag("tls")
-                    Text("None").tag("none")
+            FormCard("SMTP server") {
+                Field("Host") {
+                    TextField("smtp.example.com", text: $emailHost)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled().inputStyle()
                 }
-                TextField("Username", text: $emailUsername).textInputAutocapitalization(.never).autocorrectionDisabled()
-                secretField("Password")
+                Field("Port") {
+                    TextField("587", text: $emailPort).keyboardType(.numberPad).inputStyle()
+                }
+                Field("Security") {
+                    ChoiceChips(choices: [Choice("starttls", "STARTTLS"), Choice("tls", "TLS"), Choice("none", "None")],
+                                selection: $emailSecurity, minWidth: 90)
+                }
+                Field("Username") {
+                    TextField("Optional", text: $emailUsername)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled().inputStyle()
+                }
+                Field("Password") { secretField("Optional") }
             }
-            Section("Message") {
-                TextField("From", text: $emailFrom).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.emailAddress)
-                TextField("To", text: $emailTo).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.emailAddress)
+            FormCard("Message") {
+                Field("From") {
+                    TextField("alerts@example.com", text: $emailFrom)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .keyboardType(.emailAddress).inputStyle()
+                }
+                Field("To") {
+                    TextField("oncall@example.com", text: $emailTo)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .keyboardType(.emailAddress).inputStyle()
+                }
             }
         case "webhook":
-            Section("Webhook") {
-                TextField("URL", text: $webhookURL).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                Picker("Method", selection: $webhookMethod) {
-                    Text("POST").tag("POST")
-                    Text("PUT").tag("PUT")
+            FormCard("Webhook") {
+                Field("URL") {
+                    TextField("https://example.com/hooks/alerts", text: $webhookURL)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .keyboardType(.URL).inputStyle()
+                }
+                Field("Method") {
+                    ChoiceChips(choices: [Choice("POST", "POST"), Choice("PUT", "PUT")],
+                                selection: $webhookMethod, minWidth: 90)
                 }
             }
         default:
@@ -133,11 +161,12 @@ struct ChannelFormView: View {
         }
     }
 
-    @ViewBuilder
-    private func secretField(_ label: String) -> some View {
-        SecureField(isCreate ? label : "\(label) (leave blank to keep)", text: $secret)
+    /// The type's secret. On edit it's never shown — blank keeps the stored one.
+    private func secretField(_ placeholder: String) -> some View {
+        SecureField(isCreate ? placeholder : "Leave blank to keep the saved value", text: $secret)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
+            .inputStyle()
     }
 
     private var canSave: Bool {

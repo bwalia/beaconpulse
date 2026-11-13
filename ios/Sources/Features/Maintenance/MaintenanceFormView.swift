@@ -45,52 +45,69 @@ struct MaintenanceFormView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Title", text: $title)
-                    TextField("Notes (optional)", text: $details, axis: .vertical)
-                }
-
-                Section("When") {
-                    DatePicker("Starts", selection: $startsAt)
-                    DatePicker("Ends", selection: $endsAt, in: startsAt...)
-                }
-
-                Section("What it covers") {
-                    Picker("Scope", selection: $scope) {
-                        Text("Whole organization").tag("org")
-                        Text("Specific monitors").tag("monitor")
+            FormScreen {
+                FormCard("Window") {
+                    Field("Title") {
+                        TextField("e.g. Database upgrade", text: $title).inputStyle()
                     }
-                    .pickerStyle(.segmented)
+                    Field("Notes") {
+                        TextField("Optional", text: $details, axis: .vertical)
+                            .lineLimit(2...5)
+                            .inputStyle()
+                    }
+                }
+
+                FormCard("When") {
+                    HStack {
+                        Text("Starts").font(.subheadline.weight(.semibold))
+                        Spacer()
+                        DatePicker("Starts", selection: $startsAt).labelsHidden()
+                    }
+                    HStack {
+                        Text("Ends").font(.subheadline.weight(.semibold))
+                        Spacer()
+                        DatePicker("Ends", selection: $endsAt, in: startsAt...).labelsHidden()
+                    }
+                }
+
+                FormCard("What it covers", footer: "Alerts for what the window covers are silenced while it’s active.") {
+                    ChoiceChips(choices: [Choice("org", "Whole organization", icon: "building.2.fill"),
+                                          Choice("monitor", "Specific monitors", icon: "checklist")],
+                                selection: $scope, minWidth: 160)
                 }
 
                 if scope == "monitor" {
-                    Section("Monitors") {
+                    FormCard("Monitors") {
                         if monitors.isEmpty {
-                            Text("Loading…").foregroundStyle(.secondary)
+                            HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Loading…") }
+                                .foregroundStyle(Theme.muted)
                         } else {
-                            ForEach(monitors) { monitor in
-                                Button {
-                                    toggle(monitor.id)
-                                } label: {
-                                    HStack {
-                                        Text(monitor.name)
-                                        Spacer()
-                                        if selectedMonitorIDs.contains(monitor.id) {
-                                            Image(systemName: "checkmark").foregroundStyle(.tint)
+                            VStack(spacing: 4) {
+                                ForEach(monitors) { monitor in
+                                    let selected = selectedMonitorIDs.contains(monitor.id)
+                                    Button {
+                                        toggle(monitor.id)
+                                    } label: {
+                                        HStack(spacing: 10) {
+                                            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                                                .font(.title3)
+                                                .foregroundStyle(selected ? Theme.accent : Theme.muted.opacity(0.6))
+                                            Text(monitor.name)
+                                            Spacer()
+                                            TypeBadge(text: monitor.type)
                                         }
+                                        .padding(.vertical, 6)
+                                        .contentShape(Rectangle())
                                     }
-                                    .contentShape(Rectangle())
+                                    .buttonStyle(.plain)
+                                    .accessibilityAddTraits(selected ? .isSelected : [])
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
                 }
 
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
-                }
+                if let errorMessage { ErrorBanner(errorMessage) }
             }
             .navigationTitle(isCreate ? "New Window" : "Edit Window")
             .navigationBarTitleDisplayMode(.inline)

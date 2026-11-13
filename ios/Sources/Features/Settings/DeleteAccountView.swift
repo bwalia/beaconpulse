@@ -18,36 +18,47 @@ struct DeleteAccountView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    Text("This permanently deletes your organization and everything in it — monitors, alert history, status page, notification channels, API keys and your login. Any active subscription is cancelled immediately. This can't be undone.")
+            FormScreen {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("This can’t be undone", systemImage: "exclamationmark.triangle.fill")
+                        .font(.headline)
+                        .foregroundStyle(Theme.down)
+                    Text("This permanently deletes your organization and everything in it — monitors, alert history, status page, notification channels, API keys and your login. Any active subscription is cancelled immediately.")
                         .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Section {
-                    TextField(email, text: $confirmation)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.emailAddress)
-                        .accessibilityLabel("Type your email to confirm")
-                } header: {
-                    Text("Type your email to confirm")
-                } footer: {
-                    if let errorMessage {
-                        Text(errorMessage).foregroundStyle(.red)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.down.opacity(0.06), in: .rect(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.down.opacity(0.3)))
+
+                FormCard {
+                    Field("Type your email to confirm") {
+                        TextField(email, text: $confirmation)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .keyboardType(.emailAddress)
+                            .accessibilityLabel("Type your email to confirm")
+                            .inputStyle()
                     }
-                }
-                Section {
                     Button(role: .destructive) {
                         Task { await deleteAccount() }
                     } label: {
-                        if isDeleting {
-                            ProgressView()
-                        } else {
-                            Text("Delete My Account Permanently")
+                        Group {
+                            if isDeleting { ProgressView().tint(.white) }
+                            else { Text("Delete my account permanently") }
                         }
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Theme.down.opacity(matches ? 1 : 0.4), in: .rect(cornerRadius: 10))
                     }
+                    .buttonStyle(.plain)
                     .disabled(!matches || isDeleting)
                 }
+
+                if let errorMessage { ErrorBanner(errorMessage) }
             }
             .navigationTitle("Delete Account")
             .navigationBarTitleDisplayMode(.inline)

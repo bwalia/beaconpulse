@@ -60,93 +60,99 @@ struct MonitorFormView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Details") {
-                    TextField("Name", text: $name)
-
-                    if isCreate {
-                        Picker("Type", selection: $type) {
-                            ForEach(MonitorKind.creatable) { Text($0.rawValue.uppercased()).tag($0.rawValue) }
-                        }
-                        Picker("Project", selection: $projectID) {
-                            Text("Select…").tag("")
-                            ForEach(projects) { Text($0.name).tag($0.id) }
-                        }
-                    } else {
-                        LabeledContent("Type", value: type.uppercased())
+            FormScreen {
+                FormCard("Details") {
+                    Field("Name") {
+                        TextField("e.g. Marketing site", text: $name).inputStyle()
                     }
-
+                    Field("Type") {
+                        if isCreate {
+                            ChoiceChips(choices: MonitorKind.creatable.map {
+                                Choice($0.rawValue, $0.rawValue.uppercased(),
+                                       icon: Theme.symbol(forMonitorType: $0.rawValue))
+                            }, selection: $type, minWidth: 104)
+                        } else {
+                            ReadOnlyValue(type.uppercased())
+                        }
+                    }
+                    if isCreate {
+                        Field("Project") {
+                            Picker("Project", selection: $projectID) {
+                                Text("Select…").tag("")
+                                ForEach(projects) { Text($0.name).tag($0.id) }
+                            }
+                            .menuInputStyle()
+                        }
+                    }
                     if kind.needsTarget {
-                        TextField(targetHint, text: $target)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.URL)
+                        Field("Target") {
+                            TextField(targetHint, text: $target)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .keyboardType(.URL)
+                                .font(.body.monospaced())
+                                .inputStyle()
+                        }
                     }
                 }
 
-                Section {
+                FormCard("Checks", footer: planNote) {
                     if kind != .githubActions {
-                        Stepper("Interval: \(Self.duration(intervalSeconds))", value: $intervalSeconds,
-                                in: minInterval...86400, step: minInterval >= 60 ? 60 : 10)
+                        StepperRow(title: "Check every", value: $intervalSeconds,
+                                   range: minInterval...86400, step: minInterval >= 60 ? 60 : 10,
+                                   format: Self.duration)
                         if kind.isProbed {
-                            Stepper("Timeout: \(timeoutSeconds)s", value: $timeoutSeconds, in: 1...300)
+                            StepperRow(title: "Timeout", value: $timeoutSeconds, range: 1...300) { "\($0)s" }
                         }
                         if kind == .heartbeat {
                             // The server sets grace only at creation.
                             if isCreate {
-                                Stepper("Grace: \(graceSeconds)s", value: $graceSeconds, in: 0...86400, step: 30)
+                                StepperRow(title: "Grace period", value: $graceSeconds, range: 0...86400,
+                                           step: 30) { "\($0)s" }
                             } else {
-                                LabeledContent("Grace", value: "\(graceSeconds)s")
+                                Field("Grace period") { ReadOnlyValue("\(graceSeconds)s") }
                             }
                         }
-                        Picker("Alert sensitivity", selection: $alertSensitivity) {
-                            Text("Immediate").tag("immediate")
-                            Text("Balanced").tag("balanced")
-                            Text("Relaxed").tag("relaxed")
+                        Field("Alert sensitivity", hint: sensitivityHint) {
+                            ChoiceChips(choices: [Choice("immediate", "Immediate", icon: "bolt.fill"),
+                                                  Choice("balanced", "Balanced", icon: "scale.3d"),
+                                                  Choice("relaxed", "Relaxed", icon: "leaf.fill")],
+                                        selection: $alertSensitivity, minWidth: 104)
                         }
                     }
-                    Toggle("Enabled", isOn: $enabled)
-                } header: {
-                    Text("Checks")
-                } footer: {
-                    if let usage, kind != .githubActions, usage.minIntervalSeconds > 10 {
-                        Text("Your plan checks at most every \(Self.duration(usage.minIntervalSeconds)).")
-                    }
+                    SwitchRow(title: "Enabled", subtitle: "Run checks and send alerts", isOn: $enabled)
                 }
 
                 if isCreate, let usage, usage.monitorsUsed >= usage.monitorsLimit {
-                    Section {
-                        Text("You’ve reached your plan’s limit of \(usage.monitorsLimit) monitors. Delete one to add another.")
-                            .foregroundStyle(.secondary)
-                    }
+                    ErrorBanner("You’ve reached your plan’s limit of \(usage.monitorsLimit) monitors. Delete one to add another.")
                 }
 
                 if kind.takesRequestSettings { requestSections }
 
                 if kind == .dns {
-                    Section("DNS") {
-                        Picker("Record type", selection: $settings.dnsQueryType.or("A")) {
-                            ForEach(["A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA"], id: \.self) { Text($0) }
+                    FormCard("DNS") {
+                        Field("Record type") {
+                            ChoiceChips(choices: ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA"].map { Choice($0, $0) },
+                                        selection: $settings.dnsQueryType.or("A"), minWidth: 70)
                         }
                     }
                 }
 
                 if kind == .githubActions {
-                    Section {
-                        TextField("Workflow filter (optional)", text: $settings.githubWorkflow.or(""))
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        Toggle("Also notify on every successful run", isOn: $settings.githubNotifyOnSuccess.or(false))
-                    } header: {
-                        Text("GitHub Actions")
-                    } footer: {
-                        Text("Leave the filter blank to alert on any workflow. Rotate the ingest token on the web.")
+                    FormCard("GitHub Actions",
+                             footer: "Leave the filter blank to alert on any workflow. Rotate the ingest token on the web.") {
+                        Field("Workflow filter") {
+                            TextField("Optional, e.g. deploy.yml", text: $settings.githubWorkflow.or(""))
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .inputStyle()
+                        }
+                        SwitchRow(title: "Notify on success", subtitle: "Also send a message for every successful run",
+                                  isOn: $settings.githubNotifyOnSuccess.or(false))
                     }
                 }
 
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
-                }
+                if let errorMessage { ErrorBanner(errorMessage) }
             }
             .navigationTitle(isCreate ? "New Monitor" : "Edit Monitor")
             .navigationBarTitleDisplayMode(.inline)
@@ -169,47 +175,72 @@ struct MonitorFormView: View {
         }
     }
 
+    private var planNote: String? {
+        guard let usage, kind != .githubActions, usage.minIntervalSeconds > 10 else { return nil }
+        return "Your plan checks at most every \(Self.duration(usage.minIntervalSeconds))."
+    }
+
+    private var sensitivityHint: String {
+        switch alertSensitivity {
+        case "immediate": "Alert on the first failed check."
+        case "relaxed": "Alert only on prolonged outages (about 5 minutes)."
+        default: "Alert on a sustained failure (about 2 checks), ignoring one-off blips."
+        }
+    }
+
     /// Method, status codes, headers and response checks for HTTP-family monitors.
     @ViewBuilder private var requestSections: some View {
-        Section("Request") {
-            Picker("Method", selection: $settings.method.or("GET")) {
-                ForEach(["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE"], id: \.self) { Text($0) }
+        FormCard("Request") {
+            Field("Method") {
+                ChoiceChips(choices: ["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE"].map { Choice($0, $0) },
+                            selection: $settings.method.or("GET"), minWidth: 76)
             }
-            TextField("Expected status codes, e.g. 200, 204", text: $statusCodesText)
-                .keyboardType(.numbersAndPunctuation)
-            Toggle("Follow redirects", isOn: $settings.followRedirects.or(false))
-            Toggle("Skip TLS verification", isOn: $settings.skipTlsVerify.or(false))
-            TextField("Request body (for POST/PUT/PATCH)", text: $settings.body.or(""), axis: .vertical)
-                .lineLimit(1...6)
-                .font(.body.monospaced())
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            Field("Expected status codes", hint: "Comma-separated. Blank accepts any 2xx.") {
+                TextField("200, 204", text: $statusCodesText)
+                    .keyboardType(.numbersAndPunctuation)
+                    .inputStyle()
+            }
+            SwitchRow(title: "Follow redirects", isOn: $settings.followRedirects.or(false))
+            SwitchRow(title: "Skip TLS verification", subtitle: "Only for self-signed certificates",
+                      isOn: $settings.skipTlsVerify.or(false))
+            Field("Request body", hint: "Sent with POST, PUT and PATCH.") {
+                TextField("{ }", text: $settings.body.or(""), axis: .vertical)
+                    .lineLimit(2...6)
+                    .font(.body.monospaced())
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .inputStyle()
+            }
         }
 
-        Section {
+        FormCard("Headers",
+                 footer: "Use for auth, e.g. Authorization: Bearer <token>. Saved values are encrypted and shown as ********: leave a line as it is to keep its value, or delete the line to remove the header.") {
             TextField("Name: value, one per line", text: $headersText, axis: .vertical)
-                .lineLimit(2...8)
+                .lineLimit(3...8)
                 .font(.body.monospaced())
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-        } header: {
-            Text("Headers")
-        } footer: {
-            Text("Use for auth, e.g. Authorization: Bearer <token>. Saved values are encrypted and shown as ********: leave a line as it is to keep its value, or delete the line to remove the header.")
+                .inputStyle()
         }
 
-        Section("Response") {
-            TextField("Body must contain", text: $settings.bodyKeyword.or(""))
-            TextField("Body must NOT contain", text: $settings.bodyNotKeyword.or(""))
-            LabeledContent("Slow-response alert (ms)") {
-                TextField("Off", value: $settings.responseTimeWarningMs, format: .number)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.numberPad)
+        FormCard("Response") {
+            Field("Body must contain") {
+                TextField("Optional", text: $settings.bodyKeyword.or("")).inputStyle()
             }
-            LabeledContent("SSL expiry warning (days)") {
-                TextField("30", value: $settings.sslExpiryWarningDays, format: .number)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.numberPad)
+            Field("Body must not contain") {
+                TextField("Optional", text: $settings.bodyNotKeyword.or("")).inputStyle()
+            }
+            HStack(alignment: .top, spacing: 12) {
+                Field("Slow response (ms)") {
+                    TextField("Off", value: $settings.responseTimeWarningMs, format: .number)
+                        .keyboardType(.numberPad)
+                        .inputStyle()
+                }
+                Field("SSL expiry warning (days)") {
+                    TextField("30", value: $settings.sslExpiryWarningDays, format: .number)
+                        .keyboardType(.numberPad)
+                        .inputStyle()
+                }
             }
         }
     }
