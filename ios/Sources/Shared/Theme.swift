@@ -145,8 +145,27 @@ struct StatTile: View {
                 Text(note).font(.caption).foregroundStyle(Theme.muted)
             }
         }
+        .frame(minWidth: 130, maxHeight: .infinity, alignment: .topLeading)
         .card()
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Cards that share one row evenly (equal widths and heights) when they fit, and
+/// fall back to `narrow` (a two-column grid by default) on small screens — so three
+/// tiles fill a wide Mac or iPad row instead of half of it.
+struct FitRow<Content: View>: View {
+    var spacing: CGFloat = 12
+    var narrowColumns = 2
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: spacing) { content }
+                .fixedSize(horizontal: false, vertical: true)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: narrowColumns),
+                      spacing: spacing) { content }
+        }
     }
 }
 

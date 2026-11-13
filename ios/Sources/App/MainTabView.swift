@@ -7,6 +7,9 @@ import SwiftUI
 /// Overview tab.
 struct MainTabView: View {
     @Environment(PushManager.self) private var push
+    #if DEBUG
+    @Environment(AppContainer.self) private var container
+    #endif
 
     @State private var selection: Tab = .overview
     @State private var monitorsPath = NavigationPath()
@@ -38,6 +41,9 @@ struct MainTabView: View {
     var body: some View {
         shell
             .task { await push.requestAuthorizationAndRegister() }
+            #if DEBUG
+            .task { await ScreenshotMode.drive(selection: $selection, monitorsPath: $monitorsPath, container: container) }
+            #endif
             .onChange(of: push.pendingMonitorID) { _, id in
                 guard let id else { return }
                 selection = .monitors
@@ -66,6 +72,9 @@ struct MainTabView: View {
                     .padding(.bottom, 10)
                 }
             }
+            // Solid, like the web dashboard's sidebar (and capturable for store shots).
+            .scrollContentBackground(.hidden)
+            .background(Theme.card)
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
             stack(for: selection)

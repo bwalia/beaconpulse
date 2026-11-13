@@ -105,18 +105,22 @@ struct SettingsView: View {
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            ZStack(alignment: .topTrailing) {
-                LinearGradient(colors: [Theme.accent, Theme.accentDeep],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-                // Faint rings, as on the sign-in hero.
-                ForEach([120.0, 190, 260], id: \.self) { size in
-                    Circle()
-                        .stroke(.white.opacity(0.09), lineWidth: 1)
-                        .frame(width: size, height: size)
-                        .offset(x: size / 3, y: -size / 3)
+            // The rings sit in an overlay so they can't make the background taller
+            // than the card; the clip trims them to its rounded shape.
+            LinearGradient(colors: [Theme.accent, Theme.accentDeep],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+                .overlay(alignment: .topTrailing) {
+                    // Faint rings, as on the sign-in hero.
+                    ZStack {
+                        ForEach([120.0, 190, 260], id: \.self) { size in
+                            Circle()
+                                .stroke(.white.opacity(0.09), lineWidth: 1)
+                                .frame(width: size, height: size)
+                        }
+                    }
+                    .offset(x: 90, y: -90)
                 }
-            }
-            .clipShape(.rect(cornerRadius: 18))
+                .clipShape(.rect(cornerRadius: 18))
         }
         .shadow(color: Theme.accent.opacity(0.25), radius: 12, y: 6)
         .accessibilityElement(children: .combine)

@@ -141,7 +141,7 @@ struct MonitorDetailView: View {
                 header(monitor, kind: kind)
 
                 if let metrics {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+                    FitRow {
                         StatTile(label: "Uptime · 24h", value: String(format: "%.2f%%", metrics.uptimePercent),
                                  tint: Theme.uptimeColor(metrics.uptimePercent), icon: "checkmark.shield")
                         if let avg = metrics.responseMsAvg {
