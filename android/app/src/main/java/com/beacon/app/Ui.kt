@@ -5,7 +5,10 @@ package com.beacon.app
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.text.format.DateUtils
+import android.view.View
+import android.view.Window
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -202,7 +205,6 @@ fun Message(icon: ImageVector, title: String, text: String, action: String? = nu
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(48.dp))
         Box(Modifier.size(88.dp).background(tint.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
             Icon(icon, null, Modifier.size(42.dp), tint = tint)
         }
@@ -263,6 +265,10 @@ fun Screen(
     )
 }
 
+/** The window of the dialog this view is in, if any. */
+private tailrec fun View.dialogWindow(): Window? =
+    if (this is DialogWindowProvider) window else (parent as? View)?.dialogWindow()
+
 /** The add button over a list. */
 @Composable
 fun AddFab(label: String, onClick: () -> Unit) {
@@ -317,12 +323,18 @@ fun FormDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        // The dialog has its own window: give its system bars dark icons on the light canvas.
+        // The dialog has its own window, whose frame by default stops short of the status
+        // bar (leaving a dimmed band). Let it reach under the bars like the screens (API 30+),
+        // so the canvas-coloured top bar fills that band, with dark icons on the light canvas.
+        // The keyboard still resizes rather than pans: imePadding makes room.
         val view = LocalView.current
         val dark = LocalPalette.current.dark
         SideEffect {
-            (view.parent as? DialogWindowProvider)?.window?.let { window ->
-                WindowCompat.getInsetsController(window, view).apply {
+            view.dialogWindow()?.let { window ->
+                if (Build.VERSION.SDK_INT >= 30 && window.attributes.fitInsetsTypes != 0) {
+                    window.attributes = window.attributes.also { it.fitInsetsTypes = 0 }
+                }
+                WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = !dark
                     isAppearanceLightNavigationBars = !dark
                 }
