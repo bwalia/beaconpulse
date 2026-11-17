@@ -144,9 +144,14 @@ struct SettingsView: View {
                 }
             }
         default:
-            SettingsRow(title: "Push notifications", subtitle: "Not set up on this device",
-                        icon: "bell.fill", tint: Theme.paused) {
-                Pill(text: "Not set up", color: Theme.paused)
+            // Not asked yet (or the request failed): tapping asks again.
+            Button {
+                Task { await push.requestAuthorizationAndRegister() }
+            } label: {
+                SettingsRow(title: "Push notifications", subtitle: "Not set up — tap to turn on",
+                            icon: "bell.fill", tint: Theme.paused) {
+                    Pill(text: "Not set up", color: Theme.paused)
+                }
             }
         }
     }
