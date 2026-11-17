@@ -28,13 +28,18 @@ final class PushManager: NSObject {
         UNUserNotificationCenter.current().delegate = self
     }
 
-    /// Requests authorization and, if granted, registers for remote notifications.
-    /// The APNs device token arrives asynchronously via the AppDelegate.
+    /// Requests authorization and registers for remote notifications. The APNs
+    /// device token arrives asynchronously via the AppDelegate.
+    ///
+    /// Registration doesn't depend on the answer: APNs issues a token either way,
+    /// and the system just doesn't display alerts while notifications are off. So a
+    /// user who turns notifications on later in System Settings starts receiving
+    /// alerts at once, without relaunching (on the Mac, a request also fails outright
+    /// when notifications were switched off before, e.g. for an earlier build).
     func requestAuthorizationAndRegister() async {
         let center = UNUserNotificationCenter.current()
-        let granted = (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) ?? false
+        _ = try? await center.requestAuthorization(options: [.alert, .badge, .sound])
         authorizationStatus = await center.notificationSettings().authorizationStatus
-        guard granted else { return }
         Platform.registerForRemoteNotifications()
     }
 
